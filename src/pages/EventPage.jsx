@@ -12,6 +12,10 @@ const PAGE_SIZE = 8;
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
+function todayIsoDate() {
+  return new Date().toISOString().slice(0, 10);
+}
+
 function fmtRange(start, finish) {
   if (!start || start === '-') return '—';
   const [sy, sm, sd] = start.split('-');
@@ -26,6 +30,12 @@ function fmtDateShort(d) {
   if (!d || d === '-') return '—';
   const [y, m, day] = d.split('-');
   return `${parseInt(day)} ${MONTHS_SHORT[parseInt(m)-1]} ${y}`;
+}
+
+function fmtUpdatedLabel(updatedAt) {
+  if (!updatedAt || updatedAt === '-') return 'Updated: -';
+  if (updatedAt.includes(',')) return `Updated: ${updatedAt}`;
+  return `Updated: ${fmtDateShort(updatedAt)}`;
 }
 
 function daysUntil(start) {
@@ -71,6 +81,7 @@ function EventCard({ r, onEdit, onDelete, navigate }) {
   const accent = days !== null && days <= 7 ? 'var(--red)'
                : days !== null && days <= 30 ? 'var(--orange)'
                : 'var(--brand)';
+  const itemCount = Number.isFinite(r.itemCount) ? r.itemCount : 0;
 
   return (
     <div style={{
@@ -109,14 +120,22 @@ function EventCard({ r, onEdit, onDelete, navigate }) {
               <span>{r.location}</span>
             </div>
           )}
+          <div style={{ fontSize:11.5, color:'var(--text-muted)', marginTop:2 }}>
+            {fmtUpdatedLabel(r.updatedAt)}
+          </div>
         </div>
       </div>
 
       <div style={{ marginTop:'auto', borderTop:'1px solid var(--border)', padding:'10px 14px', display:'flex', alignItems:'center', background:'#fafbfc', borderRadius:'0 0 10px 10px', gap:2 }}>
-        <button className="btn-icon cart" title="Detail / Cart"
-          onClick={() => navigate(`/event-detail?name=${encodeURIComponent(r.date + ' | ' + r.name.toUpperCase())}`)}>
-          <IconCart />
-        </button>
+        <div style={{ display:'inline-flex', alignItems:'center', gap:4, marginRight:2 }}>
+          <button className="btn-icon cart" title="Detail / Cart"
+            onClick={() => navigate(`/event-detail?name=${encodeURIComponent(r.date + ' | ' + r.name.toUpperCase())}`)}>
+            <IconCart />
+          </button>
+          <span className="badge badge-gray" style={{ fontSize:10.5, padding:'2px 7px' }} title="Jumlah barang">
+            {itemCount}
+          </span>
+        </div>
         <button className="btn-icon" title="Summary" style={{ color:'var(--purple)' }}
           onClick={() => navigate(`/event-summary?name=${encodeURIComponent(r.name.toUpperCase())}`)}>
           <IconBarChart />
@@ -195,7 +214,11 @@ function PastEventRow({ r, onEdit, onDelete, navigate }) {
 export default function EventPage() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('upcoming');
-  const [events, setEvents] = useState(initialEvents);
+  const [events, setEvents] = useState(() => initialEvents.map(e => ({
+    ...e,
+    itemCount: Number.isFinite(e.itemCount) ? e.itemCount : 0,
+    updatedAt: e.updatedAt || e.date || e.start || '-',
+  })));
   const [nextId, setNextId] = useState(90);
 
   const [pastQuery, setPastQuery] = useState('');
@@ -266,11 +289,12 @@ export default function EventPage() {
   }
   function saveEvent() {
     if (!form.name.trim()) return;
+    const updatedAt = todayIsoDate();
     if (editingId) {
-      setEvents(es => es.map(e => e.id === editingId ? { ...e, ...form } : e));
+      setEvents(es => es.map(e => e.id === editingId ? { ...e, ...form, updatedAt } : e));
     } else {
       const type = form.start && new Date(form.start) < TODAY ? 'past' : 'upcoming';
-      setEvents(es => [{ id:nextId, ...form, type }, ...es]);
+      setEvents(es => [{ id:nextId, ...form, type, itemCount:0, updatedAt }, ...es]);
       setNextId(n => n+1);
     }
     setModalOpen(false);

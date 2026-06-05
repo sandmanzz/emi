@@ -6,6 +6,8 @@ import SortTh from '../components/SortTh';
 import { IconSearch, IconPlus, IconEdit, IconDelete, IconClose, IconCheck } from '../components/icons';
 import { initialWarehouses } from '../data/warehouses';
 
+const cols = ['name', 'location', 'pic', 'createdAt', 'updatedAt'];
+
 function ImgCell({ src, name, onClick }) {
   return (
     <div
@@ -84,8 +86,6 @@ export default function WarehousePage() {
   const [form, setForm] = useState({ name: '', location: '', pic: '', image: '' });
   const [imgPopup,   setImgPopup]   = useState({ open:false, name:'', src:null });
 
-  const cols = ['name', 'location', 'pic', 'createdAt', 'updatedAt'];
-
   const filtered = useMemo(() => {
     const q = query.toLowerCase();
     let data = q
@@ -128,17 +128,17 @@ export default function WarehousePage() {
   }
 
   function saveRow() {
-    if (!form.name.trim()) return;
+    if (!form.name.trim() || !form.location.trim() || !form.pic.trim()) return;
     const now = formatDate(new Date());
     if (editingId) {
       setWarehouses(ws => ws.map(w => w.id === editingId
-        ? { ...w, name: form.name, location: form.location, pic: form.pic, image: form.image || w.image, updatedAt: now }
+        ? { ...w, name: form.name.trim(), location: form.location.trim(), pic: form.pic.trim(), image: w.image || null, updatedAt: now }
         : w
       ));
     } else {
       setWarehouses(ws => [...ws, {
-        id: nextId, name: form.name, location: form.location,
-        pic: form.pic, image: form.image || null, createdAt: now, updatedAt: '-',
+        id: nextId, name: form.name.trim(), location: form.location.trim(),
+        pic: form.pic.trim(), image: null, createdAt: now, updatedAt: '-',
       }]);
       setNextId(n => n + 1);
     }
@@ -241,8 +241,9 @@ export default function WarehousePage() {
 
       <Modal
         open={modalOpen}
-        title={editingId ? 'Edit Warehouse' : 'New Warehouse'}
+        title={editingId ? 'Modify Warehouse' : 'Add Warehouse'}
         onClose={() => setModalOpen(false)}
+        size="lg"
         footer={
           <>
             <button className="btn-cancel-modal" onClick={() => setModalOpen(false)}><IconClose /> Cancel</button>
@@ -252,22 +253,15 @@ export default function WarehousePage() {
       >
         <div className="form-group">
           <label>Name <span style={{ color:'var(--red)' }}>*</span></label>
-          <input type="text" placeholder="e.g. Gudang Bali 66" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+          <input type="text" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
         </div>
         <div className="form-group">
-          <label>Location</label>
-          <input type="text" placeholder="e.g. Bali, Jakarta" value={form.location} onChange={e => setForm(f => ({ ...f, location: e.target.value }))} />
+          <label>Location <span style={{ color:'var(--red)' }}>*</span></label>
+          <input type="text" value={form.location} onChange={e => setForm(f => ({ ...f, location: e.target.value }))} />
         </div>
         <div className="form-group">
-          <label>PIC</label>
-          <input type="text" placeholder="Person in charge" value={form.pic} onChange={e => setForm(f => ({ ...f, pic: e.target.value }))} />
-        </div>
-        <div className="form-group">
-          <label>Image URL</label>
-          <input type="text" placeholder="https://…" value={form.image} onChange={e => setForm(f => ({ ...f, image: e.target.value }))} />
-          {form.image && (
-            <img src={form.image} alt="preview" style={{ marginTop:8, maxWidth:'100%', maxHeight:120, borderRadius:6, objectFit:'contain', border:'1px solid var(--border)' }} />
-          )}
+          <label>PIC <span style={{ color:'var(--red)' }}>*</span></label>
+          <input type="text" value={form.pic} onChange={e => setForm(f => ({ ...f, pic: e.target.value }))} />
         </div>
       </Modal>
 

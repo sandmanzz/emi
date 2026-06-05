@@ -235,10 +235,16 @@ export default function EventDetailPage() {
             <button className="btn btn-check" onClick={() => {}}>
               <IconSearch /> Check
             </button>
-            <button className="btn" style={{ background: 'var(--purple)', color: '#fff' }} onClick={() => navigate(`/event-summary?name=${encodeURIComponent(eventName)}`)}>
-              <IconBarChart /> Summary
+            <button
+              className="btn"
+              style={{ background: 'var(--purple)', color: '#fff' }}
+              title="Summary"
+              aria-label="Summary"
+              onClick={() => navigate(`/event-summary?name=${encodeURIComponent(eventName)}`)}
+            >
+              <IconBarChart />
             </button>
-            <button className="btn btn-print" onClick={() => window.print()}><IconPrint /> Print</button>
+            <button className="btn btn-print" title="Print" aria-label="Print" onClick={() => window.print()}><IconPrint /></button>
           </div>
         </div>
 

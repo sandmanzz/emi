@@ -1,10 +1,66 @@
 import { useState, useMemo } from 'react';
+import Modal from '../components/Modal';
 import Pagination from '../components/Pagination';
 import SortTh from '../components/SortTh';
-import { IconSearch, IconPlus, IconDelete, IconClose } from '../components/icons';
+import { IconSearch, IconPlus, IconDelete, IconClose, IconCheck } from '../components/icons';
 import { wiData } from '../data/warehouseInventory';
+import { initialWarehouses } from '../data/warehouses';
 
 const PAGE_SIZE = 10;
+const sortKeys = ['name','warehouseStock','warehouseName','itemStock','stokMin','stokUsed','valuation','totalValuation','minStatus','flag1','flag2','asile','rack','level','lantai','lorong','updatedAt'];
+const itemCatalog = Array.from(
+  wiData.reduce((map, item) => {
+    if (!map.has(item.name)) {
+      map.set(item.name, {
+        id: item.id,
+        name: item.name,
+        stock: item.itemStock,
+      });
+    }
+    return map;
+  }, new Map()).values(),
+);
+
+function tokenizeKeyword(value) {
+  return value
+    .toLowerCase()
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+function formatUpdatedAt() {
+  const date = new Date();
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${String(date.getDate()).padStart(2, '0')} ${months[date.getMonth()]} ${date.getFullYear()}`;
+}
+
+function deriveStatus(stock, minimum) {
+  if (!minimum) return 'Not Set';
+  if (stock <= minimum) return 'Critical';
+  if (stock <= minimum * 1.5) return 'Warning';
+  return 'Safe';
+}
+
+function ItemThumb({ name }) {
+  const initials = name
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(part => part[0]?.toUpperCase())
+    .join('') || 'IT';
+  const hue = name.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0) % 360;
+
+  return (
+    <div
+      className="inventory-item-thumb"
+      style={{ background:`linear-gradient(135deg, hsl(${hue} 55% 90%), hsl(${(hue + 36) % 360} 55% 76%))` }}
+      aria-hidden="true"
+    >
+      <span>{initials}</span>
+    </div>
+  );
+}
 
 function statusBadge(s) {
   if (s === 'Safe')     return <span className="badge badge-green">Safe</span>;
@@ -64,6 +120,8 @@ function ImageViewerModal({ open, name, src, onClose }) {
 }
 
 export default function WarehouseInventoryPage() {
+  const [inventoryRows,    setInventoryRows]    = useState(wiData);
+  const [nextId,           setNextId]           = useState(wiData.length + 1);
   const [tab,              setTab]              = useState('inventory');
   const [query,            setQuery]            = useState('');
   const [warehouseFilter,  setWarehouseFilter]  = useState('');
@@ -72,14 +130,46 @@ export default function WarehouseInventoryPage() {
   const [sortCol,          setSortCol]          = useState(0);
   const [sortAsc,          setSortAsc]          = useState(true);
   const [imgPopup,         setImgPopup]         = useState({ open:false, name:'', src:null });
+  const [modalOpen,        setModalOpen]        = useState(false);
+  const [itemSearchDraft,  setItemSearchDraft]  = useState('');
+  const [itemSearch,       setItemSearch]       = useState('');
+  const [selectedItemId,   setSelectedItemId]   = useState(itemCatalog[0]?.id ?? null);
+  const [form,             setForm]             = useState({ stock:'', stokMin:'', kode:'', rack:'', lantai:'', lorong:'', flag1:'', flag2:'', valuation:'', warehouseName:'' });
 
-  const warehouseNames = useMemo(() => [...new Set(wiData.map(r => r.warehouseName))].sort(), []);
-  const sortKeys = ['name','warehouseStock','warehouseName','itemStock','stokMin','stokUsed','valuation','totalValuation','minStatus','flag1','flag2','asile','rack','level','lantai','lorong','updatedAt'];
+  const warehouseNames = useMemo(() => {
+    const names = new Set([...inventoryRows.map(r => r.warehouseName), ...initialWarehouses.map(r => r.name)]);
+    return [...names].filter(Boolean).sort();
+  }, [inventoryRows]);
+  const selectedItem = itemCatalog.find(item => item.id === selectedItemId) || itemCatalog[0] || null;
+  const itemSearchTokens = useMemo(() => tokenizeKeyword(itemSearch), [itemSearch]);
+  const draftKeyword = itemSearchDraft.trim();
+  const hasPendingItemSearch = draftKeyword !== itemSearch;
+  const filteredCatalog = useMemo(() => {
+    if (!itemSearchTokens.length) return itemCatalog;
+
+    return [...itemCatalog]
+      .map(item => {
+        const haystack = item.name.toLowerCase();
+        const matchesAllTokens = itemSearchTokens.every(token => haystack.includes(token));
+        if (!matchesAllTokens) return null;
+
+        const startsWithMatch = haystack.startsWith(itemSearchTokens[0]);
+        const firstIndex = haystack.indexOf(itemSearchTokens[0]);
+        return {
+          item,
+          rank: startsWithMatch ? 0 : firstIndex,
+        };
+      })
+      .filter(Boolean)
+      .sort((left, right) => left.rank - right.rank || left.item.name.localeCompare(right.item.name))
+      .map(entry => entry.item);
+  }, [itemSearchTokens]);
+  const hasActiveItemSearch = itemSearchTokens.length > 0;
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase();
     const key = sortKeys[sortCol] || 'name';
-    return wiData
+    return inventoryRows
       .filter(r => {
         const mQ = !q || r.name.toLowerCase().includes(q) || r.warehouseName.toLowerCase().includes(q);
         const mW = !warehouseFilter || r.warehouseName === warehouseFilter;
@@ -90,7 +180,7 @@ export default function WarehouseInventoryPage() {
         const va = String(a[key] ?? ''), vb = String(b[key] ?? '');
         return sortAsc ? va.localeCompare(vb, undefined, { numeric:true }) : vb.localeCompare(va, undefined, { numeric:true });
       });
-  }, [query, warehouseFilter, statusFilter, sortCol, sortAsc]);
+  }, [inventoryRows, query, warehouseFilter, statusFilter, sortCol, sortAsc]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage   = Math.min(page, totalPages);
@@ -102,9 +192,75 @@ export default function WarehouseInventoryPage() {
     setPage(1);
   }
 
-  const safeCount     = wiData.filter(r => r.minStatus === 'Safe').length;
-  const warningCount  = wiData.filter(r => r.minStatus === 'Warning').length;
-  const criticalCount = wiData.filter(r => r.minStatus === 'Critical').length;
+  function closeModal() {
+    setModalOpen(false);
+    setItemSearchDraft('');
+    setItemSearch('');
+  }
+
+  function openModal() {
+    setSelectedItemId(itemCatalog[0]?.id ?? null);
+    setForm({ stock:'', stokMin:'', kode:'', rack:'', lantai:'', lorong:'', flag1:'', flag2:'', valuation:'', warehouseName:'' });
+    setItemSearchDraft('');
+    setItemSearch('');
+    setModalOpen(true);
+  }
+
+  function applyItemSearch(nextValue = itemSearchDraft) {
+    const normalizedValue = nextValue.trim();
+    setItemSearch(normalizedValue);
+
+    const searchTokens = tokenizeKeyword(normalizedValue);
+    if (!searchTokens.length) {
+      setSelectedItemId(itemCatalog[0]?.id ?? null);
+      return;
+    }
+
+    const firstMatch = itemCatalog.find(item => searchTokens.every(token => item.name.toLowerCase().includes(token)));
+    if (firstMatch) setSelectedItemId(firstMatch.id);
+  }
+
+  function clearItemSearch() {
+    setItemSearchDraft('');
+    setItemSearch('');
+    setSelectedItemId(itemCatalog[0]?.id ?? null);
+  }
+
+  function saveNewItem() {
+    if (!selectedItem || !form.stock.trim() || !form.stokMin.trim() || !form.warehouseName.trim()) return;
+
+    const stock = Number(form.stock) || 0;
+    const minimum = Number(form.stokMin) || 0;
+    const valuation = Number(form.valuation) || 0;
+
+    setInventoryRows(rows => [{
+      id: nextId,
+      name: selectedItem.name,
+      warehouseStock: stock,
+      warehouseName: form.warehouseName,
+      itemStock: stock,
+      stokMin: minimum,
+      stokUsed: 0,
+      valuation,
+      totalValuation: valuation * stock,
+      minStatus: deriveStatus(stock, minimum),
+      flag1: form.flag1.trim(),
+      flag2: form.flag2.trim(),
+      asile: form.kode.trim(),
+      rack: form.rack.trim(),
+      level: '',
+      lantai: form.lantai.trim(),
+      lorong: form.lorong.trim(),
+      updatedAt: formatUpdatedAt(),
+    }, ...rows]);
+    setNextId(id => id + 1);
+    setPage(1);
+    closeModal();
+  }
+
+  const safeCount     = inventoryRows.filter(r => r.minStatus === 'Safe').length;
+  const warningCount  = inventoryRows.filter(r => r.minStatus === 'Warning').length;
+  const criticalCount = inventoryRows.filter(r => r.minStatus === 'Critical').length;
 
   return (
     <>
@@ -115,7 +271,7 @@ export default function WarehouseInventoryPage() {
       {/* Stats */}
       <div className="stats-bar" style={{ gridTemplateColumns:'repeat(4,1fr)' }}>
         {[
-          { label:'Total Items', value:wiData.length, color:'var(--brand)',  bg:'var(--brand-bg)' },
+          { label:'Total Items', value:inventoryRows.length, color:'var(--brand)',  bg:'var(--brand-bg)' },
           { label:'Safe',        value:safeCount,     color:'var(--green)',  bg:'var(--green-bg)' },
           { label:'Warning',     value:warningCount,  color:'var(--orange)', bg:'var(--orange-bg)' },
           { label:'Critical',    value:criticalCount, color:'var(--red)',    bg:'var(--red-bg)' },
@@ -169,7 +325,7 @@ export default function WarehouseInventoryPage() {
               <button className="btn-search">Search</button>
             </div>
             <div className="toolbar-right">
-              <button className="btn-new"><IconPlus /> New</button>
+              <button className="btn-new" onClick={openModal}><IconPlus /> New</button>
             </div>
           </div>
 
@@ -245,6 +401,133 @@ export default function WarehouseInventoryPage() {
         src={imgPopup.src}
         onClose={() => setImgPopup(p => ({ ...p, open:false }))}
       />
+
+      <Modal
+        open={modalOpen}
+        title="Add Warehouse Item"
+        onClose={closeModal}
+        size="xl"
+        footer={
+          <>
+            <button className="btn-cancel-modal" onClick={closeModal}><IconClose /> Cancel</button>
+            <button className="btn-save-modal" onClick={saveNewItem}><IconCheck /> Save Item</button>
+          </>
+        }
+      >
+        <div className="inventory-modal-search-row">
+          <div className="form-group" style={{ marginBottom:0 }}>
+            <label>Keywords</label>
+            <input
+              type="text"
+              value={itemSearchDraft}
+              placeholder="Search by item name, e.g. acrylic ball"
+              onChange={e => setItemSearchDraft(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  applyItemSearch();
+                }
+              }}
+            />
+          </div>
+          <button className="btn-search inventory-modal-search-btn" onClick={() => applyItemSearch()}><IconSearch /> Search</button>
+        </div>
+
+        <div className="inventory-search-feedback">
+          {hasPendingItemSearch ? (
+            <>
+              <span className="inventory-search-count">Search not applied yet</span>
+              {draftKeyword && <span className="inventory-search-chip">"{draftKeyword}"</span>}
+              <button type="button" className="inventory-search-clear" onClick={clearItemSearch}>Reset</button>
+            </>
+          ) : (
+            <>
+              <span className="inventory-search-count">
+                {filteredCatalog.length} item{filteredCatalog.length === 1 ? '' : 's'} found
+              </span>
+              {hasActiveItemSearch && <span className="inventory-search-chip">"{itemSearch}"</span>}
+              {(hasActiveItemSearch || itemSearchDraft) && (
+                <button type="button" className="inventory-search-clear" onClick={clearItemSearch}>Clear</button>
+              )}
+            </>
+          )}
+        </div>
+
+        <div className="inventory-item-grid" role="list" aria-label="Inventory item list">
+          {filteredCatalog.length === 0 ? (
+            <div className="inventory-search-empty">
+              <strong>No matching items</strong>
+              <span>Try a shorter keyword or clear the search to browse all items.</span>
+            </div>
+          ) : (
+            filteredCatalog.map(item => (
+              <button
+                key={item.id}
+                type="button"
+                className={`inventory-item-card${item.id === selectedItemId ? ' selected' : ''}`}
+                onClick={() => setSelectedItemId(item.id)}
+              >
+                <ItemThumb name={item.name} />
+                <span className="inventory-item-meta">
+                  <span className="inventory-item-name">{item.name}</span>
+                  <span className="inventory-item-stock">Stok: {item.stock}</span>
+                </span>
+              </button>
+            ))
+          )}
+        </div>
+
+        <div className="inventory-selected-item">
+          <span>Selected Item</span>
+          <strong>{selectedItem?.name || 'No item selected'}</strong>
+        </div>
+
+        <div className="inventory-form-grid">
+          <div className="form-group">
+            <label>Stok <span style={{ color:'var(--red)' }}>*</span></label>
+            <input type="number" min="0" value={form.stock} onChange={e => setForm(current => ({ ...current, stock: e.target.value }))} />
+          </div>
+          <div className="form-group">
+            <label>Stok Minimum <span style={{ color:'var(--red)' }}>*</span></label>
+            <input type="number" min="0" value={form.stokMin} onChange={e => setForm(current => ({ ...current, stokMin: e.target.value }))} />
+          </div>
+          <div className="form-group">
+            <label>Kode</label>
+            <input type="text" value={form.kode} onChange={e => setForm(current => ({ ...current, kode: e.target.value }))} />
+          </div>
+          <div className="form-group">
+            <label>Rack</label>
+            <input type="text" value={form.rack} onChange={e => setForm(current => ({ ...current, rack: e.target.value }))} />
+          </div>
+          <div className="form-group">
+            <label>Lantai</label>
+            <input type="text" value={form.lantai} onChange={e => setForm(current => ({ ...current, lantai: e.target.value }))} />
+          </div>
+          <div className="form-group">
+            <label>Lorong</label>
+            <input type="text" value={form.lorong} onChange={e => setForm(current => ({ ...current, lorong: e.target.value }))} />
+          </div>
+          <div className="form-group">
+            <label>Flag 1</label>
+            <input type="text" value={form.flag1} onChange={e => setForm(current => ({ ...current, flag1: e.target.value }))} />
+          </div>
+          <div className="form-group">
+            <label>Flag 2</label>
+            <input type="text" value={form.flag2} onChange={e => setForm(current => ({ ...current, flag2: e.target.value }))} />
+          </div>
+          <div className="form-group">
+            <label>Valuation</label>
+            <input type="number" min="0" value={form.valuation} onChange={e => setForm(current => ({ ...current, valuation: e.target.value }))} />
+          </div>
+          <div className="form-group">
+            <label>Warehouse <span style={{ color:'var(--red)' }}>*</span></label>
+            <select value={form.warehouseName} onChange={e => setForm(current => ({ ...current, warehouseName: e.target.value }))}>
+              <option value="">Select warehouse</option>
+              {warehouseNames.map(name => <option key={name} value={name}>{name}</option>)}
+            </select>
+          </div>
+        </div>
+      </Modal>
 
       {tab === 'stockopname' && (
         <div className="card" style={{ padding:'64px 32px', textAlign:'center' }}>
