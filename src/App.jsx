@@ -19,6 +19,7 @@ import CategoryDetailPage from './pages/CategoryDetailPage';
 import UnitPage from './pages/UnitPage';
 import UnitDetailPage from './pages/UnitDetailPage';
 import PlaceholderPage from './pages/PlaceholderPage';
+import AIAnalyzerPage from './pages/AIAnalyzerPage';
 
 export default function App() {
   return (
@@ -44,6 +45,7 @@ export default function App() {
           <Route path="category-detail" element={<CategoryDetailPage />} />
           <Route path="unit" element={<UnitPage />} />
           <Route path="unit-detail" element={<UnitDetailPage />} />
+          <Route path="ai-analyzer" element={<AIAnalyzerPage />} />
           <Route path="qr-code" element={<PlaceholderPage title="QR Code" />} />
           <Route path="log" element={<PlaceholderPage title="Log" />} />
           <Route path="users" element={<PlaceholderPage title="Users" />} />
