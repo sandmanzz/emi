@@ -2,28 +2,45 @@ import { useState, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal';
 import { IconSearch, IconPlus, IconDelete, IconClose, IconCheck, IconCart, IconPrint, IconBarChart } from '../components/icons';
+import { initialAreas, SUB_AREAS } from '../data/areas';
+import { inventoryData, categories } from '../data/inventory';
+import { initialWarehouses } from '../data/warehouses';
 
-const AREAS = ['ENTRANCE','RECEPTION','CEREMONY','PHOTOBOOTH','GUEST TABLE'];
+const AREAS = initialAreas.map(a => a.name);
+const WAREHOUSES = [...new Set(initialWarehouses.map(w => w.name))];
 const STATUSES = ['Preparation','During Event','After Event'];
 
 const AREA_BADGE_CLASS = {
   CEREMONY: 'ceremony', PHOTOBOOTH: 'photobooth', RECEPTION: 'reception',
   ENTRANCE: 'entrance', 'GUEST TABLE': 'guest',
 };
+const BADGE_CLASS_CYCLE = ['ceremony', 'photobooth', 'reception', 'entrance', 'guest'];
+function areaBadgeClass(area) {
+  if (AREA_BADGE_CLASS[area]) return AREA_BADGE_CLASS[area];
+  const idx = AREAS.indexOf(area);
+  return BADGE_CLASS_CYCLE[idx >= 0 ? idx % BADGE_CLASS_CYCLE.length : 0];
+}
+
+function stockBadge(s) {
+  if (s === 'Available')    return <span className="badge badge-green">{s}</span>;
+  if (s === 'Low Stock')    return <span className="badge badge-orange">{s}</span>;
+  if (s === 'Out of Stock') return <span className="badge badge-red">{s}</span>;
+  return <span className="badge badge-gray">{s}</span>;
+}
 
 const initialItems = [
-  { id:1, name:'Chiffon White 4-6×1,2m', area:'CEREMONY',    status:'Preparation',  qty:2,  pic:'Anto',    checking:true,  warehouseItem:false, scanIn:'May 26, 2025 10:42 PM', scanOut:'May 26, 2025 9:33 PM',  note:"Please take care this item, it's luxury item" },
-  { id:2, name:'hanging rotan 1',         area:'PHOTOBOOTH',  status:'Preparation',  qty:2,  pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:"Please take care this item, it's luxury item" },
-  { id:3, name:'hanging rotan 2',         area:'RECEPTION',   status:'Preparation',  qty:10, pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:"Please take care this item, it's luxury item" },
-  { id:4, name:'hanging rotan 3',         area:'RECEPTION',   status:'Preparation',  qty:10, pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:"Please take care this item, it's luxury item" },
-  { id:5, name:'Kain Putih 3m',           area:'ENTRANCE',    status:'Preparation',  qty:5,  pic:'Novi',    checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:'' },
-  { id:6, name:'Bunga Mawar Merah',       area:'RECEPTION',   status:'During Event', qty:30, pic:'Darmian', checking:true,  warehouseItem:false, scanIn:'Apr 9, 2026 08:00 AM',  scanOut:null,                    note:'' },
-  { id:7, name:'Standing Flower Tall',    area:'ENTRANCE',    status:'Preparation',  qty:4,  pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:'' },
-  { id:8, name:'Tealight Holder 15cm',    area:'GUEST TABLE', status:'During Event', qty:50, pic:'Anto',    checking:false, warehouseItem:true,  scanIn:null,                    scanOut:null,                    note:'' },
-  { id:9, name:'Pita Emas 5m',            area:'CEREMONY',    status:'Preparation',  qty:20, pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:'' },
-  { id:10,name:'Lilin Putih 30cm',        area:'GUEST TABLE', status:'Preparation',  qty:100,pic:'Novi',    checking:true,  warehouseItem:true,  scanIn:'Apr 9, 2026 07:30 AM',  scanOut:'Apr 9, 2026 09:00 AM', note:'' },
-  { id:11,name:'Backdrop Floral 3×2m',    area:'PHOTOBOOTH',  status:'Preparation',  qty:1,  pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:'' },
-  { id:12,name:'Kursi Tiffany',           area:'RECEPTION',   status:'During Event', qty:60, pic:'Darmian', checking:false, warehouseItem:true,  scanIn:null,                    scanOut:null,                    note:'' },
+  { id:1, name:'Chiffon White 4-6×1,2m', area:'CEREMONY',    subArea:'',  status:'Preparation',  qty:2,  pic:'Anto',    checking:true,  warehouseItem:false, scanIn:'May 26, 2025 10:42 PM', scanOut:'May 26, 2025 9:33 PM',  note:"Please take care this item, it's luxury item" },
+  { id:2, name:'hanging rotan 1',         area:'PHOTOBOOTH',  subArea:'',  status:'Preparation',  qty:2,  pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:"Please take care this item, it's luxury item" },
+  { id:3, name:'hanging rotan 2',         area:'RECEPTION',   subArea:'',  status:'Preparation',  qty:10, pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:"Please take care this item, it's luxury item" },
+  { id:4, name:'hanging rotan 3',         area:'RECEPTION',   subArea:'',  status:'Preparation',  qty:10, pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:"Please take care this item, it's luxury item" },
+  { id:5, name:'Kain Putih 3m',           area:'ENTRANCE',    subArea:'',  status:'Preparation',  qty:5,  pic:'Novi',    checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:'' },
+  { id:6, name:'Bunga Mawar Merah',       area:'RECEPTION',   subArea:'',  status:'During Event', qty:30, pic:'Darmian', checking:true,  warehouseItem:false, scanIn:'Apr 9, 2026 08:00 AM',  scanOut:null,                    note:'' },
+  { id:7, name:'Standing Flower Tall',    area:'ENTRANCE',    subArea:'',  status:'Preparation',  qty:4,  pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:'' },
+  { id:8, name:'Tealight Holder 15cm',    area:'GUEST TABLE', subArea:'',  status:'During Event', qty:50, pic:'Anto',    checking:false, warehouseItem:true,  scanIn:null,                    scanOut:null,                    note:'' },
+  { id:9, name:'Pita Emas 5m',            area:'CEREMONY',    subArea:'',  status:'Preparation',  qty:20, pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:'' },
+  { id:10,name:'Lilin Putih 30cm',        area:'GUEST TABLE', subArea:'',  status:'Preparation',  qty:100,pic:'Novi',    checking:true,  warehouseItem:true,  scanIn:'Apr 9, 2026 07:30 AM',  scanOut:'Apr 9, 2026 09:00 AM', note:'' },
+  { id:11,name:'Backdrop Floral 3×2m',    area:'PHOTOBOOTH',  subArea:'',  status:'Preparation',  qty:1,  pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:'' },
+  { id:12,name:'Kursi Tiffany',           area:'RECEPTION',   subArea:'',  status:'During Event', qty:60, pic:'Darmian', checking:false, warehouseItem:true,  scanIn:null,                    scanOut:null,                    note:'' },
 ];
 
 function CheckIcon() {
@@ -42,16 +59,27 @@ function ImagePlaceholder() {
   );
 }
 
-function ItemCard({ item, onScan, onDelete, onAddToCart }) {
+function InvThumb() {
+  return (
+    <div className="inv-pick-thumb">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
+      </svg>
+    </div>
+  );
+}
+
+function ItemCard({ item, onScan, onDelete }) {
   return (
     <div className="item-card">
       <ImagePlaceholder />
       <div className="item-body">
-        <span className={`area-badge ${AREA_BADGE_CLASS[item.area] || 'ceremony'}`}>{item.area}</span>
+        <span className={`area-badge ${areaBadgeClass(item.area)}`}>{item.area}</span>
         <div className="item-name-row">
           <span className="item-name">{item.name}</span>
           <span className="item-qty">Qty: {item.qty}</span>
         </div>
+        {item.subArea && <div className="item-subarea">{item.subArea}</div>}
         <div className="item-pic">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 12, height: 12 }}>
             <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
@@ -125,14 +153,21 @@ export default function EventDetailPage() {
   const [areaDropOpen, setAreaDropOpen] = useState(false);
   const [kwSearch, setKwSearch] = useState('');
 
+  // Cart — "add from inventory" e-commerce style flow
   const [cart, setCart] = useState([]);
+  const [nextCartId, setNextCartId] = useState(1);
   const [cartOpen, setCartOpen] = useState(false);
-  const [atcOpen, setAtcOpen] = useState(false);
-  const [atcTargetId, setAtcTargetId] = useState(null);
-  const [atcForm, setAtcForm] = useState({ status: 'Preparation', area: 'ENTRANCE', qty: 1, note: '' });
+  const [selectedCartIds, setSelectedCartIds] = useState([]);
+  const [bulkPanelOpen, setBulkPanelOpen] = useState(false);
+  const [bulkArea, setBulkArea] = useState('');
+  const [bulkSubArea, setBulkSubArea] = useState('');
 
-  const [newItemOpen, setNewItemOpen] = useState(false);
-  const [newItemForm, setNewItemForm] = useState({ name: '', area: 'ENTRANCE', status: 'Preparation', qty: 1 });
+  // Inventory picker
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerQuery, setPickerQuery] = useState('');
+  const [pickerCategory, setPickerCategory] = useState('');
+  const [pickerQty, setPickerQty] = useState({});
+  const [pickerWarehouse, setPickerWarehouse] = useState({});
 
   const filtered = useMemo(() => items.filter(it => {
     if (selectedArea   && it.area   !== selectedArea)   return false;
@@ -141,8 +176,17 @@ export default function EventDetailPage() {
     return true;
   }), [items, selectedArea, selectedStatus, kwSearch]);
 
+  const pickerFiltered = useMemo(() => {
+    const q = pickerQuery.trim().toLowerCase();
+    return inventoryData.filter(inv =>
+      (!q || inv.name.toLowerCase().includes(q) || inv.sku.toLowerCase().includes(q)) &&
+      (!pickerCategory || inv.category === pickerCategory)
+    );
+  }, [pickerQuery, pickerCategory]);
+
   const areaLabel  = selectedArea   || 'All Place';
   const statusLabel = selectedStatus || 'All Status';
+  const hasMissingArea = cart.some(c => !c.area);
 
   function doScan(id) {
     const now = new Date().toLocaleString('en-US', { month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit', hour12:true });
@@ -159,37 +203,71 @@ export default function EventDetailPage() {
     setItems(is => is.filter(i => i.id !== id));
   }
 
-  function openAtcModal(id) {
-    const it = items.find(i => i.id === id);
-    setAtcTargetId(id);
-    setAtcForm({ status: it.status, area: it.area, qty: it.qty, note: '' });
-    setAtcOpen(true);
+  // --- Inventory picker → Cart ---
+  function addToCart(inv, qty, warehouse) {
+    const existing = cart.find(x => x.inventoryId === inv.id && x.warehouse === warehouse);
+    if (existing) {
+      const newQty = Math.min(inv.totalStock, existing.qty + qty);
+      setCart(c => c.map(x => x.cartId === existing.cartId ? { ...x, qty: newQty } : x));
+    } else {
+      setCart(c => [...c, {
+        cartId: nextCartId, inventoryId: inv.id, name: inv.name, sku: inv.sku,
+        category: inv.category, unit: inv.unit, totalStock: inv.totalStock,
+        warehouse, qty: Math.min(inv.totalStock, qty), area: '', subArea: '',
+      }]);
+      setNextCartId(n => n + 1);
+    }
+    setPickerQty(q => ({ ...q, [inv.id]: 1 }));
   }
 
-  function confirmAddToCart() {
-    const it = items.find(i => i.id === atcTargetId);
-    setCart(c => {
-      const existing = c.find(x => x.itemId === atcTargetId && x.status === atcForm.status && x.area === atcForm.area);
-      if (existing) return c.map(x => x === existing ? { ...x, qty: x.qty + atcForm.qty } : x);
-      return [...c, { itemId: atcTargetId, name: it.name, status: atcForm.status, area: atcForm.area, qty: atcForm.qty, note: atcForm.note }];
-    });
-    setAtcOpen(false);
+  function updateCartQty(cartId, qty) {
+    setCart(c => c.map(x => x.cartId === cartId ? { ...x, qty: Math.max(1, Math.min(x.totalStock, qty)) } : x));
   }
 
-  function removeCartItem(idx) {
-    setCart(c => c.filter((_, i) => i !== idx));
+  function removeCartItem(cartId) {
+    setCart(c => c.filter(x => x.cartId !== cartId));
+    setSelectedCartIds(s => s.filter(id => id !== cartId));
+  }
+
+  function setCartArea(cartId, area) {
+    setCart(c => c.map(x => x.cartId === cartId ? { ...x, area, subArea: '' } : x));
+  }
+
+  function setCartSubArea(cartId, subArea) {
+    setCart(c => c.map(x => x.cartId === cartId ? { ...x, subArea } : x));
+  }
+
+  function toggleCartSelect(cartId) {
+    setSelectedCartIds(s => s.includes(cartId) ? s.filter(id => id !== cartId) : [...s, cartId]);
+  }
+
+  function toggleSelectAllCart() {
+    setSelectedCartIds(s => s.length === cart.length ? [] : cart.map(c => c.cartId));
+  }
+
+  function applyBulkAssign() {
+    if (!bulkArea) return;
+    setCart(c => c.map(x => selectedCartIds.includes(x.cartId) ? { ...x, area: bulkArea, subArea: bulkSubArea } : x));
+    setBulkPanelOpen(false);
+    setBulkArea('');
+    setBulkSubArea('');
+    setSelectedCartIds([]);
   }
 
   function checkout() {
+    if (cart.length === 0 || hasMissingArea) return;
+    setItems(is => [
+      ...is,
+      ...cart.map((c, i) => ({
+        id: nextId + i, name: c.name, area: c.area, subArea: c.subArea,
+        status: 'Preparation', qty: c.qty, pic: '', checking: false,
+        warehouseItem: true, scanIn: null, scanOut: null, note: '',
+      })),
+    ]);
+    setNextId(n => n + cart.length);
     setCart([]);
+    setSelectedCartIds([]);
     setCartOpen(false);
-  }
-
-  function saveNewItem() {
-    if (!newItemForm.name.trim()) return;
-    setItems(is => [...is, { id: nextId, ...newItemForm, pic: '', checking: false, warehouseItem: false, scanIn: null, scanOut: null, note: '' }]);
-    setNextId(n => n + 1);
-    setNewItemOpen(false);
   }
 
   return (
@@ -261,8 +339,8 @@ export default function EventDetailPage() {
             <button className="btn btn-cart" onClick={() => setCartOpen(true)}>
               <IconCart /> Cart ({cart.length})
             </button>
-            <button className="btn-new" onClick={() => { setNewItemForm({ name: '', area: 'ENTRANCE', status: 'Preparation', qty: 1 }); setNewItemOpen(true); }}>
-              <IconPlus /> New
+            <button className="btn-new" onClick={() => { setPickerQuery(''); setPickerCategory(''); setPickerOpen(true); }}>
+              <IconPlus /> Tambah Barang
             </button>
           </div>
         </div>
@@ -276,117 +354,202 @@ export default function EventDetailPage() {
           : (
             <div className="items-grid">
               {filtered.map(it => (
-                <ItemCard key={it.id} item={it} onScan={doScan} onDelete={deleteItem} onAddToCart={openAtcModal} />
+                <ItemCard key={it.id} item={it} onScan={doScan} onDelete={deleteItem} />
               ))}
             </div>
           )
         }
       </div>
 
-      {/* Add to Cart Modal */}
-      <Modal open={atcOpen} title="Tambah ke Keranjang" onClose={() => setAtcOpen(false)}
+      {/* Inventory Picker Modal */}
+      <Modal
+        open={pickerOpen}
+        title="Tambah Barang dari Inventory"
+        onClose={() => setPickerOpen(false)}
+        size="2xl"
         footer={
           <>
-            <button className="btn-cancel-m" onClick={() => setAtcOpen(false)}><IconClose /> Batal</button>
-            <button className="btn-add-cart" onClick={confirmAddToCart}><IconCart /> Tambah ke Keranjang</button>
+            <span style={{ marginRight: 'auto', fontSize: 12.5, color: 'var(--text-muted)' }}>
+              {cart.length > 0 ? `${cart.reduce((s, c) => s + c.qty, 0)} pcs di keranjang` : 'Keranjang masih kosong'}
+            </span>
+            <button className="btn-cancel-m" onClick={() => setPickerOpen(false)}><IconClose /> Tutup</button>
+            <button className="btn-cart btn" onClick={() => { setPickerOpen(false); setCartOpen(true); }}>
+              <IconCart /> Lihat Keranjang ({cart.length})
+            </button>
           </>
         }
       >
-        <div className="atc-item-name">{items.find(i => i.id === atcTargetId)?.name}</div>
-        <div className="form-row">
-          <div className="form-group">
-            <label>Status / State</label>
-            <select value={atcForm.status} onChange={e => setAtcForm(f => ({ ...f, status: e.target.value }))}>
-              {STATUSES.map(s => <option key={s}>{s}</option>)}
-            </select>
+        <div className="search-row" style={{ marginBottom: 4 }}>
+          <div className="search-wrap">
+            <IconSearch />
+            <input className="search-input" type="text" placeholder="Cari nama atau SKU…" value={pickerQuery} onChange={e => setPickerQuery(e.target.value)} />
           </div>
-          <div className="form-group">
-            <label>Area</label>
-            <select value={atcForm.area} onChange={e => setAtcForm(f => ({ ...f, area: e.target.value }))}>
-              {AREAS.map(a => <option key={a}>{a}</option>)}
+          <div className="wi-select-wrap">
+            <select value={pickerCategory} onChange={e => setPickerCategory(e.target.value)}>
+              <option value="">Semua Kategori</option>
+              {categories.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
         </div>
-        <div className="form-row">
-          <div className="form-group">
-            <label>Qty</label>
-            <input type="number" min={1} value={atcForm.qty} onChange={e => setAtcForm(f => ({ ...f, qty: parseInt(e.target.value) || 1 }))} />
-          </div>
-          <div className="form-group">
-            <label>Catatan</label>
-            <input type="text" placeholder="Opsional" value={atcForm.note} onChange={e => setAtcForm(f => ({ ...f, note: e.target.value }))} />
-          </div>
+
+        <div className="inv-pick-list">
+          {pickerFiltered.length === 0
+            ? <div className="no-data">Tidak ada barang ditemukan.</div>
+            : pickerFiltered.map(inv => {
+              const qty = pickerQty[inv.id] ?? 1;
+              const warehouse = pickerWarehouse[inv.id] ?? inv.warehouse;
+              const outOfStock = inv.stockStatus === 'Out of Stock';
+              return (
+                <div className="inv-pick-row" key={inv.id}>
+                  <InvThumb />
+                  <div className="inv-pick-info">
+                    <div className="inv-pick-name-row">
+                      <span className="inv-pick-name">{inv.name}</span>
+                      {stockBadge(inv.stockStatus)}
+                    </div>
+                    <div className="inv-pick-meta">
+                      <span style={{ fontFamily: 'monospace' }}>{inv.sku}</span> · {inv.category} · {inv.unit}
+                    </div>
+                    <div className="inv-pick-stock">Stok tersedia: <strong>{inv.totalStock} {inv.unit}</strong></div>
+                    <div className="inv-pick-warehouse-row">
+                      <label>Ambil dari gudang</label>
+                      <div className="wi-select-wrap">
+                        <select
+                          value={warehouse}
+                          onChange={e => setPickerWarehouse(w => ({ ...w, [inv.id]: e.target.value }))}
+                        >
+                          {WAREHOUSES.map(w => <option key={w} value={w}>{w}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="inv-pick-actions">
+                    <input
+                      className="inv-pick-qty" type="number" min={1} max={inv.totalStock}
+                      value={qty} disabled={outOfStock}
+                      onChange={e => setPickerQty(q => ({ ...q, [inv.id]: Math.max(1, Math.min(inv.totalStock, parseInt(e.target.value) || 1)) }))}
+                    />
+                    <button
+                      className="btn-add-cart" disabled={outOfStock}
+                      onClick={() => addToCart(inv, qty, warehouse)}
+                    >
+                      <IconCart /> {outOfStock ? 'Stok Habis' : 'Tambah'}
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          }
         </div>
       </Modal>
 
       {/* Cart Modal */}
-      <Modal open={cartOpen} title="Keranjang Event" onClose={() => setCartOpen(false)}
+      <Modal
+        open={cartOpen}
+        title="Keranjang Event"
+        onClose={() => setCartOpen(false)}
+        size="xl"
         footer={
           <>
+            {hasMissingArea && cart.length > 0 && (
+              <span style={{ marginRight: 'auto', fontSize: 12, color: 'var(--red)', fontWeight: 600 }}>
+                Lengkapi Area untuk semua item sebelum checkout
+              </span>
+            )}
             <button className="btn-cancel-m" onClick={() => setCartOpen(false)}>Tutup</button>
-            <button className="btn-checkout" onClick={checkout}><IconCheck /> Simpan ke Event</button>
+            <button className="btn-checkout" onClick={checkout} disabled={cart.length === 0 || hasMissingArea}>
+              <IconCheck /> Simpan ke Event
+            </button>
           </>
         }
       >
         {cart.length === 0
           ? <div className="cart-empty">Keranjang masih kosong</div>
           : (
-            <div className="cart-list">
-              {cart.map((c, i) => (
-                <div key={i} className="cart-item">
-                  <div className="cart-item-img">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="#b0b5cc" strokeWidth="1.5" style={{ width: 28, height: 28 }}>
-                      <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
-                    </svg>
-                  </div>
-                  <div className="cart-item-info">
-                    <div className="cart-item-name">{c.name}</div>
-                    <div className="cart-item-meta">{c.status} · {c.area}{c.note ? ` · ${c.note}` : ''}</div>
-                  </div>
-                  <span className="cart-item-qty">×{c.qty}</span>
-                  <button className="cart-item-remove" onClick={() => removeCartItem(i)}>
-                    <IconDelete />
+            <>
+              <div className="toolbar" style={{ marginBottom: 10 }}>
+                <div className="toolbar-left">
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: 'var(--text-2)', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={selectedCartIds.length === cart.length} onChange={toggleSelectAllCart} />
+                    Pilih Semua ({selectedCartIds.length}/{cart.length})
+                  </label>
+                </div>
+                <div className="toolbar-right">
+                  <button
+                    className="btn btn-ghost" disabled={selectedCartIds.length === 0}
+                    onClick={() => setBulkPanelOpen(o => !o)}
+                  >
+                    Assign Lokasi ({selectedCartIds.length})
                   </button>
                 </div>
-              ))}
-            </div>
+              </div>
+
+              {bulkPanelOpen && (
+                <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, padding: '10px 12px', marginBottom: 12, background: 'var(--brand-bg)', borderRadius: 'var(--r-lg)', flexWrap: 'wrap' }}>
+                  <div className="wi-select-wrap">
+                    <select value={bulkArea} onChange={e => { setBulkArea(e.target.value); setBulkSubArea(''); }}>
+                      <option value="">Pilih Area</option>
+                      {initialAreas.map(a => <option key={a.id} value={a.name}>{a.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="wi-select-wrap">
+                    <select value={bulkSubArea} onChange={e => setBulkSubArea(e.target.value)} disabled={!bulkArea}>
+                      <option value="">{(SUB_AREAS[bulkArea] || []).length ? 'Pilih Sub Area' : '(Tidak ada Sub Area)'}</option>
+                      {(SUB_AREAS[bulkArea] || []).map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                  <button className="btn-save-modal" disabled={!bulkArea} onClick={applyBulkAssign}>
+                    <IconCheck /> Terapkan ke {selectedCartIds.length} item
+                  </button>
+                  <button className="btn-cancel-m" onClick={() => setBulkPanelOpen(false)}>Batal</button>
+                </div>
+              )}
+
+              <div className="cart-list">
+                {cart.map(c => (
+                  <div key={c.cartId} className="cart-item" style={{ alignItems: 'flex-start' }}>
+                    <input
+                      type="checkbox" style={{ marginTop: 4 }}
+                      checked={selectedCartIds.includes(c.cartId)}
+                      onChange={() => toggleCartSelect(c.cartId)}
+                    />
+                    <div className="cart-item-img">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="#b0b5cc" strokeWidth="1.5" style={{ width: 28, height: 28 }}>
+                        <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
+                      </svg>
+                    </div>
+                    <div className="cart-item-info">
+                      <div className="cart-item-name">{c.name}</div>
+                      <div className="cart-item-meta">{c.category} · {c.unit} · {c.warehouse}</div>
+                      <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                        <div className="wi-select-wrap">
+                          <select value={c.area} onChange={e => setCartArea(c.cartId, e.target.value)}>
+                            <option value="">Pilih Area</option>
+                            {initialAreas.map(a => <option key={a.id} value={a.name}>{a.name}</option>)}
+                          </select>
+                        </div>
+                        <div className="wi-select-wrap">
+                          <select value={c.subArea} onChange={e => setCartSubArea(c.cartId, e.target.value)} disabled={!c.area}>
+                            <option value="">{(SUB_AREAS[c.area] || []).length ? 'Sub Area' : '-'}</option>
+                            {(SUB_AREAS[c.area] || []).map(s => <option key={s} value={s}>{s}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                      {!c.area && <div style={{ fontSize: 11, color: 'var(--red)', marginTop: 4 }}>Lokasi belum diisi</div>}
+                    </div>
+                    <input
+                      className="inv-pick-qty" type="number" min={1} max={c.totalStock}
+                      value={c.qty} onChange={e => updateCartQty(c.cartId, parseInt(e.target.value) || 1)}
+                    />
+                    <button className="cart-item-remove" onClick={() => removeCartItem(c.cartId)}>
+                      <IconDelete />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </>
           )
         }
-      </Modal>
-
-      {/* New Item Modal */}
-      <Modal open={newItemOpen} title="Tambah Item Baru" onClose={() => setNewItemOpen(false)}
-        footer={
-          <>
-            <button className="btn-cancel-m" onClick={() => setNewItemOpen(false)}>Batal</button>
-            <button className="btn-add-cart" style={{ background: '#16a34a' }} onClick={saveNewItem}><IconCheck /> Simpan</button>
-          </>
-        }
-      >
-        <div className="form-row">
-          <div className="form-group">
-            <label>Nama Item</label>
-            <input type="text" placeholder="Nama item" value={newItemForm.name} onChange={e => setNewItemForm(f => ({ ...f, name: e.target.value }))} />
-          </div>
-          <div className="form-group">
-            <label>Area</label>
-            <select value={newItemForm.area} onChange={e => setNewItemForm(f => ({ ...f, area: e.target.value }))}>
-              {AREAS.map(a => <option key={a}>{a}</option>)}
-            </select>
-          </div>
-        </div>
-        <div className="form-row">
-          <div className="form-group">
-            <label>Status</label>
-            <select value={newItemForm.status} onChange={e => setNewItemForm(f => ({ ...f, status: e.target.value }))}>
-              {STATUSES.map(s => <option key={s}>{s}</option>)}
-            </select>
-          </div>
-          <div className="form-group">
-            <label>Qty</label>
-            <input type="number" min={1} value={newItemForm.qty} onChange={e => setNewItemForm(f => ({ ...f, qty: parseInt(e.target.value) || 1 }))} />
-          </div>
-        </div>
       </Modal>
     </>
   );

@@ -241,6 +241,7 @@ body {
 }
 .btn:active { filter: brightness(0.9); }
 .btn svg { width: 13px; height: 13px; }
+.btn:disabled { opacity: .55; cursor: not-allowed; filter: none; }
 
 .btn-primary { background: var(--brand);  color: #fff; }
 .btn-primary:hover { filter: brightness(1.07); }
@@ -334,6 +335,7 @@ body {
 }
 .btn-save:hover, .btn-save-modal:hover, .btn-add-cart:hover, .btn-checkout:hover { filter: brightness(1.07); }
 .btn-save svg, .btn-save-modal svg, .btn-add-cart svg, .btn-checkout svg { width: 12px; height: 12px; }
+.btn-save:disabled, .btn-save-modal:disabled, .btn-add-cart:disabled, .btn-checkout:disabled { opacity: .5; cursor: not-allowed; filter: none; }
 
 .btn-del-confirm, .btn-del-ok {
   display: inline-flex; align-items: center; gap: 6px;
@@ -1231,6 +1233,7 @@ td.id-cell   { color: var(--text-muted); font-size: 12px; }
 .item-name     { font-weight: 600; font-size: 13px; color: var(--text); line-height: 1.3; }
 .item-qty      { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
 .item-pic      { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-muted); margin-bottom: 10px; }
+.item-subarea  { font-size: 11px; color: var(--text-muted); margin: -3px 0 8px; }
 
 /* Indicators */
 .item-indicators { display: flex; gap: 12px; margin-bottom: 10px; }
@@ -1334,6 +1337,35 @@ td.id-cell   { color: var(--text-muted); font-size: 12px; }
 .dropdown-item { padding: 8px 12px; font-size: 13px; color: var(--text-2); cursor: pointer; transition: background .1s; }
 .dropdown-item:hover { background: var(--bg); color: var(--brand); }
 .dropdown-item.selected { background: var(--brand-bg); color: var(--brand); font-weight: 600; }
+
+/* =========================================================
+   INVENTORY PICKER (EventDetailPage — add from inventory)
+   ========================================================= */
+.inv-pick-list { max-height: 56vh; overflow-y: auto; margin-top: 12px; }
+.inv-pick-row {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 12px 4px; border-bottom: 1px solid var(--border-2);
+}
+.inv-pick-row:last-child { border-bottom: none; }
+.inv-pick-thumb {
+  width: 48px; height: 48px; border-radius: var(--r); background: var(--bg);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.inv-pick-thumb svg { width: 22px; height: 22px; color: var(--border); }
+.inv-pick-info { flex: 1; min-width: 0; }
+.inv-pick-name-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.inv-pick-name { font-weight: 600; font-size: 13px; color: var(--text); }
+.inv-pick-meta { font-size: 11.5px; color: var(--text-muted); margin-top: 3px; }
+.inv-pick-stock { font-size: 11.5px; color: var(--text-2); margin-top: 4px; }
+.inv-pick-stock strong { color: var(--text); font-weight: 700; }
+.inv-pick-warehouse-row { display: flex; align-items: center; gap: 7px; margin-top: 7px; }
+.inv-pick-warehouse-row label { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+.inv-pick-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
+.inv-pick-qty {
+  width: 56px; padding: 6px 8px; border: 1px solid var(--border); border-radius: var(--r);
+  font-size: 13px; text-align: center; font-family: inherit; color: var(--text); background: var(--white);
+}
+.inv-pick-qty:disabled { opacity: .5; }
 
 /* =========================================================
    STATS BAR  (reusable across pages)

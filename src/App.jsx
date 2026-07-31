@@ -20,11 +20,31 @@ import UnitPage from './pages/UnitPage';
 import UnitDetailPage from './pages/UnitDetailPage';
 import PlaceholderPage from './pages/PlaceholderPage';
 import AIAnalyzerPage from './pages/AIAnalyzerPage';
+import RequireAuth from './components/RequireAuth';
+import SuperAdminLogin from './pages/superadmin/SuperAdminLogin';
+import SuperAdminLayout from './pages/superadmin/SuperAdminLayout';
+import DashboardPage from './pages/superadmin/DashboardPage';
+import CustomersPage from './pages/superadmin/CustomersPage';
+import PaymentsPage from './pages/superadmin/PaymentsPage';
+import PricingPage from './pages/superadmin/PricingPage';
+import DefaultCategoriesPage from './pages/superadmin/DefaultCategoriesPage';
+import DefaultUnitsPage from './pages/superadmin/DefaultUnitsPage';
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/superadmin/login" element={<SuperAdminLogin />} />
+        <Route path="/superadmin" element={<RequireAuth><SuperAdminLayout /></RequireAuth>}>
+          <Route index element={<Navigate to="dashboard" replace />} />
+          <Route path="dashboard" element={<DashboardPage />} />
+          <Route path="customers" element={<CustomersPage />} />
+          <Route path="payments" element={<PaymentsPage />} />
+          <Route path="pricing" element={<PricingPage />} />
+          <Route path="categories" element={<DefaultCategoriesPage />} />
+          <Route path="units" element={<DefaultUnitsPage />} />
+          <Route path="*" element={<Navigate to="dashboard" replace />} />
+        </Route>
         <Route path="/" element={<Layout />}>
           <Route index element={<Navigate to="/event" replace />} />
           <Route path="event" element={<EventPage />} />
