@@ -1197,6 +1197,17 @@ td.id-cell   { color: var(--text-muted); font-size: 12px; }
    ========================================================= */
 .event-heading { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 14px; letter-spacing: -.01em; }
 
+/* Action bar (add item / cart / packaging) — separate from filter/search */
+.event-actions-bar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
 /* Filter + search rows */
 .filter-row       { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
 .filter-row-right { display: flex; gap: 6px; align-items: center; margin-left: auto; flex-shrink: 0; }
@@ -1341,7 +1352,8 @@ td.id-cell   { color: var(--text-muted); font-size: 12px; }
 /* =========================================================
    INVENTORY PICKER (EventDetailPage — add from inventory)
    ========================================================= */
-.inv-pick-list { max-height: 56vh; overflow-y: auto; margin-top: 12px; }
+.inv-pick-modal-body { max-height: 76vh; }
+.inv-pick-list { max-height: 62vh; overflow-y: auto; margin-top: 12px; }
 .inv-pick-row {
   display: flex; align-items: flex-start; gap: 12px;
   padding: 12px 4px; border-bottom: 1px solid var(--border-2);

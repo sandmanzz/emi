@@ -6,6 +6,7 @@ const sizeStyles = {
   lg: { maxWidth: 680 },
   xl: { maxWidth: 760 },
   '2xl': { maxWidth: 880 },
+  '3xl': { maxWidth: 1080 },
 };
 
 export default function Modal({

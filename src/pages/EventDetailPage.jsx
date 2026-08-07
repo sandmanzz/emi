@@ -283,6 +283,19 @@ export default function EventDetailPage() {
 
         <div className="event-heading">{eventName}</div>
 
+        <div className="event-actions-bar">
+          <button className="btn btn-pkg">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 14, height: 14 }}><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+            Packaging
+          </button>
+          <button className="btn btn-cart" onClick={() => setCartOpen(true)}>
+            <IconCart /> Cart ({cart.length})
+          </button>
+          <button className="btn-new" onClick={() => { setPickerQuery(''); setPickerCategory(''); setPickerOpen(true); }}>
+            <IconPlus /> Tambah Barang
+          </button>
+        </div>
+
         <div className="filter-row">
           <div className="custom-select" style={{ flex: 1 }}>
             <select value={selectedStatus} onChange={e => setSelectedStatus(e.target.value)}>
@@ -331,18 +344,6 @@ export default function EventDetailPage() {
             <IconSearch />
             <input className="search-input" type="text" placeholder="Keyword Search" value={kwSearch} onChange={e => setKwSearch(e.target.value)} />
           </div>
-          <div className="search-row-right">
-            <button className="btn btn-pkg">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 14, height: 14 }}><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
-              Packaging
-            </button>
-            <button className="btn btn-cart" onClick={() => setCartOpen(true)}>
-              <IconCart /> Cart ({cart.length})
-            </button>
-            <button className="btn-new" onClick={() => { setPickerQuery(''); setPickerCategory(''); setPickerOpen(true); }}>
-              <IconPlus /> Tambah Barang
-            </button>
-          </div>
         </div>
 
         <p className="summary-text">
@@ -366,17 +367,10 @@ export default function EventDetailPage() {
         open={pickerOpen}
         title="Tambah Barang dari Inventory"
         onClose={() => setPickerOpen(false)}
-        size="2xl"
+        size="3xl"
+        bodyClassName="inv-pick-modal-body"
         footer={
-          <>
-            <span style={{ marginRight: 'auto', fontSize: 12.5, color: 'var(--text-muted)' }}>
-              {cart.length > 0 ? `${cart.reduce((s, c) => s + c.qty, 0)} pcs di keranjang` : 'Keranjang masih kosong'}
-            </span>
-            <button className="btn-cancel-m" onClick={() => setPickerOpen(false)}><IconClose /> Tutup</button>
-            <button className="btn-cart btn" onClick={() => { setPickerOpen(false); setCartOpen(true); }}>
-              <IconCart /> Lihat Keranjang ({cart.length})
-            </button>
-          </>
+          <button className="btn-cancel-m" onClick={() => setPickerOpen(false)}><IconClose /> Tutup</button>
         }
       >
         <div className="search-row" style={{ marginBottom: 4 }}>
