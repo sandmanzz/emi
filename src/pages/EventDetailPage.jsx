@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal';
-import { IconSearch, IconPlus, IconDelete, IconClose, IconCheck, IconCart, IconPrint, IconBarChart } from '../components/icons';
+import { IconSearch, IconPlus, IconDelete, IconClose, IconCheck, IconCart, IconPrint, IconBarChart, IconMoreVertical } from '../components/icons';
 import { initialAreas, SUB_AREAS } from '../data/areas';
 import { inventoryData, categories } from '../data/inventory';
 import { initialWarehouses } from '../data/warehouses';
@@ -156,7 +156,6 @@ export default function EventDetailPage() {
   // Cart — "add from inventory" e-commerce style flow
   const [cart, setCart] = useState([]);
   const [nextCartId, setNextCartId] = useState(1);
-  const [cartOpen, setCartOpen] = useState(false);
   const [selectedCartIds, setSelectedCartIds] = useState([]);
   const [bulkPanelOpen, setBulkPanelOpen] = useState(false);
   const [bulkArea, setBulkArea] = useState('');
@@ -229,14 +228,6 @@ export default function EventDetailPage() {
     setSelectedCartIds(s => s.filter(id => id !== cartId));
   }
 
-  function setCartArea(cartId, area) {
-    setCart(c => c.map(x => x.cartId === cartId ? { ...x, area, subArea: '' } : x));
-  }
-
-  function setCartSubArea(cartId, subArea) {
-    setCart(c => c.map(x => x.cartId === cartId ? { ...x, subArea } : x));
-  }
-
   function toggleCartSelect(cartId) {
     setSelectedCartIds(s => s.includes(cartId) ? s.filter(id => id !== cartId) : [...s, cartId]);
   }
@@ -254,6 +245,16 @@ export default function EventDetailPage() {
     setSelectedCartIds([]);
   }
 
+  function handleCheckoutClick() {
+    if (cart.length === 0) return;
+    if (hasMissingArea) {
+      setSelectedCartIds(cart.filter(c => !c.area).map(c => c.cartId));
+      setBulkPanelOpen(true);
+      return;
+    }
+    checkout();
+  }
+
   function checkout() {
     if (cart.length === 0 || hasMissingArea) return;
     setItems(is => [
@@ -267,7 +268,6 @@ export default function EventDetailPage() {
     setNextId(n => n + cart.length);
     setCart([]);
     setSelectedCartIds([]);
-    setCartOpen(false);
   }
 
   return (
@@ -281,19 +281,24 @@ export default function EventDetailPage() {
           </button>
         </div>
 
-        <div className="event-heading">{eventName}</div>
+        <div className="event-header-row">
+          <div className="event-heading">{eventName}</div>
 
-        <div className="event-actions-bar">
-          <button className="btn btn-pkg">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 14, height: 14 }}><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
-            Packaging
-          </button>
-          <button className="btn btn-cart" onClick={() => setCartOpen(true)}>
-            <IconCart /> Cart ({cart.length})
-          </button>
-          <button className="btn-new" onClick={() => { setPickerQuery(''); setPickerCategory(''); setPickerOpen(true); }}>
-            <IconPlus /> Tambah Barang
-          </button>
+          <div className="event-actions-bar">
+            <button className="action-icon-btn btn-pkg" title="Packaging">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+            </button>
+            <button className="action-icon-btn btn-cart" title="Cart" onClick={() => setPickerOpen(true)}>
+              <IconCart />
+              {cart.length > 0 && <span className="action-icon-badge">{cart.length}</span>}
+            </button>
+            <button className="btn-new" onClick={() => { setPickerQuery(''); setPickerCategory(''); setPickerOpen(true); }}>
+              <IconPlus /> Tambah Barang
+            </button>
+            <button className="action-icon-btn more-btn" title="Menu lainnya">
+              <IconMoreVertical />
+            </button>
+          </div>
         </div>
 
         <div className="filter-row">
@@ -362,188 +367,170 @@ export default function EventDetailPage() {
         }
       </div>
 
-      {/* Inventory Picker Modal */}
+      {/* Inventory Picker + Cart Modal — two panels, no popping in/out */}
       <Modal
         open={pickerOpen}
         title="Tambah Barang dari Inventory"
         onClose={() => setPickerOpen(false)}
-        size="3xl"
+        size="4xl"
+        className="inv-pick-modal"
         bodyClassName="inv-pick-modal-body"
         footer={
-          <button className="btn-cancel-m" onClick={() => setPickerOpen(false)}><IconClose /> Tutup</button>
-        }
-      >
-        <div className="search-row" style={{ marginBottom: 4 }}>
-          <div className="search-wrap">
-            <IconSearch />
-            <input className="search-input" type="text" placeholder="Cari nama atau SKU…" value={pickerQuery} onChange={e => setPickerQuery(e.target.value)} />
-          </div>
-          <div className="wi-select-wrap">
-            <select value={pickerCategory} onChange={e => setPickerCategory(e.target.value)}>
-              <option value="">Semua Kategori</option>
-              {categories.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </div>
-        </div>
-
-        <div className="inv-pick-list">
-          {pickerFiltered.length === 0
-            ? <div className="no-data">Tidak ada barang ditemukan.</div>
-            : pickerFiltered.map(inv => {
-              const qty = pickerQty[inv.id] ?? 1;
-              const warehouse = pickerWarehouse[inv.id] ?? inv.warehouse;
-              const outOfStock = inv.stockStatus === 'Out of Stock';
-              return (
-                <div className="inv-pick-row" key={inv.id}>
-                  <InvThumb />
-                  <div className="inv-pick-info">
-                    <div className="inv-pick-name-row">
-                      <span className="inv-pick-name">{inv.name}</span>
-                      {stockBadge(inv.stockStatus)}
-                    </div>
-                    <div className="inv-pick-meta">
-                      <span style={{ fontFamily: 'monospace' }}>{inv.sku}</span> · {inv.category} · {inv.unit}
-                    </div>
-                    <div className="inv-pick-stock">Stok tersedia: <strong>{inv.totalStock} {inv.unit}</strong></div>
-                    <div className="inv-pick-warehouse-row">
-                      <label>Ambil dari gudang</label>
-                      <div className="wi-select-wrap">
-                        <select
-                          value={warehouse}
-                          onChange={e => setPickerWarehouse(w => ({ ...w, [inv.id]: e.target.value }))}
-                        >
-                          {WAREHOUSES.map(w => <option key={w} value={w}>{w}</option>)}
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="inv-pick-actions">
-                    <input
-                      className="inv-pick-qty" type="number" min={1} max={inv.totalStock}
-                      value={qty} disabled={outOfStock}
-                      onChange={e => setPickerQty(q => ({ ...q, [inv.id]: Math.max(1, Math.min(inv.totalStock, parseInt(e.target.value) || 1)) }))}
-                    />
-                    <button
-                      className="btn-add-cart" disabled={outOfStock}
-                      onClick={() => addToCart(inv, qty, warehouse)}
-                    >
-                      <IconCart /> {outOfStock ? 'Stok Habis' : 'Tambah'}
-                    </button>
-                  </div>
-                </div>
-              );
-            })
-          }
-        </div>
-      </Modal>
-
-      {/* Cart Modal */}
-      <Modal
-        open={cartOpen}
-        title="Keranjang Event"
-        onClose={() => setCartOpen(false)}
-        size="xl"
-        footer={
           <>
-            {hasMissingArea && cart.length > 0 && (
-              <span style={{ marginRight: 'auto', fontSize: 12, color: 'var(--red)', fontWeight: 600 }}>
-                Lengkapi Area untuk semua item sebelum checkout
-              </span>
-            )}
-            <button className="btn-cancel-m" onClick={() => setCartOpen(false)}>Tutup</button>
-            <button className="btn-checkout" onClick={checkout} disabled={cart.length === 0 || hasMissingArea}>
-              <IconCheck /> Simpan ke Event
+            <button className="btn-cancel-m" onClick={() => setPickerOpen(false)}><IconClose /> Tutup</button>
+            <button className="btn-checkout" onClick={handleCheckoutClick} disabled={cart.length === 0}>
+              <IconCheck /> {hasMissingArea ? 'Lengkapi Lokasi' : 'Simpan ke Event'}
             </button>
           </>
         }
       >
-        {cart.length === 0
-          ? <div className="cart-empty">Keranjang masih kosong</div>
-          : (
-            <>
-              <div className="toolbar" style={{ marginBottom: 10 }}>
-                <div className="toolbar-left">
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: 'var(--text-2)', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={selectedCartIds.length === cart.length} onChange={toggleSelectAllCart} />
-                    Pilih Semua ({selectedCartIds.length}/{cart.length})
-                  </label>
-                </div>
-                <div className="toolbar-right">
-                  <button
-                    className="btn btn-ghost" disabled={selectedCartIds.length === 0}
-                    onClick={() => setBulkPanelOpen(o => !o)}
-                  >
-                    Assign Lokasi ({selectedCartIds.length})
-                  </button>
-                </div>
+        <div className="inv-pick-split">
+          {/* Left panel — browse & add from inventory */}
+          <div className="inv-pick-left">
+            <div className="search-row" style={{ marginBottom: 4 }}>
+              <div className="search-wrap">
+                <IconSearch />
+                <input className="search-input" type="text" placeholder="Cari nama atau SKU…" value={pickerQuery} onChange={e => setPickerQuery(e.target.value)} />
               </div>
+              <div className="wi-select-wrap">
+                <select value={pickerCategory} onChange={e => setPickerCategory(e.target.value)}>
+                  <option value="">Semua Kategori</option>
+                  {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+            </div>
 
-              {bulkPanelOpen && (
-                <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, padding: '10px 12px', marginBottom: 12, background: 'var(--brand-bg)', borderRadius: 'var(--r-lg)', flexWrap: 'wrap' }}>
-                  <div className="wi-select-wrap">
-                    <select value={bulkArea} onChange={e => { setBulkArea(e.target.value); setBulkSubArea(''); }}>
-                      <option value="">Pilih Area</option>
-                      {initialAreas.map(a => <option key={a.id} value={a.name}>{a.name}</option>)}
-                    </select>
-                  </div>
-                  <div className="wi-select-wrap">
-                    <select value={bulkSubArea} onChange={e => setBulkSubArea(e.target.value)} disabled={!bulkArea}>
-                      <option value="">{(SUB_AREAS[bulkArea] || []).length ? 'Pilih Sub Area' : '(Tidak ada Sub Area)'}</option>
-                      {(SUB_AREAS[bulkArea] || []).map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </div>
-                  <button className="btn-save-modal" disabled={!bulkArea} onClick={applyBulkAssign}>
-                    <IconCheck /> Terapkan ke {selectedCartIds.length} item
-                  </button>
-                  <button className="btn-cancel-m" onClick={() => setBulkPanelOpen(false)}>Batal</button>
-                </div>
-              )}
-
-              <div className="cart-list">
-                {cart.map(c => (
-                  <div key={c.cartId} className="cart-item" style={{ alignItems: 'flex-start' }}>
-                    <input
-                      type="checkbox" style={{ marginTop: 4 }}
-                      checked={selectedCartIds.includes(c.cartId)}
-                      onChange={() => toggleCartSelect(c.cartId)}
-                    />
-                    <div className="cart-item-img">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="#b0b5cc" strokeWidth="1.5" style={{ width: 28, height: 28 }}>
-                        <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
-                      </svg>
-                    </div>
-                    <div className="cart-item-info">
-                      <div className="cart-item-name">{c.name}</div>
-                      <div className="cart-item-meta">{c.category} · {c.unit} · {c.warehouse}</div>
-                      <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-                        <div className="wi-select-wrap">
-                          <select value={c.area} onChange={e => setCartArea(c.cartId, e.target.value)}>
-                            <option value="">Pilih Area</option>
-                            {initialAreas.map(a => <option key={a.id} value={a.name}>{a.name}</option>)}
-                          </select>
+            <div className="inv-pick-list">
+              {pickerFiltered.length === 0
+                ? <div className="no-data">Tidak ada barang ditemukan.</div>
+                : pickerFiltered.map(inv => {
+                  const qty = pickerQty[inv.id] ?? 1;
+                  const warehouse = pickerWarehouse[inv.id] ?? inv.warehouse;
+                  const outOfStock = inv.stockStatus === 'Out of Stock';
+                  return (
+                    <div className="inv-pick-row" key={inv.id}>
+                      <InvThumb />
+                      <div className="inv-pick-info">
+                        <div className="inv-pick-name-row">
+                          <span className="inv-pick-name">{inv.name}</span>
+                          {stockBadge(inv.stockStatus)}
                         </div>
-                        <div className="wi-select-wrap">
-                          <select value={c.subArea} onChange={e => setCartSubArea(c.cartId, e.target.value)} disabled={!c.area}>
-                            <option value="">{(SUB_AREAS[c.area] || []).length ? 'Sub Area' : '-'}</option>
-                            {(SUB_AREAS[c.area] || []).map(s => <option key={s} value={s}>{s}</option>)}
-                          </select>
+                        <div className="inv-pick-meta">
+                          <span style={{ fontFamily: 'monospace' }}>{inv.sku}</span> · {inv.category} · {inv.unit}
+                        </div>
+                        <div className="inv-pick-stock">Stok tersedia: <strong>{inv.totalStock} {inv.unit}</strong></div>
+                        <div className="inv-pick-warehouse-row">
+                          <label>Ambil dari gudang</label>
+                          <div className="wi-select-wrap">
+                            <select
+                              value={warehouse}
+                              onChange={e => setPickerWarehouse(w => ({ ...w, [inv.id]: e.target.value }))}
+                            >
+                              {WAREHOUSES.map(w => <option key={w} value={w}>{w}</option>)}
+                            </select>
+                          </div>
                         </div>
                       </div>
-                      {!c.area && <div style={{ fontSize: 11, color: 'var(--red)', marginTop: 4 }}>Lokasi belum diisi</div>}
+                      <div className="inv-pick-actions">
+                        <input
+                          className="inv-pick-qty" type="number" min={1} max={inv.totalStock}
+                          value={qty} disabled={outOfStock}
+                          onChange={e => setPickerQty(q => ({ ...q, [inv.id]: Math.max(1, Math.min(inv.totalStock, parseInt(e.target.value) || 1)) }))}
+                        />
+                        <button
+                          className="btn-add-cart" disabled={outOfStock}
+                          onClick={() => addToCart(inv, qty, warehouse)}
+                        >
+                          <IconCart /> {outOfStock ? 'Stok Habis' : 'Tambah'}
+                        </button>
+                      </div>
                     </div>
-                    <input
-                      className="inv-pick-qty" type="number" min={1} max={c.totalStock}
-                      value={c.qty} onChange={e => updateCartQty(c.cartId, parseInt(e.target.value) || 1)}
-                    />
-                    <button className="cart-item-remove" onClick={() => removeCartItem(c.cartId)}>
-                      <IconDelete />
+                  );
+                })
+              }
+            </div>
+          </div>
+
+          {/* Right panel — cart / keranjang, always visible alongside the list */}
+          <div className="inv-pick-right">
+            <div className="inv-cart-header">
+              <IconCart /> Keranjang <span className="inv-cart-count">{cart.length}</span>
+            </div>
+
+            {cart.length === 0
+              ? <div className="cart-empty">Keranjang masih kosong</div>
+              : (
+                <>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10, flexShrink: 0 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-2)', cursor: 'pointer' }}>
+                      <input type="checkbox" checked={selectedCartIds.length === cart.length} onChange={toggleSelectAllCart} />
+                      Pilih Semua ({selectedCartIds.length}/{cart.length})
+                    </label>
+                    <button
+                      className="btn btn-ghost" disabled={selectedCartIds.length === 0}
+                      onClick={() => setBulkPanelOpen(o => !o)}
+                      style={{ fontSize: 12, padding: '6px 10px', alignSelf: 'flex-start' }}
+                    >
+                      Assign Lokasi ({selectedCartIds.length})
                     </button>
                   </div>
-                ))}
-              </div>
-            </>
-          )
-        }
+
+                  {bulkPanelOpen && (
+                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, padding: '10px 12px', marginBottom: 12, background: 'var(--brand-bg)', borderRadius: 'var(--r-lg)', flexWrap: 'wrap', flexShrink: 0 }}>
+                      <div className="wi-select-wrap">
+                        <select value={bulkArea} onChange={e => { setBulkArea(e.target.value); setBulkSubArea(''); }}>
+                          <option value="">Pilih Area</option>
+                          {initialAreas.map(a => <option key={a.id} value={a.name}>{a.name}</option>)}
+                        </select>
+                      </div>
+                      <div className="wi-select-wrap">
+                        <select value={bulkSubArea} onChange={e => setBulkSubArea(e.target.value)} disabled={!bulkArea}>
+                          <option value="">{(SUB_AREAS[bulkArea] || []).length ? 'Pilih Sub Area' : '(Tidak ada Sub Area)'}</option>
+                          {(SUB_AREAS[bulkArea] || []).map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </div>
+                      <button className="btn-save-modal" disabled={!bulkArea} onClick={applyBulkAssign}>
+                        <IconCheck /> Terapkan ke {selectedCartIds.length} item
+                      </button>
+                      <button className="btn-cancel-m" onClick={() => setBulkPanelOpen(false)}>Batal</button>
+                    </div>
+                  )}
+
+                  <div className="cart-list">
+                    {cart.map(c => (
+                      <div key={c.cartId} className="cart-item">
+                        <input
+                          type="checkbox"
+                          checked={selectedCartIds.includes(c.cartId)}
+                          onChange={() => toggleCartSelect(c.cartId)}
+                        />
+                        <div className="cart-item-img">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="#b0b5cc" strokeWidth="1.5" style={{ width: 28, height: 28 }}>
+                            <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
+                          </svg>
+                        </div>
+                        <div className="cart-item-info">
+                          <div className="cart-item-name">{c.name}</div>
+                          <div className="cart-item-meta">{c.category} · {c.unit} · {c.warehouse}</div>
+                          {c.area && (
+                            <div className="cart-item-location">{c.area}{c.subArea ? ` · ${c.subArea}` : ''}</div>
+                          )}
+                        </div>
+                        <input
+                          className="inv-pick-qty" type="number" min={1} max={c.totalStock}
+                          value={c.qty} onChange={e => updateCartQty(c.cartId, parseInt(e.target.value) || 1)}
+                        />
+                        <button className="cart-item-remove" onClick={() => removeCartItem(c.cartId)}>
+                          <IconDelete />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )
+            }
+          </div>
+        </div>
       </Modal>
     </>
   );

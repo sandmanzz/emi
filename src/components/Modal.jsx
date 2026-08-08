@@ -3,10 +3,11 @@ import { IconClose } from './icons';
 
 const sizeStyles = {
   md: undefined,
-  lg: { maxWidth: 680 },
-  xl: { maxWidth: 760 },
-  '2xl': { maxWidth: 880 },
-  '3xl': { maxWidth: 1080 },
+  lg: { width: 680 },
+  xl: { width: 760 },
+  '2xl': { width: 880 },
+  '3xl': { width: 1080 },
+  '4xl': { width: 1320 },
 };
 
 export default function Modal({

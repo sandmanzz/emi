@@ -183,6 +183,12 @@ export const IconLayers = () => (
   </svg>
 );
 
+export const IconMoreVertical = () => (
+  <svg viewBox="0 0 24 24" fill="currentColor">
+    <circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/>
+  </svg>
+);
+
 export const IconRuler = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M21.3 8.7 15.3 2.7c-.4-.4-1-.4-1.4 0L2.7 13.9c-.4.4-.4 1 0 1.4l6 6c.4.4 1 .4 1.4 0L21.3 10.1c.4-.4.4-1 0-1.4Z"/>
