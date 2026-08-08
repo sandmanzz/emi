@@ -829,6 +829,18 @@ td.id-cell   { color: var(--text-muted); font-size: 12px; }
 /* Section title */
 .section-title { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 14px; letter-spacing: -.01em; }
 
+/* Dashboard mini list (upcoming events, alerts, etc.) */
+.dash-mini-list { display: flex; flex-direction: column; gap: 2px; }
+.dash-mini-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 10px 4px; border-bottom: 1px solid var(--border-2);
+  cursor: pointer; transition: background .12s; border-radius: var(--r);
+}
+.dash-mini-item:last-child { border-bottom: none; }
+.dash-mini-item:hover { background: var(--bg); }
+.dash-mini-name { font-size: 13px; font-weight: 600; color: var(--text); }
+.dash-mini-sub { font-size: 11.5px; color: var(--text-muted); margin-top: 2px; }
+
 /* Progress bars */
 .progress-bar-track { height: 8px; background: var(--border); border-radius: 20px; overflow: hidden; }
 .progress-bar-fill  { height: 100%; border-radius: 20px; transition: width .4s ease; }

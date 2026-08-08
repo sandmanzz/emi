@@ -20,6 +20,9 @@ import UnitPage from './pages/UnitPage';
 import UnitDetailPage from './pages/UnitDetailPage';
 import PlaceholderPage from './pages/PlaceholderPage';
 import AIAnalyzerPage from './pages/AIAnalyzerPage';
+import MainDashboardPage from './pages/DashboardPage';
+import InventoryReportPage from './pages/InventoryReportPage';
+import OverviewReportPage from './pages/OverviewReportPage';
 import RequireAuth from './components/RequireAuth';
 import SuperAdminLogin from './pages/superadmin/SuperAdminLogin';
 import SuperAdminLayout from './pages/superadmin/SuperAdminLayout';
@@ -47,6 +50,9 @@ export default function App() {
         </Route>
         <Route path="/" element={<Layout />}>
           <Route index element={<Navigate to="/event" replace />} />
+          <Route path="dashboard" element={<MainDashboardPage />} />
+          <Route path="inventory-report" element={<InventoryReportPage />} />
+          <Route path="overview-report" element={<OverviewReportPage />} />
           <Route path="event" element={<EventPage />} />
           <Route path="event-detail" element={<EventDetailPage />} />
           <Route path="event-summary" element={<EventSummaryPage />} />
