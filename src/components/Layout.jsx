@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
+import GlobalSearch from './GlobalSearch';
 import { IconMenu, IconLogout } from './icons';
 
 export default function Layout() {
@@ -15,6 +16,7 @@ export default function Layout() {
           </button>
           <span className="header-title">EMI Inventory</span>
         </div>
+        <GlobalSearch />
         <button className="header-btn" title="Logout">
           <IconLogout />
         </button>

@@ -4,6 +4,7 @@ import Modal from '../components/Modal';
 import Pagination from '../components/Pagination';
 import SortTh from '../components/SortTh';
 import { IconSearch, IconPlus, IconEdit, IconDelete, IconClose, IconCheck } from '../components/icons';
+import { initialCategories } from '../data/categories';
 
 const PAGE_SIZE = 10;
 
@@ -13,17 +14,6 @@ function fmtDate(d) {
   const [y, m, day] = d.split('-');
   return `${parseInt(day)} ${MONTHS_SHORT[parseInt(m) - 1]} ${y}`;
 }
-
-const ITEM_COUNTS = { Floral:3, Furniture:3, Lighting:0, Fabric:3, Decoration:8, Equipment:3 };
-
-const initialCategories = [
-  { id:1, name:'Floral',      desc:'Fresh and artificial flower arrangements',     itemCount: ITEM_COUNTS.Floral,      createdAt:'2024-01-05', updatedAt:'2024-03-10' },
-  { id:2, name:'Furniture',   desc:'Tables, chairs, and seating equipment',        itemCount: ITEM_COUNTS.Furniture,   createdAt:'2024-01-05', updatedAt:'2024-03-10' },
-  { id:3, name:'Lighting',    desc:'Stage and ambiance lighting equipment',        itemCount: ITEM_COUNTS.Lighting,    createdAt:'2024-01-05', updatedAt:'2024-03-12' },
-  { id:4, name:'Fabric',      desc:'Linens, drapes, and fabric materials',         itemCount: ITEM_COUNTS.Fabric,      createdAt:'2024-01-05', updatedAt:'2024-03-12' },
-  { id:5, name:'Decoration',  desc:'Ornamental and decorative event accessories',  itemCount: ITEM_COUNTS.Decoration,  createdAt:'2024-01-05', updatedAt:'2024-04-01' },
-  { id:6, name:'Equipment',   desc:'Technical and functional event equipment',     itemCount: ITEM_COUNTS.Equipment,   createdAt:'2024-01-05', updatedAt:'2024-04-01' },
-];
 
 const BADGE_COLORS = {
   Floral:     { color:'var(--green)',  bg:'var(--green-bg)' },

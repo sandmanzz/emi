@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal';
+import Stepper from '../components/Stepper';
 import { IconSearch, IconPlus, IconDelete, IconClose, IconCheck, IconCart, IconPrint, IconBarChart, IconMoreVertical } from '../components/icons';
 import { initialAreas, SUB_AREAS } from '../data/areas';
 import { inventoryData, categories } from '../data/inventory';
@@ -69,7 +70,7 @@ function InvThumb() {
   );
 }
 
-function ItemCard({ item, onScan, onDelete }) {
+function ItemCard({ item, onScan, onDelete, onStatusChange }) {
   return (
     <div className="item-card">
       <ImagePlaceholder />
@@ -80,6 +81,12 @@ function ItemCard({ item, onScan, onDelete }) {
           <span className="item-qty">Qty: {item.qty}</span>
         </div>
         {item.subArea && <div className="item-subarea">{item.subArea}</div>}
+        <Stepper
+          steps={STATUSES}
+          currentIndex={STATUSES.indexOf(item.status)}
+          onStepClick={step => onStatusChange(item.id, step)}
+        />
+        <div className="stepper-label">{item.status}</div>
         <div className="item-pic">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 12, height: 12 }}>
             <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
@@ -200,6 +207,10 @@ export default function EventDetailPage() {
   function deleteItem(id) {
     if (!window.confirm('Hapus item ini dari event?')) return;
     setItems(is => is.filter(i => i.id !== id));
+  }
+
+  function updateItemStatus(id, status) {
+    setItems(is => is.map(it => it.id === id ? { ...it, status } : it));
   }
 
   // --- Inventory picker → Cart ---
@@ -360,7 +371,7 @@ export default function EventDetailPage() {
           : (
             <div className="items-grid">
               {filtered.map(it => (
-                <ItemCard key={it.id} item={it} onScan={doScan} onDelete={deleteItem} />
+                <ItemCard key={it.id} item={it} onScan={doScan} onDelete={deleteItem} onStatusChange={updateItemStatus} />
               ))}
             </div>
           )

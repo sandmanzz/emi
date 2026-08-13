@@ -23,6 +23,9 @@ import AIAnalyzerPage from './pages/AIAnalyzerPage';
 import MainDashboardPage from './pages/DashboardPage';
 import InventoryReportPage from './pages/InventoryReportPage';
 import OverviewReportPage from './pages/OverviewReportPage';
+import ItemLoanPage from './pages/ItemLoanPage';
+import LogPage from './pages/LogPage';
+import UsersPage from './pages/UsersPage';
 import RequireAuth from './components/RequireAuth';
 import SuperAdminLogin from './pages/superadmin/SuperAdminLogin';
 import SuperAdminLayout from './pages/superadmin/SuperAdminLayout';
@@ -63,6 +66,7 @@ export default function App() {
           <Route path="inventory" element={<InventoryPage />} />
           <Route path="inventory-detail" element={<InventoryDetailPage />} />
           <Route path="sync-inventory" element={<SyncInventoryPage />} />
+          <Route path="item-loan" element={<ItemLoanPage />} />
           <Route path="area" element={<AreaPage />} />
           <Route path="area-detail" element={<AreaDetailPage />} />
           <Route path="sub-area" element={<SubAreaPage />} />
@@ -73,8 +77,8 @@ export default function App() {
           <Route path="unit-detail" element={<UnitDetailPage />} />
           <Route path="ai-analyzer" element={<AIAnalyzerPage />} />
           <Route path="qr-code" element={<PlaceholderPage title="QR Code" />} />
-          <Route path="log" element={<PlaceholderPage title="Log" />} />
-          <Route path="users" element={<PlaceholderPage title="Users" />} />
+          <Route path="log" element={<LogPage />} />
+          <Route path="users" element={<UsersPage />} />
           <Route path="*" element={<Navigate to="/event" replace />} />
         </Route>
       </Routes>

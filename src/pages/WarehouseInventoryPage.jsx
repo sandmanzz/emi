@@ -136,6 +136,13 @@ export default function WarehouseInventoryPage() {
   const [selectedItemId,   setSelectedItemId]   = useState(itemCatalog[0]?.id ?? null);
   const [form,             setForm]             = useState({ stock:'', stokMin:'', kode:'', rack:'', lantai:'', lorong:'', flag1:'', flag2:'', valuation:'', warehouseName:'' });
 
+  // Stock Opname
+  const [opnameWarehouse,  setOpnameWarehouse]  = useState('');
+  const [opnameQuery,      setOpnameQuery]      = useState('');
+  const [actualStock,      setActualStock]      = useState({});
+  const [opnameNote,       setOpnameNote]       = useState({});
+  const [opnameConfirmOpen,setOpnameConfirmOpen]= useState(false);
+
   const warehouseNames = useMemo(() => {
     const names = new Set([...inventoryRows.map(r => r.warehouseName), ...initialWarehouses.map(r => r.name)]);
     return [...names].filter(Boolean).sort();
@@ -261,6 +268,57 @@ export default function WarehouseInventoryPage() {
   const safeCount     = inventoryRows.filter(r => r.minStatus === 'Safe').length;
   const warningCount  = inventoryRows.filter(r => r.minStatus === 'Warning').length;
   const criticalCount = inventoryRows.filter(r => r.minStatus === 'Critical').length;
+
+  // --- Stock Opname ---
+  const opnameRows = useMemo(() => {
+    const q = opnameQuery.toLowerCase();
+    return inventoryRows.filter(r =>
+      (!opnameWarehouse || r.warehouseName === opnameWarehouse) &&
+      (!q || r.name.toLowerCase().includes(q))
+    );
+  }, [inventoryRows, opnameWarehouse, opnameQuery]);
+
+  function getActual(row) {
+    const v = actualStock[row.id];
+    return v === undefined || v === '' ? row.itemStock : v;
+  }
+  function variance(row) {
+    return getActual(row) - row.itemStock;
+  }
+  function setActual(rowId, value) {
+    setActualStock(s => ({ ...s, [rowId]: value === '' ? '' : Number(value) }));
+  }
+  function setNote(rowId, value) {
+    setOpnameNote(s => ({ ...s, [rowId]: value }));
+  }
+
+  const opnameChanged = opnameRows.filter(r => variance(r) !== 0);
+  const opnameMatched = opnameRows.length - opnameChanged.length;
+
+  function openOpnameConfirm() {
+    if (opnameChanged.length === 0) return;
+    setOpnameConfirmOpen(true);
+  }
+
+  function applyOpname() {
+    const now = formatUpdatedAt();
+    setInventoryRows(rows => rows.map(r => {
+      const v = actualStock[r.id];
+      if (v === undefined || v === '' || v === r.itemStock) return r;
+      const newStock = Number(v);
+      return {
+        ...r,
+        itemStock: newStock,
+        warehouseStock: newStock,
+        minStatus: deriveStatus(newStock, r.stokMin),
+        totalValuation: r.valuation * newStock,
+        updatedAt: now,
+      };
+    }));
+    setActualStock({});
+    setOpnameNote({});
+    setOpnameConfirmOpen(false);
+  }
 
   return (
     <>
@@ -530,15 +588,137 @@ export default function WarehouseInventoryPage() {
       </Modal>
 
       {tab === 'stockopname' && (
-        <div className="card" style={{ padding:'64px 32px', textAlign:'center' }}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="var(--border)" strokeWidth="1.5" style={{ width:48, height:48, marginBottom:14 }}>
-            <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/>
-            <line x1="6" y1="20" x2="6" y2="14"/>
-          </svg>
-          <p style={{ fontSize:14, fontWeight:600, color:'var(--text)', marginBottom:6 }}>Stock Opname</p>
-          <p style={{ fontSize:13, color:'var(--text-muted)' }}>Feature ini akan segera tersedia</p>
+        <div className="card">
+          <div className="stats-bar" style={{ gridTemplateColumns:'repeat(3,1fr)', marginBottom:18 }}>
+            <div className="stat-card">
+              <div className="stat-icon" style={{ background:'var(--brand-bg)' }}>
+                <span className="stat-value" style={{ color:'var(--brand)' }}>{opnameRows.length}</span>
+              </div>
+              <span className="stat-label">Item Diperiksa</span>
+            </div>
+            <div className="stat-card">
+              <div className="stat-icon" style={{ background:'var(--green-bg)' }}>
+                <span className="stat-value" style={{ color:'var(--green)' }}>{opnameMatched}</span>
+              </div>
+              <span className="stat-label">Sesuai</span>
+            </div>
+            <div className="stat-card">
+              <div className="stat-icon" style={{ background:'var(--orange-bg)' }}>
+                <span className="stat-value" style={{ color:'var(--orange)' }}>{opnameChanged.length}</span>
+              </div>
+              <span className="stat-label">Ada Selisih</span>
+            </div>
+          </div>
+
+          <div className="toolbar">
+            <div className="toolbar-left">
+              <div className="search-wrap">
+                <IconSearch />
+                <input
+                  className="search-input" type="text" placeholder="Cari nama barang…"
+                  value={opnameQuery} onChange={e => setOpnameQuery(e.target.value)}
+                />
+              </div>
+              <div className="wi-select-wrap">
+                <select value={opnameWarehouse} onChange={e => setOpnameWarehouse(e.target.value)}>
+                  <option value="">Semua Warehouse</option>
+                  {warehouseNames.map(n => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="toolbar-right">
+              <button className="btn-save-modal" disabled={opnameChanged.length === 0} onClick={openOpnameConfirm}>
+                <IconCheck /> Terapkan Hasil Opname ({opnameChanged.length})
+              </button>
+            </div>
+          </div>
+
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Nama Barang</th>
+                  <th>Warehouse</th>
+                  <th style={{ width:100, textAlign:'right' }}>Stok Sistem</th>
+                  <th style={{ width:110, textAlign:'right' }}>Stok Aktual</th>
+                  <th style={{ width:80, textAlign:'right' }}>Selisih</th>
+                  <th style={{ width:100 }}>Status</th>
+                  <th>Catatan</th>
+                </tr>
+              </thead>
+              <tbody>
+                {opnameRows.length === 0
+                  ? <tr><td colSpan={7} style={{ textAlign:'center', color:'var(--text-muted)', padding:32 }}>Tidak ada item ditemukan.</td></tr>
+                  : opnameRows.map(r => {
+                    const actual = getActual(r);
+                    const diff = variance(r);
+                    return (
+                      <tr key={r.id}>
+                        <td className="name-cell">{r.name}</td>
+                        <td>{r.warehouseName}</td>
+                        <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{r.itemStock}</td>
+                        <td style={{ textAlign:'right' }}>
+                          <input
+                            type="number" min="0" className="inv-pick-qty" style={{ width:76 }}
+                            value={actual} onChange={e => setActual(r.id, e.target.value)}
+                          />
+                        </td>
+                        <td style={{ textAlign:'right', fontWeight:700, color: diff === 0 ? 'var(--text-muted)' : diff > 0 ? 'var(--brand)' : 'var(--red)' }}>
+                          {diff > 0 ? `+${diff}` : diff}
+                        </td>
+                        <td>
+                          {diff === 0
+                            ? <span className="badge badge-green">Sesuai</span>
+                            : diff > 0
+                              ? <span className="badge badge-blue">Lebih</span>
+                              : <span className="badge badge-red">Kurang</span>
+                          }
+                        </td>
+                        <td>
+                          <input
+                            type="text" placeholder="Opsional"
+                            style={{ width:'100%', padding:'5px 8px', border:'1px solid var(--border)', borderRadius:'var(--r)', fontSize:12.5, fontFamily:'inherit', color:'var(--text)' }}
+                            value={opnameNote[r.id] || ''} onChange={e => setNote(r.id, e.target.value)}
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })
+                }
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
+
+      <Modal
+        open={opnameConfirmOpen}
+        title="Terapkan Hasil Stock Opname"
+        onClose={() => setOpnameConfirmOpen(false)}
+        footer={
+          <>
+            <button className="btn-cancel-modal" onClick={() => setOpnameConfirmOpen(false)}>Batal</button>
+            <button className="btn-save-modal" onClick={applyOpname}><IconCheck /> Terapkan</button>
+          </>
+        }
+      >
+        <p className="confirm-msg" style={{ marginBottom:12 }}>
+          <strong>{opnameChanged.length}</strong> item akan diperbarui stoknya sesuai hasil hitung fisik:
+        </p>
+        <div style={{ display:'flex', flexDirection:'column', gap:6, maxHeight:240, overflowY:'auto' }}>
+          {opnameChanged.map(r => {
+            const diff = variance(r);
+            return (
+              <div key={r.id} style={{ display:'flex', justifyContent:'space-between', fontSize:12.5, padding:'6px 0', borderBottom:'1px solid var(--border-2)' }}>
+                <span>{r.name}</span>
+                <span style={{ fontWeight:700, color: diff > 0 ? 'var(--brand)' : 'var(--red)' }}>
+                  {r.itemStock} → {getActual(r)} ({diff > 0 ? '+' : ''}{diff})
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </Modal>
     </>
   );
 }
