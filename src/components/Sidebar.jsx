@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, Link } from 'react-router-dom';
 import { version } from '../../package.json';
 
 const SECTIONS = [
@@ -90,7 +90,13 @@ export default function Sidebar({ visible }) {
           ))}
         </div>
       ))}
-      <div className="sidebar-version">v{version}</div>
+      <div className="sidebar-footer">
+        <Link to="/superadmin/login" className="sidebar-owner-link">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          <span>Owner Panel</span>
+        </Link>
+        <div className="sidebar-version">v{version}</div>
+      </div>
     </nav>
   );
 }

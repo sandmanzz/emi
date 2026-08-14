@@ -30,18 +30,18 @@ function stockBadge(s) {
 }
 
 const initialItems = [
-  { id:1, name:'Chiffon White 4-6×1,2m', area:'CEREMONY',    subArea:'',  status:'Preparation',  qty:2,  pic:'Anto',    checking:true,  warehouseItem:false, scanIn:'May 26, 2025 10:42 PM', scanOut:'May 26, 2025 9:33 PM',  note:"Please take care this item, it's luxury item" },
-  { id:2, name:'hanging rotan 1',         area:'PHOTOBOOTH',  subArea:'',  status:'Preparation',  qty:2,  pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:"Please take care this item, it's luxury item" },
-  { id:3, name:'hanging rotan 2',         area:'RECEPTION',   subArea:'',  status:'Preparation',  qty:10, pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:"Please take care this item, it's luxury item" },
-  { id:4, name:'hanging rotan 3',         area:'RECEPTION',   subArea:'',  status:'Preparation',  qty:10, pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:"Please take care this item, it's luxury item" },
-  { id:5, name:'Kain Putih 3m',           area:'ENTRANCE',    subArea:'',  status:'Preparation',  qty:5,  pic:'Novi',    checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:'' },
-  { id:6, name:'Bunga Mawar Merah',       area:'RECEPTION',   subArea:'',  status:'During Event', qty:30, pic:'Darmian', checking:true,  warehouseItem:false, scanIn:'Apr 9, 2026 08:00 AM',  scanOut:null,                    note:'' },
-  { id:7, name:'Standing Flower Tall',    area:'ENTRANCE',    subArea:'',  status:'Preparation',  qty:4,  pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:'' },
-  { id:8, name:'Tealight Holder 15cm',    area:'GUEST TABLE', subArea:'',  status:'During Event', qty:50, pic:'Anto',    checking:false, warehouseItem:true,  scanIn:null,                    scanOut:null,                    note:'' },
-  { id:9, name:'Pita Emas 5m',            area:'CEREMONY',    subArea:'',  status:'Preparation',  qty:20, pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:'' },
-  { id:10,name:'Lilin Putih 30cm',        area:'GUEST TABLE', subArea:'',  status:'Preparation',  qty:100,pic:'Novi',    checking:true,  warehouseItem:true,  scanIn:'Apr 9, 2026 07:30 AM',  scanOut:'Apr 9, 2026 09:00 AM', note:'' },
-  { id:11,name:'Backdrop Floral 3×2m',    area:'PHOTOBOOTH',  subArea:'',  status:'Preparation',  qty:1,  pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:'' },
-  { id:12,name:'Kursi Tiffany',           area:'RECEPTION',   subArea:'',  status:'During Event', qty:60, pic:'Darmian', checking:false, warehouseItem:true,  scanIn:null,                    scanOut:null,                    note:'' },
+  { id:1, name:'Chiffon White 4-6×1,2m', area:'CEREMONY',    subArea:'',  stage:'Preparation', qty:2,  pic:'Anto',    checking:true,  warehouseItem:false, scanIn:'May 26, 2025 10:42 PM', scanOut:'May 26, 2025 9:33 PM',  note:"Please take care this item, it's luxury item" },
+  { id:2, name:'hanging rotan 1',         area:'PHOTOBOOTH',  subArea:'',  stage:'Preparation', qty:2,  pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:"Please take care this item, it's luxury item" },
+  { id:3, name:'hanging rotan 2',         area:'RECEPTION',   subArea:'',  stage:'Preparation', qty:10, pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:"Please take care this item, it's luxury item" },
+  { id:4, name:'hanging rotan 3',         area:'RECEPTION',   subArea:'',  stage:'Preparation', qty:10, pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:"Please take care this item, it's luxury item" },
+  { id:5, name:'Kain Putih 3m',           area:'ENTRANCE',    subArea:'',  stage:'Preparation', qty:5,  pic:'Novi',    checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:'' },
+  { id:6, name:'Bunga Mawar Merah',       area:'RECEPTION',   subArea:'',  stage:'Preparation', qty:30, pic:'Darmian', checking:true,  warehouseItem:false, scanIn:'Apr 9, 2026 08:00 AM',  scanOut:null,                    note:'' },
+  { id:7, name:'Standing Flower Tall',    area:'ENTRANCE',    subArea:'',  stage:'Preparation', qty:4,  pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:'' },
+  { id:8, name:'Tealight Holder 15cm',    area:'GUEST TABLE', subArea:'',  stage:'Preparation', qty:50, pic:'Anto',    checking:false, warehouseItem:true,  scanIn:null,                    scanOut:null,                    note:'' },
+  { id:9, name:'Pita Emas 5m',            area:'CEREMONY',    subArea:'',  stage:'Preparation', qty:20, pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:'' },
+  { id:10,name:'Lilin Putih 30cm',        area:'GUEST TABLE', subArea:'',  stage:'Preparation', qty:100,pic:'Novi',    checking:true,  warehouseItem:true,  scanIn:'Apr 9, 2026 07:30 AM',  scanOut:'Apr 9, 2026 09:00 AM', note:'' },
+  { id:11,name:'Backdrop Floral 3×2m',    area:'PHOTOBOOTH',  subArea:'',  stage:'Preparation', qty:1,  pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:'' },
+  { id:12,name:'Kursi Tiffany',           area:'RECEPTION',   subArea:'',  stage:'Preparation', qty:60, pic:'Darmian', checking:false, warehouseItem:true,  scanIn:null,                    scanOut:null,                    note:'' },
 ];
 
 function CheckIcon() {
@@ -70,7 +70,7 @@ function InvThumb() {
   );
 }
 
-function ItemCard({ item, onScan, onDelete, onStatusChange }) {
+function ItemCard({ item, onScan, onDelete }) {
   return (
     <div className="item-card">
       <ImagePlaceholder />
@@ -81,12 +81,6 @@ function ItemCard({ item, onScan, onDelete, onStatusChange }) {
           <span className="item-qty">Qty: {item.qty}</span>
         </div>
         {item.subArea && <div className="item-subarea">{item.subArea}</div>}
-        <Stepper
-          steps={STATUSES}
-          currentIndex={STATUSES.indexOf(item.status)}
-          onStepClick={step => onStatusChange(item.id, step)}
-        />
-        <div className="stepper-label">{item.status}</div>
         <div className="item-pic">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 12, height: 12 }}>
             <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
@@ -154,11 +148,13 @@ export default function EventDetailPage() {
 
   const [items, setItems] = useState(initialItems);
   const [nextId, setNextId] = useState(13);
+  const [eventStatus, setEventStatus] = useState('Preparation');
 
   const [selectedArea, setSelectedArea] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState('');
   const [areaDropOpen, setAreaDropOpen] = useState(false);
+  const [areaQuery, setAreaQuery] = useState('');
   const [kwSearch, setKwSearch] = useState('');
+  const [stageFilter, setStageFilter] = useState('all'); // 'all' | 'previous' | 'current'
 
   // Cart — "add from inventory" e-commerce style flow
   const [cart, setCart] = useState([]);
@@ -176,11 +172,36 @@ export default function EventDetailPage() {
   const [pickerWarehouse, setPickerWarehouse] = useState({});
 
   const filtered = useMemo(() => items.filter(it => {
-    if (selectedArea   && it.area   !== selectedArea)   return false;
-    if (selectedStatus && it.status !== selectedStatus) return false;
+    if (selectedArea && it.area !== selectedArea) return false;
     if (kwSearch && !it.name.toLowerCase().includes(kwSearch.toLowerCase()) && !it.area.toLowerCase().includes(kwSearch.toLowerCase())) return false;
     return true;
-  }), [items, selectedArea, selectedStatus, kwSearch]);
+  }), [items, selectedArea, kwSearch]);
+
+  const stageIndex = STATUSES.indexOf(eventStatus);
+  const previousStageItems = useMemo(() => filtered.filter(it => STATUSES.indexOf(it.stage) < stageIndex), [filtered, stageIndex]);
+  const currentStageItems  = useMemo(() => filtered.filter(it => STATUSES.indexOf(it.stage) === stageIndex), [filtered, stageIndex]);
+  const stageFiltered = stageFilter === 'previous' ? previousStageItems : stageFilter === 'current' ? currentStageItems : filtered;
+
+  const areaCounts = useMemo(() => {
+    const map = {};
+    items.forEach(it => { map[it.area] = (map[it.area] || 0) + 1; });
+    return map;
+  }, [items]);
+
+  const areaOptions = useMemo(() => {
+    const q = areaQuery.trim().toLowerCase();
+    return AREAS.filter(a => !q || a.toLowerCase().includes(q));
+  }, [areaQuery]);
+
+  function closeAreaDropdown() {
+    setAreaDropOpen(false);
+    setAreaQuery('');
+  }
+
+  function changeEventStatus(step) {
+    setEventStatus(step);
+    setStageFilter('all');
+  }
 
   const pickerFiltered = useMemo(() => {
     const q = pickerQuery.trim().toLowerCase();
@@ -190,8 +211,7 @@ export default function EventDetailPage() {
     );
   }, [pickerQuery, pickerCategory]);
 
-  const areaLabel  = selectedArea   || 'All Place';
-  const statusLabel = selectedStatus || 'All Status';
+  const areaLabel = selectedArea || 'All Place';
   const hasMissingArea = cart.some(c => !c.area);
 
   function doScan(id) {
@@ -207,10 +227,6 @@ export default function EventDetailPage() {
   function deleteItem(id) {
     if (!window.confirm('Hapus item ini dari event?')) return;
     setItems(is => is.filter(i => i.id !== id));
-  }
-
-  function updateItemStatus(id, status) {
-    setItems(is => is.map(it => it.id === id ? { ...it, status } : it));
   }
 
   // --- Inventory picker → Cart ---
@@ -271,8 +287,8 @@ export default function EventDetailPage() {
     setItems(is => [
       ...is,
       ...cart.map((c, i) => ({
-        id: nextId + i, name: c.name, area: c.area, subArea: c.subArea,
-        status: 'Preparation', qty: c.qty, pic: '', checking: false,
+        id: nextId + i, name: c.name, area: c.area, subArea: c.subArea, stage: eventStatus,
+        qty: c.qty, pic: '', checking: false,
         warehouseItem: true, scanIn: null, scanOut: null, note: '',
       })),
     ]);
@@ -312,17 +328,18 @@ export default function EventDetailPage() {
           </div>
         </div>
 
-        <div className="filter-row">
-          <div className="custom-select" style={{ flex: 1 }}>
-            <select value={selectedStatus} onChange={e => setSelectedStatus(e.target.value)}>
-              <option value="">All Status</option>
-              {STATUSES.map(s => <option key={s}>{s}</option>)}
-            </select>
-            <span className="chevron">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-            </span>
+        <div className="event-status-section">
+          <span className="event-status-section-label">Status Event</span>
+          <div style={{ maxWidth: 460, flex: 1 }}>
+            <Stepper
+              steps={STATUSES}
+              currentIndex={STATUSES.indexOf(eventStatus)}
+              onStepClick={changeEventStatus}
+            />
           </div>
+        </div>
 
+        <div className="filter-row">
           <div className="dropdown-wrap" style={{ flex: 1, position: 'relative', minWidth: 190 }}>
             <div className={`dropdown-trigger${areaDropOpen ? ' open' : ''}`} onClick={() => setAreaDropOpen(o => !o)}>
               <span>{areaLabel}</span>
@@ -330,10 +347,32 @@ export default function EventDetailPage() {
             </div>
             {areaDropOpen && (
               <div className="dropdown-menu open">
-                <div className={`dropdown-item${!selectedArea ? ' selected' : ''}`} onClick={() => { setSelectedArea(''); setAreaDropOpen(false); }}>All Area</div>
-                {AREAS.map(a => (
-                  <div key={a} className={`dropdown-item${selectedArea === a ? ' selected' : ''}`} onClick={() => { setSelectedArea(a); setAreaDropOpen(false); }}>{a}</div>
-                ))}
+                <div className="dropdown-search">
+                  <IconSearch />
+                  <input
+                    autoFocus
+                    type="text"
+                    placeholder="Cari area…"
+                    value={areaQuery}
+                    onChange={e => setAreaQuery(e.target.value)}
+                    onClick={e => e.stopPropagation()}
+                  />
+                </div>
+                <div className="dropdown-list">
+                  <div className={`dropdown-item${!selectedArea ? ' selected' : ''}`} onClick={() => { setSelectedArea(''); closeAreaDropdown(); }}>
+                    <span>All Area</span>
+                    <span className="dropdown-item-count">{items.length}</span>
+                  </div>
+                  {areaOptions.length === 0
+                    ? <div className="dropdown-empty">Area tidak ditemukan</div>
+                    : areaOptions.map(a => (
+                      <div key={a} className={`dropdown-item${selectedArea === a ? ' selected' : ''}`} onClick={() => { setSelectedArea(a); closeAreaDropdown(); }}>
+                        <span>{a}</span>
+                        <span className="dropdown-item-count">{areaCounts[a] || 0}</span>
+                      </div>
+                    ))
+                  }
+                </div>
               </div>
             )}
           </div>
@@ -362,16 +401,28 @@ export default function EventDetailPage() {
           </div>
         </div>
 
+        <div className="stage-tabs">
+          <button type="button" className={`stage-tab${stageFilter === 'all' ? ' active' : ''}`} onClick={() => setStageFilter('all')}>
+            Semua <span className="stage-tab-count">{filtered.length}</span>
+          </button>
+          <button type="button" className={`stage-tab${stageFilter === 'previous' ? ' active' : ''}`} onClick={() => setStageFilter('previous')}>
+            Dari Tahap Sebelumnya <span className="stage-tab-count">{previousStageItems.length}</span>
+          </button>
+          <button type="button" className={`stage-tab${stageFilter === 'current' ? ' active' : ''}`} onClick={() => setStageFilter('current')}>
+            Baru di &ldquo;{eventStatus}&rdquo; <span className="stage-tab-count">{currentStageItems.length}</span>
+          </button>
+        </div>
+
         <p className="summary-text">
-          <strong>{filtered.length}</strong> pcs item untuk state <strong>&ldquo;{statusLabel}&rdquo;</strong> di Area <strong>&ldquo;{areaLabel}&rdquo;</strong>
+          <strong>{stageFiltered.length}</strong> pcs item pada status event <strong>&ldquo;{eventStatus}&rdquo;</strong> di Area <strong>&ldquo;{areaLabel}&rdquo;</strong>
         </p>
 
-        {filtered.length === 0
+        {stageFiltered.length === 0
           ? <div className="no-data">No Data</div>
           : (
             <div className="items-grid">
-              {filtered.map(it => (
-                <ItemCard key={it.id} item={it} onScan={doScan} onDelete={deleteItem} onStatusChange={updateItemStatus} />
+              {stageFiltered.map(it => (
+                <ItemCard key={it.id} item={it} onScan={doScan} onDelete={deleteItem} />
               ))}
             </div>
           )
