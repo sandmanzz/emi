@@ -1,31 +1,32 @@
 import { useState, useMemo } from 'react';
 import Pagination from '../components/Pagination';
 import SortTh from '../components/SortTh';
+import SearchableSelect from '../components/SearchableSelect';
 import { IconSearch } from '../components/icons';
 
 const PAGE_SIZE = 10;
 
 const syncData = [
-  { id:1,  name:'Artificial Flower Chrysant Giant White', sku:'AFG-001', stock:342, warehouseStock:340, warehouse:'Gudang Bali 66'   },
-  { id:2,  name:'Artificial Flower Lunaria White',        sku:'AFL-002', stock:327, warehouseStock:277, warehouse:'Gudang Bali 66'   },
-  { id:3,  name:'Artificial Rose Pink',                   sku:'ARP-003', stock:182, warehouseStock:182, warehouse:'Gudang Bali 66'   },
-  { id:4,  name:'Backdrop Stand 2m',                      sku:'BSD-004', stock:8,   warehouseStock:10,  warehouse:'Gudang C9'        },
-  { id:5,  name:'Balon Latex Putih',                      sku:'BLP-005', stock:500, warehouseStock:500, warehouse:'Gudang Surabaya'  },
-  { id:6,  name:'Candle Holder Bulat Besar',              sku:'CHB-006', stock:60,  warehouseStock:58,  warehouse:'Gudang Bali 70'   },
-  { id:7,  name:'Crystal Bentuk Tabung',                  sku:'CBT-007', stock:100, warehouseStock:100, warehouse:'Gudang Bali 66'   },
-  { id:8,  name:'Fabric Putih Polos 3m',                  sku:'FPP-008', stock:20,  warehouseStock:24,  warehouse:'Gudang Cililitan' },
-  { id:9,  name:'Flower Arch Besi 60cm',                  sku:'FAB-009', stock:12,  warehouseStock:12,  warehouse:'Gudang Bali 70'   },
-  { id:10, name:'Gebyok Jati Ukiran',                     sku:'GJU-010', stock:2,   warehouseStock:3,   warehouse:'Gudang Cililitan' },
-  { id:11, name:'Janur Kuning',                           sku:'JKN-011', stock:50,  warehouseStock:50,  warehouse:'Gudang Bali 66'   },
-  { id:12, name:'Kain Batik Wahyu Tumurun',               sku:'KBW-012', stock:80,  warehouseStock:80,  warehouse:'Gudang Cililitan' },
-  { id:13, name:'Kursi Tiffany Putih',                    sku:'KTP-013', stock:80,  warehouseStock:75,  warehouse:'Gudang Bali 66'   },
-  { id:14, name:'Lilin Merah Besar',                      sku:'LMB-014', stock:50,  warehouseStock:50,  warehouse:'Gudang Bali 66'   },
-  { id:15, name:'Meja Buffet Putih',                      sku:'MBP-015', stock:8,   warehouseStock:9,   warehouse:'Gudang Surabaya'  },
-  { id:16, name:'Pita Emas Roll',                         sku:'PER-016', stock:100, warehouseStock:100, warehouse:'Gudang Bali 66'   },
-  { id:17, name:'Taplak Meja Putih 2x1m',                 sku:'TMP-017', stock:30,  warehouseStock:30,  warehouse:'Gudang Bali 66'   },
-  { id:18, name:'Tealight Holder Lama Tinggi 15cm',       sku:'THL-018', stock:27,  warehouseStock:22,  warehouse:'Gudang Bali 70'   },
-  { id:19, name:'Tripod Kamera Mini',                     sku:'TKM-019', stock:5,   warehouseStock:5,   warehouse:'Gudang Cililitan' },
-  { id:20, name:'Vase Keramik Putih Tinggi',              sku:'VKP-020', stock:15,  warehouseStock:15,  warehouse:'Gudang Bali 66'   },
+  { id:1,  name:'Artificial Flower Chrysant Giant White', sku:'AFG-001', stock:342, warehouseStock:340, warehouse:'Warehouse Bali 66'   },
+  { id:2,  name:'Artificial Flower Lunaria White',        sku:'AFL-002', stock:327, warehouseStock:277, warehouse:'Warehouse Bali 66'   },
+  { id:3,  name:'Artificial Rose Pink',                   sku:'ARP-003', stock:182, warehouseStock:182, warehouse:'Warehouse Bali 66'   },
+  { id:4,  name:'Backdrop Stand 2m',                      sku:'BSD-004', stock:8,   warehouseStock:10,  warehouse:'Warehouse C9'        },
+  { id:5,  name:'White Latex Balloon',                    sku:'BLP-005', stock:500, warehouseStock:500, warehouse:'Warehouse Surabaya'  },
+  { id:6,  name:'Large Round Candle Holder',               sku:'CHB-006', stock:60,  warehouseStock:58,  warehouse:'Warehouse Bali 70'   },
+  { id:7,  name:'Cylindrical Crystal',                     sku:'CBT-007', stock:100, warehouseStock:100, warehouse:'Warehouse Bali 66'   },
+  { id:8,  name:'Plain White Fabric 3m',                   sku:'FPP-008', stock:20,  warehouseStock:24,  warehouse:'Warehouse Cililitan' },
+  { id:9,  name:'Iron Flower Arch 60cm',                    sku:'FAB-009', stock:12,  warehouseStock:12,  warehouse:'Warehouse Bali 70'   },
+  { id:10, name:'Carved Teak Gebyok Panel',                 sku:'GJU-010', stock:2,   warehouseStock:3,   warehouse:'Warehouse Cililitan' },
+  { id:11, name:'Yellow Coconut Leaf',                      sku:'JKN-011', stock:50,  warehouseStock:50,  warehouse:'Warehouse Bali 66'   },
+  { id:12, name:'Wahyu Tumurun Batik Fabric',               sku:'KBW-012', stock:80,  warehouseStock:80,  warehouse:'Warehouse Cililitan' },
+  { id:13, name:'White Tiffany Chair',                      sku:'KTP-013', stock:80,  warehouseStock:75,  warehouse:'Warehouse Bali 66'   },
+  { id:14, name:'Large Red Candle',                         sku:'LMB-014', stock:50,  warehouseStock:50,  warehouse:'Warehouse Bali 66'   },
+  { id:15, name:'White Buffet Table',                       sku:'MBP-015', stock:8,   warehouseStock:9,   warehouse:'Warehouse Surabaya'  },
+  { id:16, name:'Gold Ribbon Roll',                         sku:'PER-016', stock:100, warehouseStock:100, warehouse:'Warehouse Bali 66'   },
+  { id:17, name:'White Tablecloth 2x1m',                    sku:'TMP-017', stock:30,  warehouseStock:30,  warehouse:'Warehouse Bali 66'   },
+  { id:18, name:'Classic Tall Tealight Holder 15cm',        sku:'THL-018', stock:27,  warehouseStock:22,  warehouse:'Warehouse Bali 70'   },
+  { id:19, name:'Mini Camera Tripod',                       sku:'TKM-019', stock:5,   warehouseStock:5,   warehouse:'Warehouse Cililitan' },
+  { id:20, name:'Tall White Ceramic Vase',                  sku:'VKP-020', stock:15,  warehouseStock:15,  warehouse:'Warehouse Bali 66'   },
 ];
 
 function DiffBadge({ diff }) {
@@ -88,7 +89,7 @@ export default function SyncInventoryPage() {
   return (
     <>
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:22 }}>
-        <h1 className="page-title" style={{ margin:0 }}>Syncronize Inventory</h1>
+        <h1 className="page-title" style={{ margin:0 }}>Sync Inventory</h1>
         <button className="btn-new" onClick={() => syncData.forEach(r => doSync(r.id))}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width:14, height:14 }}>
             <polyline points="1 4 1 10 7 10"/><polyline points="23 20 23 14 17 14"/>
@@ -124,19 +125,27 @@ export default function SyncInventoryPage() {
                 value={query} onChange={e => { setQuery(e.target.value); setPage(1); }}
               />
             </div>
-            <div className="wi-select-wrap">
-              <select value={warehouseFilter} onChange={e => { setWarehouseFilter(e.target.value); setPage(1); }}>
-                <option value="">All Warehouses</option>
-                {warehouseNames.map(n => <option key={n} value={n}>{n}</option>)}
-              </select>
-            </div>
-            <div className="wi-select-wrap">
-              <select value={diffFilter} onChange={e => { setDiffFilter(e.target.value); setPage(1); }}>
-                <option value="">All Items</option>
-                <option value="match">Matched</option>
-                <option value="diff">Discrepancy</option>
-              </select>
-            </div>
+            <SearchableSelect
+              inline
+              value={warehouseFilter}
+              onChange={v => { setWarehouseFilter(v); setPage(1); }}
+              options={[
+                { value: '', label: 'All Warehouses' },
+                ...warehouseNames.map(n => ({ value: n, label: n })),
+              ]}
+              placeholder="All Warehouses"
+            />
+            <SearchableSelect
+              inline
+              value={diffFilter}
+              onChange={v => { setDiffFilter(v); setPage(1); }}
+              options={[
+                { value: '', label: 'All Items' },
+                { value: 'match', label: 'Matched' },
+                { value: 'diff', label: 'Discrepancy' },
+              ]}
+              placeholder="All Items"
+            />
             <button className="btn-search">Search</button>
           </div>
         </div>

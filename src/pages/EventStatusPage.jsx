@@ -2,7 +2,9 @@ import { useState, useMemo } from 'react';
 import Modal from '../components/Modal';
 import Pagination from '../components/Pagination';
 import SortTh from '../components/SortTh';
+import SearchableSelect from '../components/SearchableSelect';
 import { IconSearch, IconPlus, IconEdit, IconDelete, IconClose, IconCheck } from '../components/icons';
+import { getEventStatuses, saveEventStatuses } from '../lib/eventStatuses';
 
 const PAGE_SIZE = 10;
 
@@ -13,33 +15,15 @@ function fmtDate(d) {
   return `${parseInt(day)} ${MONTHS_SHORT[parseInt(m) - 1]} ${y}`;
 }
 
-const initialStatuses = [
-  { id:1,  order:1, status:'Created by admin up',  showScan:false, action:'',        eventRunning:0,  updatedAt:'2024-01-10' },
-  { id:2,  order:2, status:'On preparing items',   showScan:false, action:'',        eventRunning:2,  updatedAt:'2024-01-10' },
-  { id:3,  order:3, status:'Finish setup',          showScan:false, action:'',        eventRunning:1,  updatedAt:'2024-01-12' },
-  { id:4,  order:4, status:'Waiting scan in',       showScan:true,  action:'SCAN IN', eventRunning:3,  updatedAt:'2024-01-15' },
-  { id:5,  order:5, status:'Event running',         showScan:false, action:'',        eventRunning:5,  updatedAt:'2024-02-01' },
-  { id:6,  order:6, status:'Waiting scan out',      showScan:true,  action:'SCAN OUT',eventRunning:2,  updatedAt:'2024-02-05' },
-  { id:7,  order:7, status:'Finished',              showScan:false, action:'',        eventRunning:12, updatedAt:'2024-02-10' },
-  { id:8,  order:8, status:'Postphone',             showScan:false, action:'',        eventRunning:1,  updatedAt:'2024-03-01' },
-  { id:9,  order:9, status:'Disable',               showScan:false, action:'',        eventRunning:0,  updatedAt:'2024-03-05' },
-];
-
-function ScanBadge({ show }) {
-  return show
-    ? <span className="badge badge-green" style={{ fontSize:'11px' }}>Yes</span>
-    : <span className="badge badge-gray"  style={{ fontSize:'11px', background:'transparent', border:'1px solid var(--border)', color:'var(--text-muted)', fontWeight:400 }}>No</span>;
-}
-
-function ActionBadge({ action }) {
-  if (action === 'SCAN IN')  return <span className="badge badge-blue"   style={{ fontSize:'11px', letterSpacing:'.03em' }}>SCAN IN</span>;
-  if (action === 'SCAN OUT') return <span className="badge badge-orange" style={{ fontSize:'11px', letterSpacing:'.03em' }}>SCAN OUT</span>;
-  return <span style={{ color:'var(--text-muted)', fontSize:'12px' }}>—</span>;
+function ScanBadge({ scan }) {
+  return scan === 'Scan'
+    ? <span className="badge badge-green" style={{ fontSize:'11px' }}>Scan</span>
+    : <span className="badge badge-gray"  style={{ fontSize:'11px', background:'transparent', border:'1px solid var(--border)', color:'var(--text-muted)', fontWeight:400 }}>None</span>;
 }
 
 export default function EventStatusPage() {
-  const [statuses,     setStatuses]     = useState(initialStatuses);
-  const [nextId,       setNextId]       = useState(initialStatuses.length + 1);
+  const [statuses,     setStatusesState] = useState(() => getEventStatuses());
+  const [nextId,       setNextId]       = useState(() => Math.max(0, ...getEventStatuses().map(s => s.id)) + 1);
   const [query,        setQuery]        = useState('');
   const [sortCol,      setSortCol]      = useState(-1);
   const [sortAsc,      setSortAsc]      = useState(true);
@@ -49,7 +33,15 @@ export default function EventStatusPage() {
   const [deleteModal,  setDeleteModal]  = useState(false);
   const [editingId,    setEditingId]    = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [form, setForm] = useState({ status: '', showScan: false, action: '', order: '' });
+  const [form, setForm] = useState({ status: '', scan: 'None', order: '' });
+
+  function setStatuses(updater) {
+    setStatusesState(current => {
+      const next = typeof updater === 'function' ? updater(current) : updater;
+      saveEventStatuses(next);
+      return next;
+    });
+  }
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -80,7 +72,7 @@ export default function EventStatusPage() {
 
   function openNew() {
     setEditingId(null);
-    setForm({ status: '', showScan: false, action: '', order: String(statuses.length + 1) });
+    setForm({ status: '', scan: 'None', order: String(statuses.length + 1) });
     setStatusModal(true);
   }
 
@@ -88,7 +80,7 @@ export default function EventStatusPage() {
     const r = statuses.find(x => x.id === id);
     if (!r) return;
     setEditingId(id);
-    setForm({ status: r.status, showScan: r.showScan, action: r.action, order: String(r.order) });
+    setForm({ status: r.status, scan: r.scan, order: String(r.order) });
     setStatusModal(true);
   }
 
@@ -97,11 +89,11 @@ export default function EventStatusPage() {
     const now = new Date().toISOString().slice(0, 10);
     if (editingId) {
       setStatuses(ss => ss.map(s => s.id === editingId
-        ? { ...s, status: form.status, showScan: form.showScan, action: form.action, order: parseInt(form.order) || s.order, updatedAt: now }
+        ? { ...s, status: form.status, scan: form.scan, order: parseInt(form.order) || s.order, updatedAt: now }
         : s
       ));
     } else {
-      setStatuses(ss => [...ss, { id: nextId, order: parseInt(form.order) || ss.length + 1, status: form.status, showScan: form.showScan, action: form.action, eventRunning: 0, updatedAt: now }]);
+      setStatuses(ss => [...ss, { id: nextId, order: parseInt(form.order) || ss.length + 1, status: form.status, scan: form.scan, eventRunning: 0, updatedAt: now }]);
       setNextId(n => n + 1);
     }
     setStatusModal(false);
@@ -128,7 +120,7 @@ export default function EventStatusPage() {
 
   const deleteRecord   = statuses.find(x => x.id === deleteTarget);
   const runningTotal   = statuses.reduce((a, s) => a + s.eventRunning, 0);
-  const scanEnabled    = statuses.filter(s => s.showScan).length;
+  const scanEnabled    = statuses.filter(s => s.scan === 'Scan').length;
 
   return (
     <>
@@ -136,6 +128,13 @@ export default function EventStatusPage() {
         <h1 className="page-title" style={{ margin:0 }}>Event Status</h1>
         <button className="btn-new" onClick={openNew}><IconPlus /> New Status</button>
       </div>
+
+      <p style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: -14, marginBottom: 18 }}>
+        This list drives the stage stepper on every event&rsquo;s detail page, in the
+        order shown below — add, remove, reorder, or rename a status here and it
+        applies everywhere. A status with Scan set to &ldquo;Scan&rdquo; requires
+        items to be scanned while an event is at that stage.
+      </p>
 
       <div className="stats-bar" style={{ gridTemplateColumns:'repeat(3,1fr)' }}>
         {[
@@ -176,8 +175,7 @@ export default function EventStatusPage() {
                 <SortTh label="Order"         colIndex={0} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width:70, textAlign:'center' }} />
                 <th style={{ width:80, textAlign:'center' }}>Edit Order</th>
                 <SortTh label="Status"        colIndex={1} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} />
-                <th style={{ width:100, textAlign:'center' }}>Show Scan</th>
-                <th style={{ width:110, textAlign:'center' }}>Scan Action</th>
+                <th style={{ width:100, textAlign:'center' }}>Scan</th>
                 <SortTh label="Event Running" colIndex={4} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width:120, textAlign:'right' }} />
                 <SortTh label="Updated At"    colIndex={5} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width:120 }} />
                 <th style={{ width:100, textAlign:'center' }}>Action</th>
@@ -185,7 +183,7 @@ export default function EventStatusPage() {
             </thead>
             <tbody>
               {pageData.length === 0
-                ? <tr><td colSpan={8} style={{ textAlign:'center', padding:40, color:'var(--text-muted)' }}>No statuses found.</td></tr>
+                ? <tr><td colSpan={7} style={{ textAlign:'center', padding:40, color:'var(--text-muted)' }}>No statuses found.</td></tr>
                 : pageData.map((r, idx) => (
                   <tr key={r.id}>
                     <td style={{ textAlign:'center' }}>
@@ -214,8 +212,7 @@ export default function EventStatusPage() {
                       </div>
                     </td>
                     <td className="name-cell">{r.status}</td>
-                    <td style={{ textAlign:'center' }}><ScanBadge show={r.showScan} /></td>
-                    <td style={{ textAlign:'center' }}><ActionBadge action={r.action} /></td>
+                    <td style={{ textAlign:'center' }}><ScanBadge scan={r.scan} /></td>
                     <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums', fontWeight:600 }}>
                       {r.eventRunning > 0
                         ? <span style={{ color:'var(--orange)' }}>{r.eventRunning}</span>
@@ -257,23 +254,16 @@ export default function EventStatusPage() {
           <input type="text" placeholder="e.g. Event running" value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} />
         </div>
         <div className="form-group">
-          <label>Scan Action</label>
-          <select value={form.action} onChange={e => {
-            const action = e.target.value;
-            setForm(f => ({ ...f, action, showScan: action !== '' }));
-          }}>
-            <option value="">None</option>
-            <option value="SCAN IN">SCAN IN</option>
-            <option value="SCAN OUT">SCAN OUT</option>
-          </select>
-        </div>
-        <div className="form-group" style={{ flexDirection:'row', alignItems:'center', gap:10 }}>
-          <input
-            type="checkbox" id="showScan" checked={form.showScan}
-            onChange={e => setForm(f => ({ ...f, showScan: e.target.checked }))}
-            style={{ width:16, height:16, cursor:'pointer' }}
+          <label>Scan</label>
+          <SearchableSelect
+            value={form.scan}
+            onChange={v => setForm(f => ({ ...f, scan: v }))}
+            options={[
+              { value: 'None', label: 'None' },
+              { value: 'Scan', label: 'Scan' },
+            ]}
+            placeholder="None"
           />
-          <label htmlFor="showScan" style={{ marginBottom:0, cursor:'pointer', userSelect:'none' }}>Show Scan Button</label>
         </div>
       </Modal>
 

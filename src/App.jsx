@@ -27,6 +27,12 @@ import ItemLoanPage from './pages/ItemLoanPage';
 import LogPage from './pages/LogPage';
 import UsersPage from './pages/UsersPage';
 import RequireAuth from './components/RequireAuth';
+import RequireTenantAuth from './components/RequireTenantAuth';
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import PRDPage from './pages/PRDPage';
+import StockOpnamePage from './pages/StockOpnamePage';
 import SuperAdminLogin from './pages/superadmin/SuperAdminLogin';
 import SuperAdminLayout from './pages/superadmin/SuperAdminLayout';
 import DashboardPage from './pages/superadmin/DashboardPage';
@@ -40,6 +46,10 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+
         <Route path="/superadmin/login" element={<SuperAdminLogin />} />
         <Route path="/superadmin" element={<RequireAuth><SuperAdminLayout /></RequireAuth>}>
           <Route index element={<Navigate to="dashboard" replace />} />
@@ -51,8 +61,10 @@ export default function App() {
           <Route path="units" element={<DefaultUnitsPage />} />
           <Route path="*" element={<Navigate to="dashboard" replace />} />
         </Route>
-        <Route path="/" element={<Layout />}>
+        <Route path="/" element={<RequireTenantAuth><Layout /></RequireTenantAuth>}>
           <Route index element={<Navigate to="/event" replace />} />
+          <Route path="prd" element={<PRDPage />} />
+          <Route path="stock-opname" element={<StockOpnamePage />} />
           <Route path="dashboard" element={<MainDashboardPage />} />
           <Route path="inventory-report" element={<InventoryReportPage />} />
           <Route path="overview-report" element={<OverviewReportPage />} />

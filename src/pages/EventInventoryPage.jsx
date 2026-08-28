@@ -1,12 +1,15 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Pagination from '../components/Pagination';
 import SortTh from '../components/SortTh';
-import { IconSearch } from '../components/icons';
+import SearchableSelect from '../components/SearchableSelect';
+import { IconSearch, IconEye } from '../components/icons';
 import { eiData } from '../data/eventInventory';
 
 const PAGE_SIZE = 10;
 
 export default function EventInventoryPage() {
+  const navigate = useNavigate();
   const [query,        setQuery]        = useState('');
   const [eventFilter,  setEventFilter]  = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -77,18 +80,20 @@ export default function EventInventoryPage() {
                 value={query} onChange={e => { setQuery(e.target.value); setPage(1); }}
               />
             </div>
-            <div className="wi-select-wrap">
-              <select value={eventFilter} onChange={e => { setEventFilter(e.target.value); setPage(1); }}>
-                <option value="">All Events</option>
-                {eventNames.map(n => <option key={n} value={n}>{n}</option>)}
-              </select>
-            </div>
-            <div className="wi-select-wrap">
-              <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1); }}>
-                <option value="">All Status</option>
-                {statuses.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
+            <SearchableSelect
+              inline
+              value={eventFilter}
+              onChange={v => { setEventFilter(v); setPage(1); }}
+              options={[{ value: '', label: 'All Events' }, ...eventNames.map(n => ({ value: n, label: n }))]}
+              placeholder="All Events"
+            />
+            <SearchableSelect
+              inline
+              value={statusFilter}
+              onChange={v => { setStatusFilter(v); setPage(1); }}
+              options={[{ value: '', label: 'All Status' }, ...statuses.map(s => ({ value: s, label: s }))]}
+              placeholder="All Status"
+            />
             <button className="btn-search">Search</button>
           </div>
         </div>
@@ -103,11 +108,12 @@ export default function EventInventoryPage() {
                 <SortTh label="Item"         colIndex={3} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} />
                 <th style={{ width:110, textAlign:'right' }}>Stock Item</th>
                 <th style={{ width:120, textAlign:'right' }}>Stock in Cart</th>
+                <th style={{ width:70, textAlign:'center' }}>Action</th>
               </tr>
             </thead>
             <tbody>
               {pageData.length === 0
-                ? <tr><td colSpan={6} style={{ textAlign:'center', color:'var(--text-muted)', padding:32 }}>No results found.</td></tr>
+                ? <tr><td colSpan={7} style={{ textAlign:'center', color:'var(--text-muted)', padding:32 }}>No results found.</td></tr>
                 : pageData.map((r, i) => (
                   <tr key={i}>
                     <td style={{ fontWeight:600 }}>{r.event}</td>
@@ -121,6 +127,14 @@ export default function EventInventoryPage() {
                     <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{r.stockItem}</td>
                     <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums', color: r.stockCart > r.stockItem ? 'var(--red)' : 'inherit' }}>
                       {r.stockCart}
+                    </td>
+                    <td style={{ textAlign:'center' }}>
+                      <button
+                        className="btn-icon" title="View Event Detail" style={{ color:'var(--brand)' }}
+                        onClick={() => navigate(`/event-detail?name=${encodeURIComponent(r.event)}`)}
+                      >
+                        <IconEye />
+                      </button>
                     </td>
                   </tr>
                 ))

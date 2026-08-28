@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import Pagination from '../components/Pagination';
+import SearchableSelect from '../components/SearchableSelect';
 import { IconSearch, IconPrint, IconChevronLeft } from '../components/icons';
 
 const TABLE_PAGE_SIZE = 12;
@@ -86,7 +87,12 @@ function DotNo() {
 export default function EventSummaryPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const [eventIdx, setEventIdx] = useState(0);
+  const requestedName = searchParams.get('name');
+  const [eventIdx, setEventIdx] = useState(() => {
+    if (!requestedName) return 0;
+    const idx = EVENTS.findIndex(e => e.name.toLowerCase() === requestedName.toLowerCase());
+    return idx >= 0 ? idx : 0;
+  });
   const [tableSearch, setTableSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [areaFilter, setAreaFilter] = useState('');
@@ -150,6 +156,17 @@ export default function EventSummaryPage() {
 
   return (
     <>
+      <div className="breadcrumb">
+        <Link to="/event">Event</Link>
+        <span className="breadcrumb-sep">/</span>
+        {requestedName
+          ? <Link to={`/event-detail?name=${encodeURIComponent(requestedName)}`}>{requestedName}</Link>
+          : <span>{ev.name}</span>
+        }
+        <span className="breadcrumb-sep">/</span>
+        <span className="breadcrumb-current">Summary</span>
+      </div>
+
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:18, flexWrap:'wrap', gap:10 }}>
         <div style={{ display:'flex', alignItems:'center', gap:10 }}>
           <button onClick={() => navigate('/event')} style={{ display:'flex', alignItems:'center', color:'var(--text-muted)', background:'none', border:'none', cursor:'pointer' }}>
@@ -158,11 +175,15 @@ export default function EventSummaryPage() {
           <h1 className="page-title" style={{ margin:0 }}>Event Summary</h1>
         </div>
         <div style={{ display:'flex', gap:8 }}>
-          <div className="wi-select-wrap">
-            <select style={{ minWidth:220 }} value={eventIdx} onChange={e => { setEventIdx(parseInt(e.target.value)); setTablePage(1); }}>
-              {EVENTS.map((ev, i) => <option key={i} value={i}>{ev.name}</option>)}
-            </select>
-          </div>
+          <SearchableSelect
+            inline
+            style={{ minWidth:220 }}
+            value={String(eventIdx)}
+            onChange={v => { setEventIdx(parseInt(v)); setTablePage(1); }}
+            options={EVENTS.map((ev, i) => ({ value: String(i), label: ev.name }))}
+            placeholder="Select event…"
+            searchPlaceholder="Search events…"
+          />
           <button className="btn-print" onClick={() => window.print()}><IconPrint /> Print Report</button>
         </div>
       </div>
@@ -254,18 +275,31 @@ export default function EventSummaryPage() {
               <IconSearch />
               <input className="search-input" type="text" placeholder="Search items…" value={tableSearch} onChange={e => { setTableSearch(e.target.value); setTablePage(1); }} />
             </div>
-            <div className="wi-select-wrap">
-              <select style={{ width:140 }} value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setTablePage(1); }}>
-                <option value="">All Status</option>
-                <option>In Use</option><option>Ready</option><option>Missing</option><option>Damaged</option>
-              </select>
-            </div>
-            <div className="wi-select-wrap">
-              <select style={{ width:160 }} value={areaFilter} onChange={e => { setAreaFilter(e.target.value); setTablePage(1); }}>
-                <option value="">All Areas</option>
-                {areaNames.map(a => <option key={a}>{a}</option>)}
-              </select>
-            </div>
+            <SearchableSelect
+              inline
+              style={{ width:140 }}
+              value={statusFilter}
+              onChange={v => { setStatusFilter(v); setTablePage(1); }}
+              options={[
+                { value: '', label: 'All Status' },
+                { value: 'In Use', label: 'In Use' },
+                { value: 'Ready', label: 'Ready' },
+                { value: 'Missing', label: 'Missing' },
+                { value: 'Damaged', label: 'Damaged' },
+              ]}
+              placeholder="All Status"
+            />
+            <SearchableSelect
+              inline
+              style={{ width:160 }}
+              value={areaFilter}
+              onChange={v => { setAreaFilter(v); setTablePage(1); }}
+              options={[
+                { value: '', label: 'All Areas' },
+                ...areaNames.map(a => ({ value: a, label: a })),
+              ]}
+              placeholder="All Areas"
+            />
           </div>
         </div>
         <div className="table-wrap">

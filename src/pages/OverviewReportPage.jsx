@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import Pagination from '../components/Pagination';
+import SearchableSelect from '../components/SearchableSelect';
 import { IconSearch, IconPrint } from '../components/icons';
 import { initialEvents } from '../data/events';
 import { inventoryData } from '../data/inventory';
@@ -30,7 +31,7 @@ export default function OverviewReportPage() {
   const locationBreakdown = useMemo(() => {
     const map = {};
     initialEvents.forEach(e => {
-      const loc = e.location && e.location !== '-' ? e.location : 'Lainnya';
+      const loc = e.location && e.location !== '-' ? e.location : 'Other';
       map[loc] = (map[loc] || 0) + 1;
     });
     return Object.entries(map).sort((a, b) => b[1] - a[1]);
@@ -60,37 +61,37 @@ export default function OverviewReportPage() {
         <div className="kpi-card brand-accent">
           <div className="kpi-label">Total Events</div>
           <div className="kpi-value">{initialEvents.length}</div>
-          <div className="kpi-sub">sepanjang tercatat</div>
+          <div className="kpi-sub">all-time total</div>
         </div>
         <div className="kpi-card green-accent">
           <div className="kpi-label">Upcoming</div>
           <div className="kpi-value">{upcomingCount}</div>
-          <div className="kpi-sub">{pct(upcomingCount, initialEvents.length)}% dari total</div>
+          <div className="kpi-sub">{pct(upcomingCount, initialEvents.length)}% of total</div>
         </div>
         <div className="kpi-card orange-accent">
           <div className="kpi-label">Past Events</div>
           <div className="kpi-value">{pastCount}</div>
-          <div className="kpi-sub">{pct(pastCount, initialEvents.length)}% dari total</div>
+          <div className="kpi-sub">{pct(pastCount, initialEvents.length)}% of total</div>
         </div>
         <div className="kpi-card red-accent">
           <div className="kpi-label">Warehouses</div>
           <div className="kpi-value">{warehouseCount}</div>
-          <div className="kpi-sub">lokasi gudang aktif</div>
+          <div className="kpi-sub">active warehouse locations</div>
         </div>
         <div className="kpi-card brand-accent">
           <div className="kpi-label">Areas</div>
           <div className="kpi-value">{initialAreas.length}</div>
-          <div className="kpi-sub">area setup terdaftar</div>
+          <div className="kpi-sub">registered setup areas</div>
         </div>
         <div className="kpi-card green-accent">
           <div className="kpi-label">Inventory SKU</div>
           <div className="kpi-value">{inventoryData.length}</div>
-          <div className="kpi-sub">{totalItemCount.toLocaleString('id-ID')} item di event upcoming</div>
+          <div className="kpi-sub">{totalItemCount.toLocaleString('en-US')} items across upcoming events</div>
         </div>
       </div>
 
       <div className="card" style={{ marginBottom: 22 }}>
-        <div className="section-title">Progress Event</div>
+        <div className="section-title">Event Progress</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(260px,1fr))', gap: 16 }}>
           {[
             { label: 'Upcoming', value: upcomingCount, color: 'var(--brand)' },
@@ -113,13 +114,13 @@ export default function OverviewReportPage() {
       </div>
 
       <div className="card" style={{ marginBottom: 22 }}>
-        <div className="section-title">Event per Lokasi</div>
+        <div className="section-title">Events by Location</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {locationBreakdown.map(([location, count]) => (
             <div key={location}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
                 <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-2)' }}>{location}</span>
-                <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text)' }}>{count} event</span>
+                <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text)' }}>{count} events</span>
               </div>
               <div className="progress-bar-track">
                 <div className="progress-bar-fill" style={{ width: `${(count / maxLocationCount) * 100}%`, background: 'var(--purple)' }} />
@@ -135,17 +136,21 @@ export default function OverviewReportPage() {
             <div className="search-wrap">
               <IconSearch />
               <input
-                className="search-input" type="text" placeholder="Cari nama, kode, atau lokasi…"
+                className="search-input" type="text" placeholder="Search name, code, or location…"
                 value={query} onChange={e => { setQuery(e.target.value); setPage(1); }}
               />
             </div>
-            <div className="wi-select-wrap">
-              <select value={typeFilter} onChange={e => { setTypeFilter(e.target.value); setPage(1); }}>
-                <option value="">Semua Tipe</option>
-                <option value="upcoming">Upcoming</option>
-                <option value="past">Past</option>
-              </select>
-            </div>
+            <SearchableSelect
+              inline
+              value={typeFilter}
+              onChange={v => { setTypeFilter(v); setPage(1); }}
+              options={[
+                { value: '', label: 'All Types' },
+                { value: 'upcoming', label: 'Upcoming' },
+                { value: 'past', label: 'Past' },
+              ]}
+              placeholder="All Types"
+            />
           </div>
         </div>
 
@@ -153,17 +158,17 @@ export default function OverviewReportPage() {
           <table>
             <thead>
               <tr>
-                <th>Nama Event</th>
-                <th style={{ width: 90 }}>Kode</th>
-                <th style={{ width: 130 }}>Tanggal</th>
-                <th>Lokasi</th>
+                <th>Event Name</th>
+                <th style={{ width: 90 }}>Code</th>
+                <th style={{ width: 130 }}>Date</th>
+                <th>Location</th>
                 <th style={{ width: 90, textAlign: 'right' }}>Items</th>
-                <th style={{ width: 100 }}>Tipe</th>
+                <th style={{ width: 100 }}>Type</th>
               </tr>
             </thead>
             <tbody>
               {pageData.length === 0
-                ? <tr><td colSpan={6} style={{ textAlign: 'center', padding: 32, color: 'var(--text-muted)' }}>Tidak ada event ditemukan.</td></tr>
+                ? <tr><td colSpan={6} style={{ textAlign: 'center', padding: 32, color: 'var(--text-muted)' }}>No events found.</td></tr>
                 : pageData.map(e => (
                   <tr key={e.id}>
                     <td className="name-cell">{e.name}</td>
@@ -178,7 +183,7 @@ export default function OverviewReportPage() {
             </tbody>
           </table>
         </div>
-        <Pagination currentPage={safePage} total={filtered.length} pageSize={PAGE_SIZE} onPage={setPage} label="event" />
+        <Pagination currentPage={safePage} total={filtered.length} pageSize={PAGE_SIZE} onPage={setPage} label="events" />
       </div>
     </>
   );

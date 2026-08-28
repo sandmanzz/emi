@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import Modal from '../components/Modal';
 import Pagination from '../components/Pagination';
+import SearchableSelect from '../components/SearchableSelect';
 import { IconSearch, IconPlus, IconEdit, IconDelete, IconClose, IconCheck, IconBan } from '../components/icons';
 import { initialUsers } from '../data/users';
 
@@ -128,16 +129,20 @@ export default function UsersPage() {
             <div className="search-wrap">
               <IconSearch />
               <input
-                className="search-input" type="text" placeholder="Cari nama atau email…"
+                className="search-input" type="text" placeholder="Search name or email…"
                 value={query} onChange={e => { setQuery(e.target.value); setPage(1); }}
               />
             </div>
-            <div className="wi-select-wrap">
-              <select value={roleFilter} onChange={e => { setRoleFilter(e.target.value); setPage(1); }}>
-                <option value="">Semua Role</option>
-                {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-              </select>
-            </div>
+            <SearchableSelect
+              inline
+              value={roleFilter}
+              onChange={v => { setRoleFilter(v); setPage(1); }}
+              options={[
+                { value: '', label: 'All Roles' },
+                ...ROLES.map(r => ({ value: r, label: r })),
+              ]}
+              placeholder="All Roles"
+            />
           </div>
           <div className="toolbar-right">
             <button className="btn-new" onClick={openNew}><IconPlus /> New</button>
@@ -148,16 +153,16 @@ export default function UsersPage() {
           <table>
             <thead>
               <tr>
-                <th>Nama</th>
+                <th>Name</th>
                 <th style={{ width: 110 }}>Role</th>
                 <th style={{ width: 100 }}>Status</th>
-                <th style={{ width: 140 }}>Terakhir Aktif</th>
-                <th style={{ width: 120, textAlign: 'center' }}>Aksi</th>
+                <th style={{ width: 140 }}>Last Active</th>
+                <th style={{ width: 120, textAlign: 'center' }}>Action</th>
               </tr>
             </thead>
             <tbody>
               {pageData.length === 0
-                ? <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 32 }}>Tidak ada user ditemukan.</td></tr>
+                ? <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 32 }}>No users found.</td></tr>
                 : pageData.map(u => (
                   <tr key={u.id}>
                     <td>
@@ -176,7 +181,7 @@ export default function UsersPage() {
                       <div className="action-btns" style={{ justifyContent: 'center' }}>
                         <button className="btn-icon edit" title="Edit" onClick={() => openEdit(u.id)}><IconEdit /></button>
                         <button
-                          className="btn-icon" title={u.status === 'active' ? 'Nonaktifkan' : 'Aktifkan'}
+                          className="btn-icon" title={u.status === 'active' ? 'Deactivate' : 'Activate'}
                           style={{ color: u.status === 'active' ? 'var(--orange)' : 'var(--green)' }}
                           onClick={() => toggleStatus(u.id)}
                         ><IconBan /></button>
@@ -204,7 +209,7 @@ export default function UsersPage() {
         }
       >
         <div className="form-group">
-          <label>Nama <span style={{ color: 'var(--red)' }}>*</span></label>
+          <label>Name <span style={{ color: 'var(--red)' }}>*</span></label>
           <input type="text" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
         </div>
         <div className="form-group">
@@ -214,16 +219,24 @@ export default function UsersPage() {
         <div className="form-row">
           <div className="form-group">
             <label>Role</label>
-            <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))}>
-              {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-            </select>
+            <SearchableSelect
+              value={form.role}
+              onChange={v => setForm(f => ({ ...f, role: v }))}
+              options={ROLES.map(r => ({ value: r, label: r }))}
+              placeholder="Select role"
+            />
           </div>
           <div className="form-group">
             <label>Status</label>
-            <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
+            <SearchableSelect
+              value={form.status}
+              onChange={v => setForm(f => ({ ...f, status: v }))}
+              options={[
+                { value: 'active', label: 'Active' },
+                { value: 'inactive', label: 'Inactive' },
+              ]}
+              placeholder="Select status"
+            />
           </div>
         </div>
       </Modal>

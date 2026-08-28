@@ -2,6 +2,7 @@ import { useState, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal';
 import Pagination from '../components/Pagination';
+import SearchableSelect from '../components/SearchableSelect';
 import {
   IconSearch, IconPlus, IconPrint, IconEdit, IconDelete,
   IconCart, IconHistory, IconBarChart, IconClose, IconCheck, IconCalendar,
@@ -132,7 +133,7 @@ function EventCard({ r, onEdit, onDelete, navigate }) {
             onClick={() => navigate(`/event-detail?name=${encodeURIComponent(r.date + ' | ' + r.name.toUpperCase())}`)}>
             <IconCart />
           </button>
-          <span className="badge badge-gray" style={{ fontSize:10.5, padding:'2px 7px' }} title="Jumlah barang">
+          <span className="badge badge-gray" style={{ fontSize:10.5, padding:'2px 7px' }} title="Item count">
             {itemCount}
           </span>
         </div>
@@ -446,7 +447,7 @@ export default function EventPage() {
       {activeTab === 'invite' && (
         <div className="card" style={{ padding:'56px 32px', textAlign:'center' }}>
           <p style={{ fontSize:14, fontWeight:600, color:'var(--text)', marginBottom:6 }}>Invite User</p>
-          <p style={{ fontSize:13, color:'var(--text-muted)' }}>Feature ini akan segera tersedia</p>
+          <p style={{ fontSize:13, color:'var(--text-muted)' }}>This feature is coming soon.</p>
         </div>
       )}
 
@@ -512,12 +513,12 @@ export default function EventPage() {
           </div>
           <div className="form-group">
             <label>Status</label>
-            <select value={form.status} onChange={setF('status')}>
-              <option value="">— Select Status —</option>
-              {['Created by admin up','On preparing items','Finish setup','Waiting scan in','Event running','Waiting scan out','Finished','Postphone','Disable'].map(s => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
+            <SearchableSelect
+              value={form.status}
+              onChange={v => setForm(f => ({ ...f, status: v }))}
+              options={['Created by admin up','On preparing items','Finish setup','Waiting scan in','Event running','Waiting scan out','Finished','Postphone','Disable'].map(s => ({ value: s, label: s }))}
+              placeholder="— Select Status —"
+            />
           </div>
         </div>
         <div className="form-row">
@@ -527,13 +528,18 @@ export default function EventPage() {
           </div>
           <div className="form-group">
             <label>QR Type</label>
-            <select value={form.qrType} onChange={setF('qrType')}>
-              <option value="">Select QR Type</option>
-              <option value="scan_in">Scan In</option>
-              <option value="scan_out">Scan Out</option>
-              <option value="scan_both">Scan In &amp; Out</option>
-              <option value="none">No Scan</option>
-            </select>
+            <SearchableSelect
+              value={form.qrType}
+              onChange={v => setForm(f => ({ ...f, qrType: v }))}
+              options={[
+                { value: '', label: 'Select QR Type' },
+                { value: 'scan_in', label: 'Scan In' },
+                { value: 'scan_out', label: 'Scan Out' },
+                { value: 'scan_both', label: 'Scan In & Out' },
+                { value: 'none', label: 'No Scan' },
+              ]}
+              placeholder="Select QR Type"
+            />
           </div>
         </div>
 

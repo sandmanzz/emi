@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import Pagination from '../components/Pagination';
+import SearchableSelect from '../components/SearchableSelect';
 import { IconSearch } from '../components/icons';
 import { initialActivityLogs } from '../data/activityLogs';
 import { TODAY } from '../data/events';
@@ -48,9 +49,9 @@ export default function LogPage() {
 
       <div className="stats-bar" style={{ gridTemplateColumns: 'repeat(3,1fr)' }}>
         {[
-          { label: 'Total Log',       value: initialActivityLogs.length, color: 'var(--brand)',  bg: 'var(--brand-bg)' },
-          { label: 'Aktivitas Hari Ini', value: todayCount,               color: 'var(--green)',  bg: 'var(--green-bg)' },
-          { label: 'User Aktif',      value: activeUserCount,            color: 'var(--purple)', bg: 'var(--purple-bg)' },
+          { label: 'Total Logs',      value: initialActivityLogs.length, color: 'var(--brand)',  bg: 'var(--brand-bg)' },
+          { label: "Today's Activity", value: todayCount,                color: 'var(--green)',  bg: 'var(--green-bg)' },
+          { label: 'Active Users',    value: activeUserCount,            color: 'var(--purple)', bg: 'var(--purple-bg)' },
         ].map(s => (
           <div key={s.label} className="stat-card">
             <div className="stat-icon" style={{ background: s.bg }}>
@@ -67,22 +68,30 @@ export default function LogPage() {
             <div className="search-wrap">
               <IconSearch />
               <input
-                className="search-input" type="text" placeholder="Cari aktivitas atau user…"
+                className="search-input" type="text" placeholder="Search activity or user…"
                 value={query} onChange={e => { setQuery(e.target.value); setPage(1); }}
               />
             </div>
-            <div className="wi-select-wrap">
-              <select value={moduleFilter} onChange={e => { setModuleFilter(e.target.value); setPage(1); }}>
-                <option value="">Semua Modul</option>
-                {MODULES.map(m => <option key={m} value={m}>{m}</option>)}
-              </select>
-            </div>
-            <div className="wi-select-wrap">
-              <select value={actionFilter} onChange={e => { setActionFilter(e.target.value); setPage(1); }}>
-                <option value="">Semua Aksi</option>
-                {ACTIONS.map(a => <option key={a} value={a}>{a}</option>)}
-              </select>
-            </div>
+            <SearchableSelect
+              inline
+              value={moduleFilter}
+              onChange={v => { setModuleFilter(v); setPage(1); }}
+              options={[
+                { value: '', label: 'All Modules' },
+                ...MODULES.map(m => ({ value: m, label: m })),
+              ]}
+              placeholder="All Modules"
+            />
+            <SearchableSelect
+              inline
+              value={actionFilter}
+              onChange={v => { setActionFilter(v); setPage(1); }}
+              options={[
+                { value: '', label: 'All Actions' },
+                ...ACTIONS.map(a => ({ value: a, label: a })),
+              ]}
+              placeholder="All Actions"
+            />
           </div>
         </div>
 
@@ -90,16 +99,16 @@ export default function LogPage() {
           <table>
             <thead>
               <tr>
-                <th style={{ width: 140 }}>Waktu</th>
+                <th style={{ width: 140 }}>Time</th>
                 <th style={{ width: 130 }}>User</th>
-                <th style={{ width: 90 }}>Aksi</th>
-                <th style={{ width: 150 }}>Modul</th>
-                <th>Deskripsi</th>
+                <th style={{ width: 90 }}>Action</th>
+                <th style={{ width: 150 }}>Module</th>
+                <th>Description</th>
               </tr>
             </thead>
             <tbody>
               {pageData.length === 0
-                ? <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 32 }}>Tidak ada log ditemukan.</td></tr>
+                ? <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 32 }}>No logs found.</td></tr>
                 : pageData.map(l => (
                   <tr key={l.id}>
                     <td style={{ color: 'var(--text-muted)', fontSize: '12.5px' }}>{l.timestamp}</td>
@@ -113,7 +122,7 @@ export default function LogPage() {
             </tbody>
           </table>
         </div>
-        <Pagination currentPage={safePage} total={filtered.length} pageSize={PAGE_SIZE} onPage={p => setPage(p)} label="log" />
+        <Pagination currentPage={safePage} total={filtered.length} pageSize={PAGE_SIZE} onPage={p => setPage(p)} label="logs" />
       </div>
     </>
   );

@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import Modal from '../components/Modal';
 import Pagination from '../components/Pagination';
 import SortTh from '../components/SortTh';
+import SearchableSelect from '../components/SearchableSelect';
 import { IconSearch, IconPlus, IconEdit, IconDelete, IconClose, IconCheck } from '../components/icons';
 import { initialAreas, SUB_AREAS } from '../data/areas';
 
@@ -142,12 +143,16 @@ export default function SubAreaPage() {
                 value={query} onChange={e => { setQuery(e.target.value); setPage(1); }}
               />
             </div>
-            <div className="wi-select-wrap">
-              <select value={areaFilter} onChange={e => { setAreaFilter(e.target.value); setPage(1); }}>
-                <option value="">All Areas</option>
-                {areaNames.map(n => <option key={n} value={n}>{n}</option>)}
-              </select>
-            </div>
+            <SearchableSelect
+              inline
+              value={areaFilter}
+              onChange={v => { setAreaFilter(v); setPage(1); }}
+              options={[
+                { value: '', label: 'All Areas' },
+                ...areaNames.map(n => ({ value: n, label: n })),
+              ]}
+              placeholder="All Areas"
+            />
             <button className="btn-search">Search</button>
           </div>
           <div className="toolbar-right">
@@ -209,10 +214,15 @@ export default function SubAreaPage() {
         </div>
         <div className="form-group">
           <label>Parent Area <span style={{ color:'var(--red)' }}>*</span></label>
-          <select value={form.area} onChange={e => setForm(f => ({ ...f, area: e.target.value }))}>
-            <option value="">— Select Area —</option>
-            {areaNames.map(n => <option key={n} value={n}>{n}</option>)}
-          </select>
+          <SearchableSelect
+            value={form.area}
+            onChange={v => setForm(f => ({ ...f, area: v }))}
+            options={[
+              { value: '', label: '— Select Area —' },
+              ...areaNames.map(n => ({ value: n, label: n })),
+            ]}
+            placeholder="— Select Area —"
+          />
         </div>
       </Modal>
 

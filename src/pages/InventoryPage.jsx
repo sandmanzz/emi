@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Pagination from '../components/Pagination';
 import SortTh from '../components/SortTh';
+import SearchableSelect from '../components/SearchableSelect';
 import { IconSearch, IconPlus, IconEdit, IconDelete, IconClose } from '../components/icons';
 import { inventoryData, categories, stockStatuses } from '../data/inventory';
 
@@ -145,18 +146,20 @@ export default function InventoryPage() {
                 value={query} onChange={e => { setQuery(e.target.value); setPage(1); }}
               />
             </div>
-            <div className="wi-select-wrap">
-              <select value={catFilter} onChange={e => { setCatFilter(e.target.value); setPage(1); }}>
-                <option value="">All Categories</option>
-                {categories.map(c => <option key={c}>{c}</option>)}
-              </select>
-            </div>
-            <div className="wi-select-wrap">
-              <select value={stockFilter} onChange={e => { setStockFilter(e.target.value); setPage(1); }}>
-                <option value="">All Status</option>
-                {stockStatuses.map(s => <option key={s}>{s}</option>)}
-              </select>
-            </div>
+            <SearchableSelect
+              inline
+              value={catFilter}
+              onChange={v => { setCatFilter(v); setPage(1); }}
+              options={[{ value: '', label: 'All Categories' }, ...categories.map(c => ({ value: c, label: c }))]}
+              placeholder="All Categories"
+            />
+            <SearchableSelect
+              inline
+              value={stockFilter}
+              onChange={v => { setStockFilter(v); setPage(1); }}
+              options={[{ value: '', label: 'All Status' }, ...stockStatuses.map(s => ({ value: s, label: s }))]}
+              placeholder="All Status"
+            />
             <button className="btn-search">Search</button>
           </div>
           <div className="toolbar-right">

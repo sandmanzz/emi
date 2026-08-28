@@ -5,11 +5,11 @@ import { IconEdit, IconDelete } from '../components/icons';
 import { initialWarehouses } from '../data/warehouses';
 
 const warehouseItems = {
-  'Gudang Bali 66':   [{ name:'Artificial Flower Chrysant Giant White', sku:'AFG-001', qty:342, status:'Available' },{ name:'Artificial Rose Pink', sku:'ARP-003', qty:182, status:'Available' },{ name:'Crystal Bentuk Tabung', sku:'CBT-007', qty:100, status:'Available' }],
-  'Gudang Bali 70':   [{ name:'Candle Holder Bulat Besar', sku:'CHB-006', qty:60, status:'Available' },{ name:'Flower Arch Besi 60cm', sku:'FAB-009', qty:12, status:'Available' },{ name:'Acrylic Ball Silver 20cm', sku:'ABS-021', qty:189, status:'Available' }],
-  'Gudang C9':        [{ name:'Backdrop Stand 2m', sku:'BSD-004', qty:8, status:'Low Stock' }],
-  'Gudang Surabaya':  [{ name:'Balon Latex Putih', sku:'BLP-005', qty:500, status:'Available' },{ name:'Meja Buffet Putih', sku:'MBP-015', qty:8, status:'Low Stock' }],
-  'Gudang Cililitan': [{ name:'Fabric Putih Polos 3m', sku:'FPP-008', qty:20, status:'Low Stock' },{ name:'Gebyok Jati Ukiran', sku:'GJU-010', qty:2, status:'Low Stock' },{ name:'Kain Batik Wahyu Tumurun', sku:'KBW-012', qty:80, status:'Available' }],
+  'Warehouse Bali 66':   [{ name:'Artificial Flower Chrysant Giant White', sku:'AFG-001', qty:342, status:'Available' },{ name:'Artificial Rose Pink', sku:'ARP-003', qty:182, status:'Available' },{ name:'Cylinder-Shaped Crystal', sku:'CBT-007', qty:100, status:'Available' }],
+  'Warehouse Bali 70':   [{ name:'Large Round Candle Holder', sku:'CHB-006', qty:60, status:'Available' },{ name:'Iron Flower Arch 60cm', sku:'FAB-009', qty:12, status:'Available' },{ name:'Acrylic Ball Silver 20cm', sku:'ABS-021', qty:189, status:'Available' }],
+  'Warehouse C9':        [{ name:'Backdrop Stand 2m', sku:'BSD-004', qty:8, status:'Low Stock' }],
+  'Warehouse Surabaya':  [{ name:'White Latex Balloon', sku:'BLP-005', qty:500, status:'Available' },{ name:'White Buffet Table', sku:'MBP-015', qty:8, status:'Low Stock' }],
+  'Warehouse Cililitan': [{ name:'Plain White Fabric 3m', sku:'FPP-008', qty:20, status:'Low Stock' },{ name:'Carved Teak Gebyok', sku:'GJU-010', qty:2, status:'Low Stock' },{ name:'Wahyu Tumurun Batik Cloth', sku:'KBW-012', qty:80, status:'Available' }],
 };
 
 function statusBadge(s) {

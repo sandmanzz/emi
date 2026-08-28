@@ -1,21 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { IconClose, IconPlus, IconSearch } from '../components/icons';
+import SearchableSelect from '../components/SearchableSelect';
 
 const PROJECT_OPTIONS = [
   { id: 'wsg-2026', name: 'Wedding Spring Garden', location: 'Bogor', date: '10-11 May 2026' },
   { id: 'cs26-2026', name: 'Corporate Summit 2026', location: 'Jakarta', date: '1-3 Jun 2026' },
   { id: 'wbs-2026', name: 'Wedding Bali Season', location: 'Bali', date: '14-15 Jul 2026' },
-  { id: 'fmn-2026', name: 'Festival Musik Nusantara', location: 'Surabaya', date: '17-19 Aug 2026' },
+  { id: 'fmn-2026', name: 'Nusantara Music Festival', location: 'Surabaya', date: '17-19 Aug 2026' },
 ];
 
-const WAREHOUSE_COLUMNS = ['Gudang Bali 66', 'Gudang Bali 70', 'Gudang C9'];
+const WAREHOUSE_COLUMNS = ['Warehouse Bali 66', 'Warehouse Bali 70', 'Warehouse C9'];
 
 const PRICE_BOOK = {
   'Backdrop Floral 3x2m': 1250000,
-  'Kain Putih 3m': 285000,
+  'White Fabric 3m': 285000,
   'Standing Flower Tall': 640000,
-  'Kursi Tiffany': 165000,
-  'Lampu LED Warm White': 48000,
+  'Tiffany Chair': 165000,
+  'Warm White LED Lamp': 48000,
   'Table Runner Gold': 74000,
   'Photobooth Frame': 1850000,
   'Tealight Holder 15cm': 29000,
@@ -25,35 +26,35 @@ const PRICE_BOOK = {
 const WAREHOUSE_STOCK = {
   'Backdrop Floral 3x2m': {
     unit: 'pcs',
-    warehouses: { 'Gudang Bali 66': 2, 'Gudang Bali 70': 3, 'Gudang C9': 0 },
+    warehouses: { 'Warehouse Bali 66': 2, 'Warehouse Bali 70': 3, 'Warehouse C9': 0 },
   },
-  'Kain Putih 3m': {
+  'White Fabric 3m': {
     unit: 'roll',
-    warehouses: { 'Gudang Bali 66': 40, 'Gudang Bali 70': 66, 'Gudang C9': 14 },
+    warehouses: { 'Warehouse Bali 66': 40, 'Warehouse Bali 70': 66, 'Warehouse C9': 14 },
   },
   'Standing Flower Tall': {
     unit: 'pcs',
-    warehouses: { 'Gudang Bali 66': 8, 'Gudang Bali 70': 14, 'Gudang C9': 4 },
+    warehouses: { 'Warehouse Bali 66': 8, 'Warehouse Bali 70': 14, 'Warehouse C9': 4 },
   },
-  'Kursi Tiffany': {
+  'Tiffany Chair': {
     unit: 'pcs',
-    warehouses: { 'Gudang Bali 66': 140, 'Gudang Bali 70': 190, 'Gudang C9': 10 },
+    warehouses: { 'Warehouse Bali 66': 140, 'Warehouse Bali 70': 190, 'Warehouse C9': 10 },
   },
-  'Lampu LED Warm White': {
+  'Warm White LED Lamp': {
     unit: 'pcs',
-    warehouses: { 'Gudang Bali 66': 105, 'Gudang Bali 70': 90, 'Gudang C9': 45 },
+    warehouses: { 'Warehouse Bali 66': 105, 'Warehouse Bali 70': 90, 'Warehouse C9': 45 },
   },
   'Table Runner Gold': {
     unit: 'pcs',
-    warehouses: { 'Gudang Bali 66': 22, 'Gudang Bali 70': 47, 'Gudang C9': 15 },
+    warehouses: { 'Warehouse Bali 66': 22, 'Warehouse Bali 70': 47, 'Warehouse C9': 15 },
   },
   'Photobooth Frame': {
     unit: 'set',
-    warehouses: { 'Gudang Bali 66': 5, 'Gudang Bali 70': 8, 'Gudang C9': 1 },
+    warehouses: { 'Warehouse Bali 66': 5, 'Warehouse Bali 70': 8, 'Warehouse C9': 1 },
   },
   'Tealight Holder 15cm': {
     unit: 'pcs',
-    warehouses: { 'Gudang Bali 66': 75, 'Gudang Bali 70': 80, 'Gudang C9': 35 },
+    warehouses: { 'Warehouse Bali 66': 75, 'Warehouse Bali 70': 80, 'Warehouse C9': 35 },
   },
 };
 
@@ -67,10 +68,10 @@ function estimateMaterials(imageCount, extraNotes) {
 
   return [
     { name: 'Backdrop Floral 3x2m', qty: base + noteBias, unit: 'pcs' },
-    { name: 'Kain Putih 3m', qty: base * 4 + noteBias * 2, unit: 'roll' },
+    { name: 'White Fabric 3m', qty: base * 4 + noteBias * 2, unit: 'roll' },
     { name: 'Standing Flower Tall', qty: base * 2, unit: 'pcs' },
-    { name: 'Kursi Tiffany', qty: 80 + base * 10, unit: 'pcs' },
-    { name: 'Lampu LED Warm White', qty: base * 24 + noteBias * 6, unit: 'pcs' },
+    { name: 'Tiffany Chair', qty: 80 + base * 10, unit: 'pcs' },
+    { name: 'Warm White LED Lamp', qty: base * 24 + noteBias * 6, unit: 'pcs' },
     { name: 'Table Runner Gold', qty: base * 8 + noteBias * 2, unit: 'pcs' },
     { name: 'Photobooth Frame', qty: Math.max(1, Math.floor(base / 2)), unit: 'set' },
     { name: 'Tealight Holder 15cm', qty: base * 20, unit: 'pcs' },
@@ -284,14 +285,18 @@ export default function AIAnalyzerPage() {
         <div className="ai-input-grid">
           <div className="form-group">
             <label>Project <span style={{ color:'var(--red)' }}>*</span></label>
-            <select value={projectId} onChange={e => setProjectId(e.target.value)}>
-              <option value="">Choose project</option>
-              {PROJECT_OPTIONS.map(project => (
-                <option key={project.id} value={project.id}>
-                  {project.name} - {project.location} ({project.date})
-                </option>
-              ))}
-            </select>
+            <SearchableSelect
+              value={projectId}
+              onChange={v => setProjectId(v)}
+              options={[
+                { value: '', label: 'Choose project' },
+                ...PROJECT_OPTIONS.map(project => ({
+                  value: project.id,
+                  label: `${project.name} - ${project.location} (${project.date})`,
+                })),
+              ]}
+              placeholder="Choose project"
+            />
           </div>
 
           <div className="form-group">

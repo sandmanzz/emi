@@ -77,7 +77,7 @@ export default function PricingPage() {
         <h1 className="page-title" style={{ margin: 0 }}>Pricing Plans</h1>
         <button className="btn-new" onClick={openNew}><IconPlus /> New Plan</button>
       </div>
-      <p className="summary-text">Harga plan dihitung otomatis dari modul, AI feature, dan kapasitas storage yang dipilih.</p>
+      <p className="summary-text">Plan pricing is calculated automatically based on the selected modules, AI feature, and storage capacity.</p>
 
       <div className="sa-plan-grid">
         {plans.map(p => {
@@ -129,7 +129,7 @@ export default function PricingPage() {
             <select value={form.cycle} onChange={e => setForm(f => ({ ...f, cycle: e.target.value }))}>
               <option value="month">Monthly</option>
               <option value="year">Yearly</option>
-              <option value="custom">Custom (harga tidak ditampilkan)</option>
+              <option value="custom">Custom (price not shown)</option>
             </select>
           </div>
         </div>
@@ -188,7 +188,7 @@ export default function PricingPage() {
             <span>{formatIDR(formStorageFee)}</span>
           </div>
           <div className="sa-price-summary-row sa-price-summary-total">
-            <span>Total per {form.cycle === 'custom' ? 'periode' : form.cycle}</span>
+            <span>Total per {form.cycle === 'custom' ? 'period' : form.cycle}</span>
             <span>{form.cycle === 'custom' ? 'Custom' : formatIDR(formTotal)}</span>
           </div>
         </div>
