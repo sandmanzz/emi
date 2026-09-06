@@ -2,12 +2,11 @@ import { useState, useMemo } from 'react';
 import Pagination from '../components/Pagination';
 import SearchableSelect from '../components/SearchableSelect';
 import { IconSearch } from '../components/icons';
-import { initialActivityLogs } from '../data/activityLogs';
+import { getActivityLogs } from '../lib/activityLogStore';
 import { TODAY } from '../data/events';
 
 const PAGE_SIZE = 10;
 const ACTIONS = ['Login', 'Logout', 'Create', 'Update', 'Delete'];
-const MODULES = [...new Set(initialActivityLogs.map(l => l.module))].sort();
 
 function actionBadgeClass(action) {
   if (action === 'Create') return 'badge-green';
@@ -22,26 +21,29 @@ function todayIso() {
 }
 
 export default function LogPage() {
+  const [logs] = useState(() => getActivityLogs());
   const [query, setQuery] = useState('');
   const [moduleFilter, setModuleFilter] = useState('');
   const [actionFilter, setActionFilter] = useState('');
   const [page, setPage] = useState(1);
 
+  const modules = useMemo(() => [...new Set(logs.map(l => l.module))].sort(), [logs]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return initialActivityLogs.filter(l =>
+    return logs.filter(l =>
       (!q || l.description.toLowerCase().includes(q) || l.userName.toLowerCase().includes(q)) &&
       (!moduleFilter || l.module === moduleFilter) &&
       (!actionFilter || l.action === actionFilter)
     );
-  }, [query, moduleFilter, actionFilter]);
+  }, [logs, query, moduleFilter, actionFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const pageData = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
-  const todayCount = initialActivityLogs.filter(l => l.timestamp.startsWith(todayIso())).length;
-  const activeUserCount = new Set(initialActivityLogs.map(l => l.userName)).size;
+  const todayCount = logs.filter(l => l.timestamp.startsWith(todayIso())).length;
+  const activeUserCount = new Set(logs.map(l => l.userName)).size;
 
   return (
     <>
@@ -49,7 +51,7 @@ export default function LogPage() {
 
       <div className="stats-bar" style={{ gridTemplateColumns: 'repeat(3,1fr)' }}>
         {[
-          { label: 'Total Logs',      value: initialActivityLogs.length, color: 'var(--brand)',  bg: 'var(--brand-bg)' },
+          { label: 'Total Logs',      value: logs.length,                color: 'var(--brand)',  bg: 'var(--brand-bg)' },
           { label: "Today's Activity", value: todayCount,                color: 'var(--green)',  bg: 'var(--green-bg)' },
           { label: 'Active Users',    value: activeUserCount,            color: 'var(--purple)', bg: 'var(--purple-bg)' },
         ].map(s => (
@@ -78,7 +80,7 @@ export default function LogPage() {
               onChange={v => { setModuleFilter(v); setPage(1); }}
               options={[
                 { value: '', label: 'All Modules' },
-                ...MODULES.map(m => ({ value: m, label: m })),
+                ...modules.map(m => ({ value: m, label: m })),
               ]}
               placeholder="All Modules"
             />

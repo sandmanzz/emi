@@ -10,10 +10,12 @@ this project. Per the user's standing instruction:
    feature seems like it doesn't fit well, say so to the user instead of guessing
    silently.
 
-This file complements [update-history.md](update-history.md) — that file is a
-changelog of what changed in the code and why; this file is the log of what was
-*asked for* and the decisions made in response, independent of whether the code has
-caught up yet.
+This file complements [changes.md](changes.md) (renamed from `update-history.md` —
+same file, same purpose, just a name the user asked for) — that file is a changelog
+of what changed in the code and why, in mixed technical + plain language, updated
+with **every** change going forward per a 2026-08-28 standing instruction; this file
+is the log of what was *asked for* and the decisions made in response, independent of
+whether the code has caught up yet.
 
 ---
 
@@ -105,7 +107,7 @@ redundant**, so it was deleted in favor of consolidating onto Event Status:
 - Item and location/warehouse mock data has been substantially expanded per request
   #1 — more items inside events, and more items per warehouse/location — to make the
   demo feel populated rather than sparse. This is additive to the existing seed data
-  established earlier (see update-history.md Round 1–5).
+  established earlier (see changes.md Round 1–5).
 
 ### Scan gate before stage advancement
 - Event Settings gets a second control: **"Require scan before advancing stage"**
@@ -164,7 +166,7 @@ Previous Stage / New in [stage], on Event Detail's item list:
     individually, unchanged.
 
 ### Stock Opname — split into its own page, with an approval workflow
-This replaces the earlier decision (see the Round 5 / update-history.md entry) where
+This replaces the earlier decision (see the Round 5 / changes.md entry) where
 Stock Opname was a tab inside Warehouse Inventory. New shape:
 - **Warehouse Inventory** page keeps the "Inventory" and "Opname History" tabs, but
   the "Stock Opname" tab is gone — replaced by a **"Start Stock Opname" button** that
@@ -273,12 +275,179 @@ meant this broadly rather than just that one field.
   only by Event Detail's Area filter) since the shared component's `.ss-*` CSS
   replaces it everywhere.
 
+### Event Detail — persisted stage + restructured item-list tabs (2026-08-28)
+Two changes landed together after live testing raised both:
+1. **Event stage now persists per event** (localStorage, `src/lib/eventProgress.js`)
+   instead of always resetting to the first Event Status row on every page visit.
+   Reason: opening an event that had already been advanced to, say, "Waiting scan
+   in" and finding it back at "Created by admin up" was confusing and looked like a
+   bug — it wasn't a bug, `eventStatus` just had no persistence at all.
+2. **Item-list tabs replaced.** Old: All / From Previous Stage / New in [stage] /
+   Grouped. New, in this order: **Waiting Scan** (only shown when the current
+   status has Scan enabled — unscanned items in scope) / **Grouped** (unchanged) /
+   **All** (redefined — now only items whose stage is at-or-before the current one,
+   not literally every item in the event regardless of stage) / **Added New**
+   (same as the old "New in [stage]", renamed and moved last). "From Previous
+   Stage" was dropped as a separate tab since the redefined "All" already covers
+   that ground. See [changes.md](changes.md) Round 7 for the full technical
+   writeup, including the gotcha that "All" no longer matches the *Next* button's
+   unscanned-item gate (that gate intentionally wasn't touched — still scoped to
+   the whole event, not just the current stage, per the existing "scan requirement
+   scope" assumption below).
+
+### Event Detail — polish pass on item cards, packaging, picker stock, header actions (2026-08-28)
+Five small fixes requested together after visual review:
+1. **Item card delete button** moved from a persistent bottom row to a hover-only
+   circular icon overlaid at the top-right of the card (over the image area) —
+   only visible while hovering that card, not taking up permanent space.
+2. **Packaging (grouping) is no longer restricted to the first stage.** Any
+   ungrouped item can be added to a box regardless of which stage it (or the
+   event) is currently at — previously both the header trigger button and the
+   picker inside the Group modal were locked to "first stage only."
+3. **Removed the inert per-item box icon** from each item card's action row — it
+   never had a click handler (grouping only ever happens through the header box
+   icon → Group modal), so it was dead UI. Only the Scan button remains on the
+   card itself.
+4. **"Add Item from Inventory" picker's stock figure now reflects the selected
+   warehouse**, not a single fixed catalog number. Previously "Available stock"
+   showed `inventoryData`'s static `totalStock` regardless of which warehouse the
+   "Take from warehouse" dropdown was set to — switching warehouses changed
+   nothing about the number, the qty cap, or whether Add was enabled. It now
+   looks up the real per-warehouse figure from `src/data/warehouseInventory.js`
+   (cross-referenced by item name + warehouse name) and uses that for the
+   displayed stock, the quantity input's max, and whether the row counts as Out
+   of Stock. The "Available"/"Low Stock" badge label itself still comes from the
+   catalog's static `stockStatus` (only the Out-of-Stock case was corrected to
+   follow the live number, since letting someone "Add" an item with 0 real stock
+   at the chosen warehouse would be a functional bug, not just a cosmetic one).
+5. **Summary and Print moved into the header's &ldquo;⋮&rdquo; more-menu**, which
+   previously existed but had no click handler ("added for future actions" per
+   `changes.md` Round 1). They used to be two separate icon buttons in the
+   filter-row toolbar, next to the Area dropdown and Check button — decluttering
+   that row down to just Area + Check.
+
+### Event Detail header sizing, mock-status fallback, Event Status edit mode, Upgrade CTA (2026-08-28)
+Four more requests, addressed together:
+1. **Header action buttons now match height** (36px) — the "+ Add Item" pill was
+   6px shorter than the icon buttons next to it (30px vs 36px), causing visible
+   misalignment. Fixed with a scoped `.event-actions-bar .btn-new { height: 36px }`
+   rule rather than changing `.btn-new` globally (it's reused, correctly sized, on
+   many other pages' toolbars).
+2. **Opening an event for the first time now falls back to a real mock status**,
+   not always the first stage. `src/data/eventInventory.js`'s `status` field was
+   uniformly `'Created by admin'` on every single row (all 364, including the
+   ~326 synthetic padding rows) — a typo that didn't even match any canonical
+   Event Status name (`'Created by admin up'`), so it could never have been read
+   meaningfully anyway. Fixed the typo and gave the 7 hand-authored named event
+   groups (Wedding Thamrin, Gala Dinner Bali, Birthday Party, Corporate Event,
+   National Seminar, Traditional Wedding, Culinary Festival) distinct, plausible
+   statuses spanning the lifecycle instead of all sharing one value.
+   `EventDetailPage.jsx` now checks, in order: saved progress
+   (`localStorage`, per event) → this mock status (matched by event name) →
+   the first Event Status row. This only ever applies before an event has any
+   saved progress — once a user moves its stepper even once, that takes over
+   per the existing Round 7 persistence.
+3. **Event Status reordering is now edit-mode + explicit Save**, not
+   instant-apply-per-arrow-click. An "Edit Order" button enters a reorder mode
+   (up/down arrows appear, everything else — New, per-row Edit/Delete — disables);
+   changes accumulate in a local draft; **Save Order** commits it through the
+   existing `saveEventStatuses` persistence, **Cancel** discards it. Previously
+   every arrow click mutated and persisted immediately with no undo.
+4. **Added an "Upgrade" call-to-action** in the top navbar (gradient pill, next
+   to the language switcher) — opens a modal with the SaaS Owner Panel's real
+   plan catalog (`src/data/pricingPlans.js`, `computePlanPrice`/`planFeatureList`
+   from `src/lib/pricingCalc.js`) so pricing here can't drift from what
+   `/superadmin`'s Pricing page shows. This is explicitly a monetization hook for
+   later — there's no real billing behind it; clicking a plan's button just shows
+   a "request sent" state. New component: `src/components/UpgradeCTA.jsx`.
+
+### Upgrade page, live activity log, Item Loan overhaul (Vendor + borrow/return) (2026-08-28)
+Three requests landed together:
+
+1. **Dedicated `/upgrade` page**, replacing the navbar modal built earlier. Same
+   dummy plan data (`src/data/pricingPlans.js`, `computePlanPrice`/
+   `planFeatureList`), now with room for a "Current Plan" usage card (hardcoded
+   to Starter, with invented usage numbers — there's no real per-tenant plan or
+   usage tracking anywhere in the app) and a short FAQ. The navbar CTA
+   (`UpgradeCTA.jsx`) now just navigates to the page instead of opening a modal.
+
+2. **The Log page is now backed by a real, live activity log**, not just a
+   static seed array nobody ever wrote to. New `src/lib/activityLogStore.js`
+   (localStorage-backed, `getActivityLogs()`/`addActivityLog(entry)`) seeds from
+   the same `initialActivityLogs`. Wired into `tenantAuth.js` (Login/Logout/
+   Register now append real entries) and into Item Loan's create/return actions
+   (below). `LogPage.jsx` and `DashboardPage.jsx`'s "Recent Activity" both read
+   from the store now instead of the static import. Scope note: only
+   authentication and Item Loan actions were wired up — the rest of the app
+   (event CRUD, warehouse edits, stock opname, etc.) still doesn't produce real
+   log entries. Extending that is the same pattern, just not done everywhere yet
+   since it wasn't asked for everywhere.
+
+3. **Item Loan overhaul** — three changes together:
+   - **Vendor entity added.** New `src/data/vendors.js` / `src/lib/vendorStore.js`
+     (localStorage-backed) replace the old free-text "Borrower Name"/"Contact"
+     fields. The Loan Item modal now has a Vendor picker (searchable, from the
+     vendor list) plus a "+ New Vendor" button that opens a small nested modal to
+     add one on the fly — it's auto-selected once saved. Separate free-text
+     "Contact Person"/"Contact Phone" fields remain, since the actual pickup
+     contact at a vendor can differ loan-to-loan; they default to the vendor's
+     own name/contact if left blank.
+   - **Item selection now uses real, per-warehouse live stock** (the same
+     `stockOpnameStore.js` rows Warehouse Inventory and Moving Order already
+     share) instead of the old `inventoryData` catalog, which only ever modeled
+     one fixed warehouse + stock number per item. Borrowing now actually
+     **decrements** the specific warehouse row's stock; returning **restores**
+     it — Item Loan was previously fully isolated from real stock (you could
+     "borrow" 500 units of something a warehouse never had).
+   - **Return is now a modal, not a single icon click.** "Mark as Returned" used
+     to just stamp today's date with one click, no record of condition. Now
+     "Return Item" opens a modal: Return Date, Item Condition (Good/Poor — reusing
+     Stock Opname's exact `.condition-toggle` pattern for consistency), and a
+     Condition Notes field that appears only for Poor. A Poor return shows a red
+     "Poor" badge next to the loan's Returned status in the table.
+   - **Gotcha:** `inventoryRowId` is only populated for loans created through the
+     new flow — the 6 seed loans have it `null`, so returning one of them does
+     not restore any stock (there's nothing real to restore to; they were never
+     really decremented since they predate this change). This is intentional,
+     not a bug — don't "fix" it by inventing a stock adjustment for seed data.
+
+### Item Loan restructured — Listing + Detail, multi-item orders, new/external items (2026-08-28)
+A logic gap in the Item Loan overhaul above got flagged and fixed right after:
+1. **Borrowing can now be a brand-new/external item, not only something already
+   in our warehouse.** The previous version only let you pick from live
+   warehouse stock — but a real loan can just as easily be an item a vendor
+   brings in that we&rsquo;ve never stocked ourselves. The "Items to Loan" section
+   of the New Loan modal now has two add-modes: **From Warehouse** (searchable
+   picker over live stock, decrements it) and **New / External Item** (free-text
+   name + qty + unit, no stock impact at all since we never had it).
+2. **A single loan can now cover multiple items at once** (previously exactly
+   one item per loan record). Items get staged into a running list before
+   saving — same "search/pick → Add → running list" shape as Moving Order&rsquo;s
+   multi-item flow, for consistency.
+3. **The page split into Listing + Detail**, matching how every other list+detail
+   pair in this app already works (Event → Event Detail, Warehouse Inventory row
+   → its detail, etc.): `/item-loan` now lists loan **orders** (one row per
+   vendor transaction, showing item count and an overall status), and
+   `/item-loan-detail?id=` shows one order&rsquo;s individual item lines with
+   their own per-item Return action — so a 3-item loan can be **partially
+   returned** (2 back, 1 still out) instead of the whole loan flipping to
+   Returned only when literally everything is back.
+   - Data model changed from a flat one-item-per-record list to
+     order-with-`items[]`. New `src/lib/itemLoanStore.js` (in-memory module
+     store, same pattern as `stockOpnameStore.js`) holds it now instead of
+     page-local `useState`, since Listing and Detail are separate routes that
+     both need to see — and mutate — the same orders.
+   - `GlobalSearch.jsx` and `DashboardPage.jsx`'s loan-related KPIs were updated
+     for the new nested shape (they read the old flat fields directly and broke
+     when the data model changed) — Global Search now deep-links a matching item
+     straight to its loan&rsquo;s detail page instead of just `/item-loan`.
+
 ### Product knowledge page
 - All of the above (plus everything already in this file) is also recapped as an
   in-app, navigable page — not just this markdown file — per the request "product
   knowledge yang bisa diakses di halaman khusus." Built as a real route in the app
   (a rendered page, not a static `.html` export the user has to find on disk), styled
-  consistently with the rest of the tenant UI. See update-history.md for the route.
+  consistently with the rest of the tenant UI. See changes.md for the route.
 
 ---
 
@@ -364,6 +533,52 @@ clashes or seems off) — proceeding with the stated assumption unless corrected
 
 ## Raw instruction log
 
+### 2026-08-28 — Item Loan logic fix: new/external items, multi-item loans, Listing+Detail split
+Pointed out a logic gap right after the Item Loan overhaul: borrowing should
+support either an item already in our warehouse OR a brand-new item we don't
+stock; a loan should be able to cover more than one item at once; and the page
+should be restructured as a Listing page first, then a Detail page per loan.
+
+### 2026-08-28 — Upgrade page, user log feature, Item Loan overhaul (vendor + borrow/return)
+1. Continue the Upgrade work into a full page (not just the navbar modal) —
+   dummy data is fine.
+2. Build a feature for the user (activity) log.
+3. Item Loan should be better: add a Vendor concept, and record the borrow/
+   return process more thoroughly — able to borrow an item and later return it.
+
+### 2026-08-28 — Header button sizing, mock status fallback, Event Status edit mode, Upgrade CTA
+1. Header action buttons (box/cart/Add Item/more-menu) should all be the same
+   size — flagged a screenshot showing "+ Add Item" shorter than the rest.
+2. Opening an event should go straight to its last event status, and the mock
+   data backing that needs to be correct too (flagged a screenshot).
+3. Event Status's row reordering should require an explicit Save button first —
+   "use like edit mode" — instead of applying instantly on every arrow click.
+4. Add an upgrade call-to-action in the navbar or similar, for future monetization.
+
+### 2026-08-28 — Event Detail polish: card delete, packaging scope, picker stock, header menu
+1. Delete button on item cards should only show on hover, positioned at the top of
+   the card, not a persistent row at the bottom.
+2. Grouping (packaging) should be usable from anywhere, not restricted to the
+   first stage.
+3. Remove the box icon shown per-item in the item list (it never did anything).
+4. Reported (with a screenshot of the Add Item picker) that switching the "Take
+   from warehouse" dropdown didn't change the shown available stock number.
+5. Asked (with a screenshot of the header) to move the Print and Summary buttons
+   into the "⋮" more-menu button, which existed but did nothing yet.
+
+### 2026-08-28 — Standing rule: log every change in changes.md; Event Detail tab/persistence rework
+1. New standing instruction: from now on, every code change gets an entry in
+   `changes.md` (renamed from `update-history.md`), written in mixed technical +
+   plain language so a developer isn't confused. This supplements, doesn't
+   replace, the existing rule of logging every *instruction* here in context.md.
+2. Asked why opening Event Detail always starts at stage 1 instead of wherever the
+   event was actually left — answer: `eventStatus` had no persistence at all; now
+   fixed via `src/lib/eventProgress.js` (localStorage, per event name).
+3. Asked for the item-list filter tabs to change from All / From Previous Stage /
+   New in [stage] / Grouped to: Waiting Scan (conditional on scan being enabled) /
+   Grouped (unchanged) / All (redefined to only include items at-or-before the
+   current stage) / Added New (same as the old "New in [stage]").
+
 ### 2026-08-28 — Grouped-items tab + clarified purpose; confirmed Event Settings location
 1. Asked where "Event Settings" with the scan option went — confirmed (see
    "Event Status is the real source of truth") it was intentionally consolidated
@@ -394,7 +609,7 @@ clashes or seems off) — proceeding with the stated assumption unless corrected
 
 Entries are logged from this point forward, most recent first. Instructions given
 earlier in the project are captured as implemented decisions in
-[update-history.md](update-history.md) rather than reconstructed verbatim here.
+[changes.md](changes.md) rather than reconstructed verbatim here.
 
 ### 2026-08-27 — Event Status is the real source of truth (clash + consolidation)
 Discovered mid-build: the app already had an "Event Status" master-data page

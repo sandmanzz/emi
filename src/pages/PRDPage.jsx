@@ -11,6 +11,8 @@ const SECTIONS = [
   { id: 'moving-order', label: 'Moving Order' },
   { id: 'event-inventory-link', label: 'Event Inventory Link' },
   { id: 'searchable-dropdown', label: 'Searchable Dropdown' },
+  { id: 'activity-log', label: 'Activity Log' },
+  { id: 'item-loan', label: 'Item Loan & Vendors' },
   { id: 'data', label: 'Mock Data' },
   { id: 'assumptions', label: 'Open Assumptions' },
 ];
@@ -61,7 +63,10 @@ export default function PRDPage() {
           <strong>SaaS Owner Panel</strong> at <code>/superadmin</code> (managing
           customers, payments, and pricing for the SaaS business itself). Everything
           runs on mock data — there is no backend, so refreshing the browser resets
-          any in-session changes.
+          any in-session changes. An <strong>&ldquo;Upgrade&rdquo;</strong> button
+          in the top navbar is a monetization hook for later — it opens a plan
+          comparison (reusing the SaaS Owner Panel&rsquo;s real plan catalog) but
+          isn&rsquo;t wired to real billing yet.
         </P>
       </Section>
 
@@ -71,6 +76,12 @@ export default function PRDPage() {
           Detail page. The stages come <strong>directly from the Event Status master
           data</strong> (Master Data → Event Status, <code>/event-status</code>) —
           whatever rows exist there, in their configured order, become the stepper.
+          Whatever stage an event is currently at is <strong>remembered</strong> —
+          leaving and reopening the event (even a full page reload) picks up right
+          where it was, instead of resetting to the first stage every time. Before
+          any progress has ever been saved for an event, it now opens at a
+          plausible mock status (from Event Inventory&rsquo;s data) instead of
+          always the first stage.
           The default seed is:
         </P>
         <Ul>
@@ -87,9 +98,12 @@ export default function PRDPage() {
         <P>
           Add, rename, reorder, or remove a row on Event Status and every event&rsquo;s
           stepper reflects it immediately. Every item added to an event records which
-          stage was active when it was added, which powers the &ldquo;All / From
-          Previous Stage / New in [stage]&rdquo; tabs on Event Detail — a quick way to
-          see what carried over versus what&rsquo;s new at the current stage.
+          stage was active when it was added, which powers the item-list tabs on
+          Event Detail: <strong>Waiting Scan</strong> (only shown when the current
+          stage has scan enabled — items still needing a scan), <strong>Grouped</strong>
+          (packaging boxes, see below), <strong>All</strong> (every item added up
+          through the current stage — not stages still ahead of it), and{' '}
+          <strong>Added New</strong> (items added exactly at the current stage).
         </P>
         <P>
           <strong>History note:</strong> an earlier pass built a separate,
@@ -145,7 +159,7 @@ export default function PRDPage() {
           <li>Only enabled at the event&rsquo;s <strong>first stage</strong> (whatever Event Status row has the lowest order — &ldquo;Created by admin up&rdquo; by default). Disabled everywhere else, with a tooltip explaining why.</li>
           <li>Clicking it opens a picker limited to first-stage items that aren&rsquo;t already in a group; you name the group (the box) and select which items belong to it.</li>
           <li>Grouped items show a purple group badge on their card, everywhere they appear.</li>
-          <li>A dedicated <strong>&ldquo;Grouped&rdquo; tab</strong> (alongside All / From Previous Stage / New in [stage]) shows every box as its own card — name, item count, and (only when the current stage has scan enabled) a single <strong>Scan Box</strong> button that scans every item inside at once. Individual items don&rsquo;t get their own Scan button inside a box card — scanning is a box-level action there, matching the one-QR-per-box reality. Outside the Grouped tab, an item card still shows its group badge and can still be scanned individually, which scans the whole group the same way.</li>
+          <li>A dedicated <strong>&ldquo;Grouped&rdquo; tab</strong> (alongside Waiting Scan / All / Added New) shows every box as its own card — name, item count, and (only when the current stage has scan enabled) a single <strong>Scan Box</strong> button that scans every item inside at once. Individual items don&rsquo;t get their own Scan button inside a box card — scanning is a box-level action there, matching the one-QR-per-box reality. Outside the Grouped tab, an item card still shows its group badge and can still be scanned individually, which scans the whole group the same way.</li>
           <li>There&rsquo;s no &ldquo;remove from group&rdquo; UI yet, and groups are scoped to a single event — not reusable across events.</li>
         </Ul>
       </Section>
@@ -198,6 +212,13 @@ export default function PRDPage() {
           now. Note that Event Status itself is <strong>not</strong> Admin-gated —
           anyone can view and edit it via Master Data; only this sidebar shortcut is
           Admin-only. See &ldquo;Open Assumptions&rdquo; below.
+        </P>
+        <P>
+          Reordering statuses is <strong>edit-mode + explicit Save</strong>, not
+          instant-apply: click &ldquo;Edit Order&rdquo; to reveal the up/down
+          arrows (everything else locks while reordering), then{' '}
+          <strong>Save Order</strong> to commit or <strong>Cancel</strong> to
+          discard.
         </P>
       </Section>
 
@@ -283,6 +304,50 @@ export default function PRDPage() {
           native selects &mdash; it&rsquo;s a separate area that wasn&rsquo;t part
           of this conversion. See &ldquo;Open Assumptions&rdquo; below.
         </P>
+      </Section>
+
+      <Section id="activity-log" title="Activity Log">
+        <P>
+          The Log page (and Dashboard&rsquo;s &ldquo;Recent Activity&rdquo;) now
+          reflect a <strong>real, live log</strong> instead of a static seed list
+          nothing ever wrote to. Logging in, logging out, registering, loaning an
+          item, and returning an item all append a real entry with the actual
+          current time.
+        </P>
+        <P>
+          Not everything logs yet — only authentication and Item Loan actions do.
+          Extending this to other modules (events, warehouse edits, stock opname,
+          etc.) follows the same small pattern (<code>addActivityLog(...)</code>
+          from <code>src/lib/activityLogStore.js</code>) but hasn&rsquo;t been done
+          everywhere.
+        </P>
+      </Section>
+
+      <Section id="item-loan" title="Item Loan & Vendors">
+        <P>
+          Item Loan now has a proper <strong>Vendor</strong> list instead of
+          free-text borrower fields &mdash; pick an existing vendor or add a new
+          one on the fly from the same modal. Contact person/phone stay editable
+          per loan, since who you dealt with can differ from the vendor&rsquo;s
+          own listed contact.
+        </P>
+        <P>
+          A loan is now an <strong>order that can cover multiple items at once</strong>,
+          each added either <strong>From Warehouse</strong> (real, live stock —
+          borrowing decreases it, returning restores it) or as a{' '}
+          <strong>New / External Item</strong> (something the business doesn&rsquo;t
+          stock itself — no inventory impact at all). The page is split like every
+          other list+detail pair in the app: <strong>/item-loan</strong> lists
+          loan orders (vendor, item count, overall status), and{' '}
+          <strong>/item-loan-detail</strong> shows one order&rsquo;s individual
+          items, each with its own <strong>Return Item</strong> action (date,
+          Good/Poor condition, notes if Poor) &mdash; so a 3-item loan can be{' '}
+          <strong>Partially Returned</strong> instead of all-or-nothing.
+        </P>
+        <Ul>
+          <li>The 6 seed loans&rsquo; warehouse-sourced items aren&rsquo;t tied to a real inventory row, so returning one of them doesn&rsquo;t restore any stock &mdash; only loans created through the app do.</li>
+          <li>Global Search&rsquo;s Item Loan results deep-link straight to a matching item&rsquo;s loan detail page.</li>
+        </Ul>
       </Section>
 
       <Section id="data" title="Mock Data">

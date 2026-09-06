@@ -4,7 +4,7 @@ import { initialEvents, TODAY } from '../data/events';
 import { inventoryData } from '../data/inventory';
 import { initialWarehouses } from '../data/warehouses';
 import { initialItemLoans } from '../data/itemLoans';
-import { initialActivityLogs } from '../data/activityLogs';
+import { getActivityLogs } from '../lib/activityLogStore';
 
 const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const MONTHS_LONG = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -83,8 +83,9 @@ export default function DashboardPage() {
   const totalStockUnits = inventoryData.reduce((s, i) => s + i.totalStock, 0);
   const warehouseCount = useMemo(() => new Set(initialWarehouses.map(w => w.name)).size, []);
 
-  const activeLoans = initialItemLoans.filter(l => !l.returnDate);
-  const overdueLoans = activeLoans.filter(l => new Date(l.dueDate) < TODAY);
+  const allLoanItems = useMemo(() => initialItemLoans.flatMap(l => l.items.map(it => ({ ...it, dueDate: l.dueDate }))), []);
+  const activeLoans = allLoanItems.filter(it => !it.returnDate);
+  const overdueLoans = activeLoans.filter(it => new Date(it.dueDate) < TODAY);
 
   const categoryBreakdown = useMemo(() => {
     const map = {};
@@ -101,7 +102,7 @@ export default function DashboardPage() {
   const maxWarehouseStock = Math.max(...warehouseBreakdown.map(([, v]) => v), 1);
 
   const recentActivity = useMemo(
-    () => [...initialActivityLogs].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).slice(0, 5),
+    () => [...getActivityLogs()].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)).slice(0, 5),
     []
   );
 
@@ -141,7 +142,7 @@ export default function DashboardPage() {
         <div className="kpi-card brand-accent">
           <div className="kpi-label">Currently On Loan</div>
           <div className="kpi-value">{activeLoans.length}</div>
-          <div className="kpi-sub">out of {initialItemLoans.length} total loans</div>
+          <div className="kpi-sub">out of {allLoanItems.length} total items loaned</div>
           <KpiDelta direction="flat">stable</KpiDelta>
         </div>
         <div className="kpi-card red-accent">

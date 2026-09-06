@@ -3,6 +3,7 @@ import { Outlet, useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import GlobalSearch from './GlobalSearch';
 import LanguageSwitcher from './LanguageSwitcher';
+import UpgradeCTA from './UpgradeCTA';
 import { IconMenu, IconLogout } from './icons';
 import { logoutTenant, getCurrentTenantUser } from '../lib/tenantAuth';
 
@@ -27,6 +28,7 @@ export default function Layout() {
         </div>
         <GlobalSearch />
         <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+          <UpgradeCTA />
           {currentUser && (
             <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-2)', whiteSpace: 'nowrap' }}>
               {currentUser.name} <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>· {currentUser.role}</span>

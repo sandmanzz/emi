@@ -60,9 +60,10 @@ function search(query) {
   if (units.length) groups.push({ type: 'Unit', items: units });
 
   const loans = initialItemLoans
-    .filter(l => l.itemName.toLowerCase().includes(q) || l.borrowerName.toLowerCase().includes(q))
+    .flatMap(l => l.items.map(item => ({ loan: l, item })))
+    .filter(({ loan, item }) => item.itemName.toLowerCase().includes(q) || loan.vendorName.toLowerCase().includes(q))
     .slice(0, MAX_PER_GROUP)
-    .map(l => ({ label: l.itemName, sub: `Borrowed by ${l.borrowerName}`, to: '/item-loan' }));
+    .map(({ loan, item }) => ({ label: item.itemName, sub: `Borrowed by ${loan.vendorName}`, to: `/item-loan-detail?id=${loan.id}` }));
   if (loans.length) groups.push({ type: 'Item Loan', items: loans });
 
   return groups;

@@ -24,6 +24,7 @@ import MainDashboardPage from './pages/DashboardPage';
 import InventoryReportPage from './pages/InventoryReportPage';
 import OverviewReportPage from './pages/OverviewReportPage';
 import ItemLoanPage from './pages/ItemLoanPage';
+import ItemLoanDetailPage from './pages/ItemLoanDetailPage';
 import LogPage from './pages/LogPage';
 import UsersPage from './pages/UsersPage';
 import RequireAuth from './components/RequireAuth';
@@ -33,6 +34,7 @@ import RegisterPage from './pages/RegisterPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import PRDPage from './pages/PRDPage';
 import StockOpnamePage from './pages/StockOpnamePage';
+import UpgradePage from './pages/UpgradePage';
 import SuperAdminLogin from './pages/superadmin/SuperAdminLogin';
 import SuperAdminLayout from './pages/superadmin/SuperAdminLayout';
 import DashboardPage from './pages/superadmin/DashboardPage';
@@ -65,6 +67,7 @@ export default function App() {
           <Route index element={<Navigate to="/event" replace />} />
           <Route path="prd" element={<PRDPage />} />
           <Route path="stock-opname" element={<StockOpnamePage />} />
+          <Route path="upgrade" element={<UpgradePage />} />
           <Route path="dashboard" element={<MainDashboardPage />} />
           <Route path="inventory-report" element={<InventoryReportPage />} />
           <Route path="overview-report" element={<OverviewReportPage />} />
@@ -79,6 +82,7 @@ export default function App() {
           <Route path="inventory-detail" element={<InventoryDetailPage />} />
           <Route path="sync-inventory" element={<SyncInventoryPage />} />
           <Route path="item-loan" element={<ItemLoanPage />} />
+          <Route path="item-loan-detail" element={<ItemLoanDetailPage />} />
           <Route path="area" element={<AreaPage />} />
           <Route path="area-detail" element={<AreaDetailPage />} />
           <Route path="sub-area" element={<SubAreaPage />} />

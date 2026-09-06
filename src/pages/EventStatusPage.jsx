@@ -35,6 +35,11 @@ export default function EventStatusPage() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [form, setForm] = useState({ status: '', scan: 'None', order: '' });
 
+  // Reordering is edit-mode + explicit Save, not instant-apply-per-click.
+  const [reorderMode,    setReorderMode]    = useState(false);
+  const [draftStatuses,  setDraftStatuses]  = useState(null);
+  const displayStatuses = reorderMode ? draftStatuses : statuses;
+
   function setStatuses(updater) {
     setStatusesState(current => {
       const next = typeof updater === 'function' ? updater(current) : updater;
@@ -45,7 +50,7 @@ export default function EventStatusPage() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    let data = statuses.filter(r => !q || r.status.toLowerCase().includes(q));
+    let data = displayStatuses.filter(r => !q || r.status.toLowerCase().includes(q));
     if (sortCol >= 0) {
       data.sort((a, b) => {
         let va, vb;
@@ -58,7 +63,7 @@ export default function EventStatusPage() {
       });
     }
     return data;
-  }, [statuses, query, sortCol, sortAsc]);
+  }, [displayStatuses, query, sortCol, sortAsc]);
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const safePage   = Math.min(page, Math.max(1, totalPages));
@@ -99,8 +104,26 @@ export default function EventStatusPage() {
     setStatusModal(false);
   }
 
+  function startReorder() {
+    setDraftStatuses([...statuses]);
+    setReorderMode(true);
+    setSortCol(0);
+    setSortAsc(true);
+  }
+
+  function cancelReorder() {
+    setReorderMode(false);
+    setDraftStatuses(null);
+  }
+
+  function saveReorder() {
+    setStatuses(() => draftStatuses);
+    setReorderMode(false);
+    setDraftStatuses(null);
+  }
+
   function moveOrder(id, dir) {
-    setStatuses(ss => {
+    setDraftStatuses(ss => {
       const sorted = [...ss].sort((a, b) => a.order - b.order);
       const idx = sorted.findIndex(s => s.id === id);
       const swapIdx = idx + dir;
@@ -164,9 +187,28 @@ export default function EventStatusPage() {
             <button className="btn-search">Search</button>
           </div>
           <div className="toolbar-right">
-            <button className="btn-new" onClick={openNew}><IconPlus /> New</button>
+            {reorderMode ? (
+              <>
+                <button className="btn-cancel-modal" onClick={cancelReorder}><IconClose /> Cancel</button>
+                <button className="btn-save-modal" onClick={saveReorder}><IconCheck /> Save Order</button>
+              </>
+            ) : (
+              <>
+                <button className="btn btn-ghost" onClick={startReorder}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width:14, height:14 }}><polyline points="8 7 12 3 16 7"/><polyline points="16 17 12 21 8 17"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
+                  Edit Order
+                </button>
+                <button className="btn-new" onClick={openNew}><IconPlus /> New</button>
+              </>
+            )}
           </div>
         </div>
+
+        {reorderMode && (
+          <p style={{ fontSize: 12.5, color: 'var(--brand)', background: 'var(--brand-bg)', padding: '9px 14px', borderRadius: 'var(--r-lg)', margin: '0 0 14px' }}>
+            Reordering — use the arrows below, then <strong>Save Order</strong> to apply, or <strong>Cancel</strong> to discard.
+          </p>
+        )}
 
         <div className="table-wrap">
           <table>
@@ -190,26 +232,30 @@ export default function EventStatusPage() {
                       <span style={{ display:'inline-flex', alignItems:'center', justifyContent:'center', width:28, height:28, background:'var(--brand-bg)', color:'var(--brand)', borderRadius:6, fontWeight:700, fontSize:13 }}>{r.order}</span>
                     </td>
                     <td style={{ textAlign:'center' }}>
-                      <div style={{ display:'inline-flex', flexDirection:'column', gap:2 }}>
-                        <button
-                          className="btn-icon"
-                          title="Move up"
-                          style={{ padding:'2px 5px', color: idx === 0 ? 'var(--border)' : 'var(--text-muted)' }}
-                          disabled={idx === 0}
-                          onClick={() => moveOrder(r.id, -1)}
-                        >
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ width:12, height:12 }}><polyline points="18 15 12 9 6 15"/></svg>
-                        </button>
-                        <button
-                          className="btn-icon"
-                          title="Move down"
-                          style={{ padding:'2px 5px', color: idx === pageData.length - 1 ? 'var(--border)' : 'var(--text-muted)' }}
-                          disabled={idx === pageData.length - 1}
-                          onClick={() => moveOrder(r.id, 1)}
-                        >
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ width:12, height:12 }}><polyline points="6 9 12 15 18 9"/></svg>
-                        </button>
-                      </div>
+                      {reorderMode ? (
+                        <div style={{ display:'inline-flex', flexDirection:'column', gap:2 }}>
+                          <button
+                            className="btn-icon"
+                            title="Move up"
+                            style={{ padding:'2px 5px', color: idx === 0 ? 'var(--border)' : 'var(--text-muted)' }}
+                            disabled={idx === 0}
+                            onClick={() => moveOrder(r.id, -1)}
+                          >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ width:12, height:12 }}><polyline points="18 15 12 9 6 15"/></svg>
+                          </button>
+                          <button
+                            className="btn-icon"
+                            title="Move down"
+                            style={{ padding:'2px 5px', color: idx === pageData.length - 1 ? 'var(--border)' : 'var(--text-muted)' }}
+                            disabled={idx === pageData.length - 1}
+                            onClick={() => moveOrder(r.id, 1)}
+                          >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ width:12, height:12 }}><polyline points="6 9 12 15 18 9"/></svg>
+                          </button>
+                        </div>
+                      ) : (
+                        <span style={{ color:'var(--text-muted)', fontSize:12 }}>—</span>
+                      )}
                     </td>
                     <td className="name-cell">{r.status}</td>
                     <td style={{ textAlign:'center' }}><ScanBadge scan={r.scan} /></td>
@@ -221,8 +267,8 @@ export default function EventStatusPage() {
                     <td style={{ color:'var(--text-muted)', fontSize:'12.5px' }}>{fmtDate(r.updatedAt)}</td>
                     <td>
                       <div className="action-btns" style={{ justifyContent:'center' }}>
-                        <button className="btn-icon edit"   title="Edit"   onClick={() => openEdit(r.id)}><IconEdit /></button>
-                        <button className="btn-icon delete" title="Delete" onClick={() => openDelete(r.id)}><IconDelete /></button>
+                        <button className="btn-icon edit"   title="Edit"   disabled={reorderMode} onClick={() => openEdit(r.id)}><IconEdit /></button>
+                        <button className="btn-icon delete" title="Delete" disabled={reorderMode} onClick={() => openDelete(r.id)}><IconDelete /></button>
                       </div>
                     </td>
                   </tr>

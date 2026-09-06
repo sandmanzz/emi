@@ -1,4 +1,5 @@
 import { initialUsers } from '../data/users';
+import { addActivityLog } from './activityLogStore';
 
 const AUTH_KEY = 'emi_tenant_auth';
 
@@ -37,6 +38,7 @@ export function loginTenant(email, password) {
   if (user.status !== 'active') return { ok: false, error: 'This account has been deactivated. Contact your admin.' };
   const session = toSession(user);
   localStorage.setItem(AUTH_KEY, JSON.stringify(session));
+  addActivityLog({ userName: session.name, action: 'Login', module: 'System', description: 'Logged into the system' });
   return { ok: true, session };
 }
 
@@ -57,6 +59,8 @@ export function registerTenant({ name, email, password }) {
   roster = [...roster, user];
   const session = toSession(user);
   localStorage.setItem(AUTH_KEY, JSON.stringify(session));
+  addActivityLog({ userName: session.name, action: 'Create', module: 'Users', description: `Registered a new account (${session.email})` });
+  addActivityLog({ userName: session.name, action: 'Login', module: 'System', description: 'Logged into the system' });
   return { ok: true, session };
 }
 
@@ -66,5 +70,9 @@ export function tenantEmailExists(email) {
 }
 
 export function logoutTenant() {
+  const current = getCurrentTenantUser();
+  if (current) {
+    addActivityLog({ userName: current.name, action: 'Logout', module: 'System', description: 'Logged out of the system' });
+  }
   localStorage.removeItem(AUTH_KEY);
 }

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal';
 import Stepper from '../components/Stepper';
@@ -7,7 +7,10 @@ import { IconSearch, IconPlus, IconDelete, IconClose, IconCheck, IconCart, IconP
 import { initialAreas, SUB_AREAS } from '../data/areas';
 import { inventoryData, categories } from '../data/inventory';
 import { initialWarehouses } from '../data/warehouses';
+import { wiData } from '../data/warehouseInventory';
+import { eiData } from '../data/eventInventory';
 import { getEventStageNames, isScanStage } from '../lib/eventStatuses';
+import { getEventProgress, saveEventProgress } from '../lib/eventProgress';
 
 const AREAS = initialAreas.map(a => a.name);
 const WAREHOUSES = [...new Set(initialWarehouses.map(w => w.name))];
@@ -28,6 +31,14 @@ function stockBadge(s) {
   if (s === 'Low Stock')    return <span className="badge badge-orange">{s}</span>;
   if (s === 'Out of Stock') return <span className="badge badge-red">{s}</span>;
   return <span className="badge badge-gray">{s}</span>;
+}
+
+// Real stock at a specific warehouse (from Warehouse Inventory), not the catalog's
+// single fixed totalStock — used so the picker's stock figure reflects whichever
+// warehouse the user picked, not always the item's original home warehouse.
+function stockAtWarehouse(inv, warehouseName) {
+  const row = wiData.find(r => r.name === inv.name && r.warehouseName === warehouseName);
+  return row ? row.itemStock : 0;
 }
 
 const initialItems = [
@@ -88,6 +99,9 @@ function InvThumb() {
 function ItemCard({ item, group, showScanButton, onScanClick, onDelete }) {
   return (
     <div className="item-card">
+      <button className="item-card-delete" title="Delete" onClick={() => onDelete(item.id)}>
+        <IconDelete />
+      </button>
       <ImagePlaceholder />
       <div className="item-body">
         <span className={`area-badge ${areaBadgeClass(item.area)}`}>{item.area}</span>
@@ -146,24 +160,14 @@ function ItemCard({ item, group, showScanButton, onScanClick, onDelete }) {
           </div>
         </div>
         {item.note && <div className="item-note">{item.note}</div>}
-        <div className="item-actions">
-          <div className="item-actions-row">
-            <button className="btn-ia-pkg" title="Packaging">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
-            </button>
-            {showScanButton && (
-              <button className={`btn-ia-scan${item.scanned ? ' scanned' : ''}`} onClick={() => onScanClick(item)}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h.01M14 17h3v3M17 14h3"/></svg>
-                {item.scanned ? 'Re-scan' : 'Scan'}
-              </button>
-            )}
-          </div>
-          <div className="item-actions-row">
-            <button className="btn-ia-del" title="Delete" onClick={() => onDelete(item.id)}>
-              <IconDelete />
+        {showScanButton && (
+          <div className="item-actions">
+            <button className={`btn-ia-scan${item.scanned ? ' scanned' : ''}`} onClick={() => onScanClick(item)}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h.01M14 17h3v3M17 14h3"/></svg>
+              {item.scanned ? 'Re-scan' : 'Scan'}
             </button>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
@@ -177,9 +181,28 @@ export default function EventDetailPage() {
   const [items, setItems] = useState(initialItems);
   const [nextId, setNextId] = useState(27);
   const [stages] = useState(() => getEventStageNames());
-  const [eventStatus, setEventStatus] = useState(() => stages[0] || 'Preparation');
+  const [eventStatus, setEventStatus] = useState(() => {
+    const saved = getEventProgress(eventName);
+    if (saved && stages.includes(saved)) return saved;
+    // No saved progress yet (first-ever visit) — fall back to this event's mock
+    // status from Event Inventory instead of always starting at the first stage.
+    const mockRow = eiData.find(r => r.event === eventName);
+    if (mockRow && stages.includes(mockRow.status)) return mockRow.status;
+    return stages[0] || 'Preparation';
+  });
   const stageScanEnabled = isScanStage(eventStatus);
   const [summaryOpen, setSummaryOpen] = useState(false);
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const moreMenuRef = useRef(null);
+
+  useEffect(() => {
+    if (!moreMenuOpen) return;
+    function onDocMouseDown(e) {
+      if (!moreMenuRef.current?.contains(e.target)) setMoreMenuOpen(false);
+    }
+    document.addEventListener('mousedown', onDocMouseDown);
+    return () => document.removeEventListener('mousedown', onDocMouseDown);
+  }, [moreMenuOpen]);
   const [scanningItem, setScanningItem] = useState(null);
   const [scanPhase, setScanPhase] = useState('ready'); // ready | scanning | done
   const [stepperError, setStepperError] = useState('');
@@ -217,9 +240,14 @@ export default function EventDetailPage() {
   }), [items, selectedArea, kwSearch]);
 
   const stageIndex = stages.indexOf(eventStatus);
-  const previousStageItems = useMemo(() => filtered.filter(it => stages.indexOf(it.stage) < stageIndex), [filtered, stageIndex]);
-  const currentStageItems  = useMemo(() => filtered.filter(it => stages.indexOf(it.stage) === stageIndex), [filtered, stageIndex]);
-  const stageFiltered = stageFilter === 'previous' ? previousStageItems : stageFilter === 'current' ? currentStageItems : filtered;
+  // "All" only counts items added up through the current stage — not items whose
+  // stage is still ahead of where the event is now (only reachable if the stepper
+  // was moved backward, since an item's `stage` is stamped once, at add-time).
+  const scopedItems = useMemo(() => filtered.filter(it => stages.indexOf(it.stage) <= stageIndex), [filtered, stageIndex]);
+  const currentStageItems = useMemo(() => filtered.filter(it => stages.indexOf(it.stage) === stageIndex), [filtered, stageIndex]); // "Added New"
+  const waitingScanItems = useMemo(() => scopedItems.filter(it => !it.scanned), [scopedItems]);
+  const effectiveStageFilter = (stageFilter === 'waiting' && !stageScanEnabled) ? 'all' : stageFilter;
+  const stageFiltered = effectiveStageFilter === 'added' ? currentStageItems : effectiveStageFilter === 'waiting' ? waitingScanItems : scopedItems;
 
   const areaCounts = useMemo(() => {
     const map = {};
@@ -239,6 +267,7 @@ export default function EventDetailPage() {
     }
     setStepperError('');
     setEventStatus(step);
+    saveEventProgress(eventName, step);
     setStageFilter('all');
   }
 
@@ -247,11 +276,10 @@ export default function EventDetailPage() {
     changeEventStatus(stages[stageIndex + 1]);
   }
 
-  // --- Packaging (group first-stage items so they scan together) ---
-  const isFirstStage = stageIndex === 0;
+  // --- Packaging (group items so they scan together) — usable at any stage ---
   const packableItems = useMemo(
-    () => items.filter(it => stages.indexOf(it.stage) === 0 && !it.groupId),
-    [items, stages]
+    () => items.filter(it => !it.groupId),
+    [items]
   );
 
   function openPackagingModal() {
@@ -340,15 +368,16 @@ export default function EventDetailPage() {
 
   // --- Inventory picker → Cart ---
   function addToCart(inv, qty, warehouse) {
+    const stockHere = stockAtWarehouse(inv, warehouse);
     const existing = cart.find(x => x.inventoryId === inv.id && x.warehouse === warehouse);
     if (existing) {
-      const newQty = Math.min(inv.totalStock, existing.qty + qty);
+      const newQty = Math.min(stockHere, existing.qty + qty);
       setCart(c => c.map(x => x.cartId === existing.cartId ? { ...x, qty: newQty } : x));
     } else {
       setCart(c => [...c, {
         cartId: nextCartId, inventoryId: inv.id, name: inv.name, sku: inv.sku,
-        category: inv.category, unit: inv.unit, totalStock: inv.totalStock,
-        warehouse, qty: Math.min(inv.totalStock, qty), area: '', subArea: '',
+        category: inv.category, unit: inv.unit, totalStock: stockHere,
+        warehouse, qty: Math.min(stockHere, qty), area: '', subArea: '',
       }]);
       setNextCartId(n => n + 1);
     }
@@ -423,8 +452,7 @@ export default function EventDetailPage() {
           <div className="event-actions-bar">
             <button
               className="action-icon-btn btn-pkg"
-              title={isFirstStage ? 'Packaging — group items to scan together' : `Packaging is only available at the "${stages[0]}" stage`}
-              disabled={!isFirstStage}
+              title="Packaging — group items to scan together"
               onClick={openPackagingModal}
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
@@ -436,9 +464,21 @@ export default function EventDetailPage() {
             <button className="btn-new" onClick={() => { setPickerQuery(''); setPickerCategory(''); setPickerOpen(true); }}>
               <IconPlus /> Add Item
             </button>
-            <button className="action-icon-btn more-btn" title="More menu">
-              <IconMoreVertical />
-            </button>
+            <div className="more-menu-wrap" ref={moreMenuRef}>
+              <button className="action-icon-btn more-btn" title="More menu" onClick={() => setMoreMenuOpen(o => !o)}>
+                <IconMoreVertical />
+              </button>
+              {moreMenuOpen && (
+                <div className="more-menu-dropdown">
+                  <button className="more-menu-item" onClick={() => { setSummaryOpen(true); setMoreMenuOpen(false); }}>
+                    <IconBarChart /> Summary
+                  </button>
+                  <button className="more-menu-item" onClick={() => { window.print(); setMoreMenuOpen(false); }}>
+                    <IconPrint /> Print
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -492,16 +532,6 @@ export default function EventDetailPage() {
             <button className="btn btn-check" onClick={() => {}}>
               <IconSearch /> Check
             </button>
-            <button
-              className="btn"
-              style={{ background: 'var(--purple)', color: '#fff' }}
-              title="Summary"
-              aria-label="Summary"
-              onClick={() => setSummaryOpen(true)}
-            >
-              <IconBarChart />
-            </button>
-            <button className="btn btn-print" title="Print" aria-label="Print" onClick={() => window.print()}><IconPrint /></button>
           </div>
         </div>
 
@@ -513,27 +543,29 @@ export default function EventDetailPage() {
         </div>
 
         <div className="stage-tabs">
-          <button type="button" className={`stage-tab${stageFilter === 'all' ? ' active' : ''}`} onClick={() => setStageFilter('all')}>
-            All <span className="stage-tab-count">{filtered.length}</span>
-          </button>
-          <button type="button" className={`stage-tab${stageFilter === 'previous' ? ' active' : ''}`} onClick={() => setStageFilter('previous')}>
-            From Previous Stage <span className="stage-tab-count">{previousStageItems.length}</span>
-          </button>
-          <button type="button" className={`stage-tab${stageFilter === 'current' ? ' active' : ''}`} onClick={() => setStageFilter('current')}>
-            New in &ldquo;{eventStatus}&rdquo; <span className="stage-tab-count">{currentStageItems.length}</span>
-          </button>
-          <button type="button" className={`stage-tab${stageFilter === 'grouped' ? ' active' : ''}`} onClick={() => setStageFilter('grouped')}>
+          {stageScanEnabled && (
+            <button type="button" className={`stage-tab${effectiveStageFilter === 'waiting' ? ' active' : ''}`} onClick={() => setStageFilter('waiting')}>
+              Waiting Scan <span className="stage-tab-count">{waitingScanItems.length}</span>
+            </button>
+          )}
+          <button type="button" className={`stage-tab${effectiveStageFilter === 'grouped' ? ' active' : ''}`} onClick={() => setStageFilter('grouped')}>
             Grouped <span className="stage-tab-count">{packages.length}</span>
+          </button>
+          <button type="button" className={`stage-tab${effectiveStageFilter === 'all' ? ' active' : ''}`} onClick={() => setStageFilter('all')}>
+            All <span className="stage-tab-count">{scopedItems.length}</span>
+          </button>
+          <button type="button" className={`stage-tab${effectiveStageFilter === 'added' ? ' active' : ''}`} onClick={() => setStageFilter('added')}>
+            Added New <span className="stage-tab-count">{currentStageItems.length}</span>
           </button>
         </div>
 
-        {stageFilter === 'grouped' ? (
+        {effectiveStageFilter === 'grouped' ? (
           <>
             <p className="summary-text">
               <strong>{packages.length}</strong> box{packages.length === 1 ? '' : 'es'} packaged &mdash; each box scans as one QR code instead of scanning every item inside it one by one.
             </p>
             {packages.length === 0
-              ? <div className="no-data">No boxes yet. Use the box icon above (at the first stage) to group items into one.</div>
+              ? <div className="no-data">No boxes yet. Use the box icon above to group items into one.</div>
               : (
                 <div className="package-list">
                   {packages.map(pkg => {
@@ -573,7 +605,11 @@ export default function EventDetailPage() {
         ) : (
           <>
             <p className="summary-text">
-              <strong>{stageFiltered.length}</strong> pcs items at event status <strong>&ldquo;{eventStatus}&rdquo;</strong> in Area <strong>&ldquo;{areaLabel}&rdquo;</strong>
+              {effectiveStageFilter === 'waiting' ? (
+                <><strong>{stageFiltered.length}</strong> item{stageFiltered.length === 1 ? '' : 's'} still need{stageFiltered.length === 1 ? 's' : ''} scanning at event status <strong>&ldquo;{eventStatus}&rdquo;</strong> in Area <strong>&ldquo;{areaLabel}&rdquo;</strong></>
+              ) : (
+                <><strong>{stageFiltered.length}</strong> pcs items at event status <strong>&ldquo;{eventStatus}&rdquo;</strong> in Area <strong>&ldquo;{areaLabel}&rdquo;</strong></>
+              )}
             </p>
 
             {stageFiltered.length === 0
@@ -637,19 +673,20 @@ export default function EventDetailPage() {
                 : pickerFiltered.map(inv => {
                   const qty = pickerQty[inv.id] ?? 1;
                   const warehouse = pickerWarehouse[inv.id] ?? inv.warehouse;
-                  const outOfStock = inv.stockStatus === 'Out of Stock';
+                  const stockHere = stockAtWarehouse(inv, warehouse);
+                  const outOfStock = stockHere <= 0;
                   return (
                     <div className="inv-pick-row" key={inv.id}>
                       <InvThumb />
                       <div className="inv-pick-info">
                         <div className="inv-pick-name-row">
                           <span className="inv-pick-name">{inv.name}</span>
-                          {stockBadge(inv.stockStatus)}
+                          {stockBadge(outOfStock ? 'Out of Stock' : inv.stockStatus)}
                         </div>
                         <div className="inv-pick-meta">
                           <span style={{ fontFamily: 'monospace' }}>{inv.sku}</span> · {inv.category} · {inv.unit}
                         </div>
-                        <div className="inv-pick-stock">Available stock: <strong>{inv.totalStock} {inv.unit}</strong></div>
+                        <div className="inv-pick-stock">Available stock at {warehouse}: <strong>{stockHere} {inv.unit}</strong></div>
                         <div className="inv-pick-warehouse-row">
                           <label>Take from warehouse</label>
                           <SearchableSelect
@@ -662,9 +699,9 @@ export default function EventDetailPage() {
                       </div>
                       <div className="inv-pick-actions">
                         <input
-                          className="inv-pick-qty" type="number" min={1} max={inv.totalStock}
+                          className="inv-pick-qty" type="number" min={1} max={stockHere}
                           value={qty} disabled={outOfStock}
-                          onChange={e => setPickerQty(q => ({ ...q, [inv.id]: Math.max(1, Math.min(inv.totalStock, parseInt(e.target.value) || 1)) }))}
+                          onChange={e => setPickerQty(q => ({ ...q, [inv.id]: Math.max(1, Math.min(stockHere, parseInt(e.target.value) || 1)) }))}
                         />
                         <button
                           className="btn-add-cart" disabled={outOfStock}
@@ -867,11 +904,11 @@ export default function EventDetailPage() {
           <input type="text" placeholder="e.g. Ceremony Decor Bundle" value={packagingName} onChange={e => setPackagingName(e.target.value)} />
         </div>
         <p style={{ fontSize: 12.5, color: 'var(--text-muted)', marginBottom: 10 }}>
-          Only items still at the &ldquo;{stages[0]}&rdquo; stage that aren&rsquo;t already grouped can be added.
+          Any item not already in a box can be added, regardless of stage.
         </p>
         <div className="package-pick-list">
           {packableItems.length === 0
-            ? <div className="no-data">No ungrouped items at &ldquo;{stages[0]}&rdquo; to package.</div>
+            ? <div className="no-data">No ungrouped items to package.</div>
             : packableItems.map(it => (
               <div
                 key={it.id}
