@@ -5,9 +5,13 @@ import Pagination from '../components/Pagination';
 import SearchableSelect from '../components/SearchableSelect';
 import {
   IconSearch, IconPlus, IconPrint, IconEdit, IconDelete,
-  IconCart, IconHistory, IconBarChart, IconClose, IconCheck, IconCalendar,
+  IconCart, IconHistory, IconBarChart, IconClose, IconCheck,
 } from '../components/icons';
 import { initialEvents, TODAY } from '../data/events';
+import { getEventClosing, isReadyToClose, isOnGoingByItems } from '../lib/eventClosing';
+import { CLOSING_LABELS } from '../lib/eventClosingLabels';
+import { getEventStageNames } from '../lib/eventStatuses';
+import { saveEventProgress } from '../lib/eventProgress';
 
 const PAGE_SIZE = 8;
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -44,6 +48,39 @@ function daysUntil(start) {
   return Math.ceil((new Date(start) - TODAY) / 86400000);
 }
 
+// Matches the "<date> | <NAME>" key EventDetailPage.jsx reads its ?name= from,
+// so closing status set there is found here without a real backend join.
+function closingKeyFor(e) {
+  return `${e.date} | ${(e.name || '').toUpperCase()}`;
+}
+function closingOf(e) {
+  return getEventClosing(closingKeyFor(e));
+}
+function readyToCloseOf(e) {
+  return isReadyToClose(closingKeyFor(e));
+}
+function onGoingByItemsOf(e) {
+  return isOnGoingByItems(closingKeyFor(e), e.itemCount);
+}
+// Distinguishes a Returned & Completed event from a plain seed `type: 'past'`
+// event (folded into the same tab), which has no closing badge of its own.
+function returnedExtraBadge(e) {
+  if (closingOf(e) !== 'returned-completed') return null;
+  return (
+    <span className={`badge ${CLOSING_LABELS['returned-completed'].badgeClass}`} style={{ fontSize:10.5, flexShrink:0 }}>
+      {CLOSING_LABELS['returned-completed'].label}
+    </span>
+  );
+}
+function applySearch(data, q) {
+  if (!q) return data;
+  const query = q.toLowerCase();
+  return data.filter(e =>
+    e.name.toLowerCase().includes(query) || e.code.toLowerCase().includes(query) ||
+    e.location.toLowerCase().includes(query) || e.desc.toLowerCase().includes(query)
+  );
+}
+
 function IconPin() {
   return (
     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
@@ -77,7 +114,7 @@ function CountdownChip({ days }) {
   );
 }
 
-function EventCard({ r, onEdit, onDelete, navigate }) {
+function EventCard({ r, onEdit, onDelete, navigate, readyToClose, onGoingByItems }) {
   const days = daysUntil(r.start);
   const accent = days !== null && days <= 7 ? 'var(--red)'
                : days !== null && days <= 30 ? 'var(--orange)'
@@ -94,8 +131,19 @@ function EventCard({ r, onEdit, onDelete, navigate }) {
     onMouseLeave={e => { e.currentTarget.style.boxShadow='none'; e.currentTarget.style.transform='none'; }}
     >
       <div style={{ padding: '16px 18px 14px' }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: 10 }}>
-          <span className="badge badge-gray" style={{ fontSize:10.5 }}>{r.code}</span>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: 10, gap: 6 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+            <span className="badge badge-gray" style={{ fontSize:10.5 }}>{r.code}</span>
+            {readyToClose ? (
+              <span className={`badge ${CLOSING_LABELS['ready-to-close'].badgeClass}`} style={{ fontSize:10.5 }}>
+                {CLOSING_LABELS['ready-to-close'].label}
+              </span>
+            ) : (
+              <span className={`badge ${CLOSING_LABELS[onGoingByItems ? 'on-going' : 'upcoming'].badgeClass}`} style={{ fontSize:10.5 }}>
+                {CLOSING_LABELS[onGoingByItems ? 'on-going' : 'upcoming'].label}
+              </span>
+            )}
+          </div>
           <CountdownChip days={days} />
         </div>
 
@@ -150,7 +198,7 @@ function EventCard({ r, onEdit, onDelete, navigate }) {
   );
 }
 
-function PastEventRow({ r, onEdit, onDelete, navigate }) {
+function PastEventRow({ r, onEdit, onDelete, navigate, extraBadge }) {
   const day   = r.date && r.date !== '-' ? parseInt(r.date.split('-')[2]) : '—';
   const month = r.date && r.date !== '-' ? MONTHS_SHORT[parseInt(r.date.split('-')[1]) - 1] : '';
 
@@ -177,6 +225,7 @@ function PastEventRow({ r, onEdit, onDelete, navigate }) {
             {r.name}
           </span>
           <span className="badge badge-gray" style={{ fontSize:10.5, flexShrink:0 }}>{r.code}</span>
+          {extraBadge}
         </div>
         <div style={{ display:'flex', gap:14, fontSize:12, color:'var(--text-muted)', flexWrap:'wrap' }}>
           {r.desc && (
@@ -222,9 +271,10 @@ export default function EventPage() {
   })));
   const [nextId, setNextId] = useState(90);
 
-  const [pastQuery, setPastQuery] = useState('');
-  const [pastPage, setPastPage]   = useState(1);
-  const [upQuery,  setUpQuery]    = useState('');
+  // One shared search query + page, reset whenever the active tab changes —
+  // simpler than a separate pair per tab now that there are 6 of them.
+  const [tabQuery, setTabQuery] = useState('');
+  const [tabPage,  setTabPage]  = useState(1);
 
   const [modalOpen,  setModalOpen]  = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -233,45 +283,73 @@ export default function EventPage() {
   const [form, setForm] = useState({ name:'', code:'', desc:'', start:'', finish:'', date:'', location:'', pic:'', status:'', address:'', qrType:'', note:'', image:'' });
   const imgInputRef = useRef(null);
 
-  const pastEvents = useMemo(() => {
-    let data = events.filter(e => e.type === 'past');
-    if (pastQuery) {
-      const q = pastQuery.toLowerCase();
-      data = data.filter(e =>
-        e.name.toLowerCase().includes(q) || e.code.toLowerCase().includes(q) ||
-        e.location.toLowerCase().includes(q) || e.desc.toLowerCase().includes(q)
-      );
-    }
-    return data.sort((a, b) => (b.start || '').localeCompare(a.start || ''));
-  }, [events, pastQuery]);
+  function selectTab(id) {
+    setActiveTab(id);
+    setTabQuery('');
+    setTabPage(1);
+  }
 
-  const upEvents = useMemo(() => {
-    let data = events.filter(e => e.type === 'upcoming');
-    if (upQuery) {
-      const q = upQuery.toLowerCase();
-      data = data.filter(e =>
-        e.name.toLowerCase().includes(q) || e.code.toLowerCase().includes(q) ||
-        e.location.toLowerCase().includes(q) || e.desc.toLowerCase().includes(q)
-      );
-    }
-    return data.sort((a, b) => (a.start || '').localeCompare(b.start || ''));
-  }, [events, upQuery]);
+  // Raw buckets — one per status the event's own flag can show, mirroring the
+  // status flag 1:1 (Upcoming / On Going / Ready to Close / Checking Inventory /
+  // Returned & Completed / Transferred) so the tab bar matches it exactly. Not
+  // query-filtered, since tab badge counts should stay stable while typing in
+  // the search box — only the rendered list below is.
+  const rawUpcoming = useMemo(() =>
+    events.filter(e => e.type === 'upcoming' && closingOf(e) === 'on-going' && !readyToCloseOf(e) && !onGoingByItemsOf(e)),
+  [events]);
+  const rawOnGoing = useMemo(() =>
+    events.filter(e => e.type === 'upcoming' && closingOf(e) === 'on-going' && !readyToCloseOf(e) && onGoingByItemsOf(e)),
+  [events]);
+  const rawReadyToClose = useMemo(() =>
+    events.filter(e => e.type === 'upcoming' && readyToCloseOf(e)),
+  [events]);
+  const rawChecking = useMemo(() =>
+    events.filter(e => closingOf(e) === 'checking-inventory'),
+  [events]);
+  // Legacy seed `type: 'past'` events (which predate the status flag entirely)
+  // are folded into Returned & Completed — the closest equivalent, since both
+  // mean "this event is done."
+  const rawReturned = useMemo(() =>
+    events.filter(e => e.type === 'past' || closingOf(e) === 'returned-completed'),
+  [events]);
+  const rawTransferred = useMemo(() =>
+    events.filter(e => closingOf(e) === 'transferred'),
+  [events]);
 
-  const groupedPast = useMemo(() => {
-    if (pastQuery) return null;
+  const upcomingEvents = useMemo(() =>
+    applySearch(rawUpcoming, tabQuery).sort((a, b) => (a.start || '').localeCompare(b.start || '')),
+  [rawUpcoming, tabQuery]);
+  const onGoingEvents = useMemo(() =>
+    applySearch(rawOnGoing, tabQuery).sort((a, b) => (a.start || '').localeCompare(b.start || '')),
+  [rawOnGoing, tabQuery]);
+  const readyToCloseEvents = useMemo(() =>
+    applySearch(rawReadyToClose, tabQuery).sort((a, b) => (a.start || '').localeCompare(b.start || '')),
+  [rawReadyToClose, tabQuery]);
+  const checkingEvents = useMemo(() =>
+    applySearch(rawChecking, tabQuery).sort((a, b) => (b.start || '').localeCompare(a.start || '')),
+  [rawChecking, tabQuery]);
+  const returnedEvents = useMemo(() =>
+    applySearch(rawReturned, tabQuery).sort((a, b) => (b.start || '').localeCompare(a.start || '')),
+  [rawReturned, tabQuery]);
+  const transferredEvents = useMemo(() =>
+    applySearch(rawTransferred, tabQuery).sort((a, b) => (b.start || '').localeCompare(a.start || '')),
+  [rawTransferred, tabQuery]);
+
+  const groupedReturned = useMemo(() => {
+    if (tabQuery) return null;
     const map = {};
-    pastEvents.forEach(e => {
+    returnedEvents.forEach(e => {
       const [y, m] = (e.start || '').split('-');
       const key = `${y}-${m}`;
       if (!map[key]) map[key] = { label: `${MONTHS[parseInt(m)-1]} ${y}`, items: [] };
       map[key].items.push(e);
     });
     return Object.values(map);
-  }, [pastEvents, pastQuery]);
+  }, [returnedEvents, tabQuery]);
 
-  const pastFlat = useMemo(() =>
-    pastEvents.slice((pastPage-1)*PAGE_SIZE, pastPage*PAGE_SIZE),
-  [pastEvents, pastPage]);
+  const returnedFlat = useMemo(() =>
+    returnedEvents.slice((tabPage-1)*PAGE_SIZE, tabPage*PAGE_SIZE),
+  [returnedEvents, tabPage]);
 
   function setF(field) { return e => setForm(f => ({ ...f, [field]: e.target.value })); }
 
@@ -295,6 +373,10 @@ export default function EventPage() {
       setEvents(es => es.map(e => e.id === editingId ? { ...e, ...form, updatedAt } : e));
     } else {
       const type = form.start && new Date(form.start) < TODAY ? 'past' : 'upcoming';
+      // The Status field is hidden — a new event always starts at the first
+      // Event Status stage, written to the same store Event Detail's stepper reads.
+      const firstStage = getEventStageNames()[0];
+      if (firstStage) saveEventProgress(closingKeyFor(form), firstStage);
       setEvents(es => [{ id:nextId, ...form, type, itemCount:0, updatedAt }, ...es]);
       setNextId(n => n+1);
     }
@@ -304,8 +386,63 @@ export default function EventPage() {
   function confirmDelete() { setEvents(es => es.filter(e => e.id !== deletingId)); setDeleteOpen(false); }
 
   const delTarget = events.find(e => e.id === deletingId);
-  const totalUp   = events.filter(e => e.type === 'upcoming').length;
-  const totalPast = events.filter(e => e.type === 'past').length;
+  const totalActive    = rawUpcoming.length + rawOnGoing.length + rawReadyToClose.length;
+  const totalCompleted = rawReturned.length + rawTransferred.length;
+
+  const TABS = [
+    { id:'upcoming',       label:CLOSING_LABELS['upcoming'].label,           count:rawUpcoming.length },
+    { id:'on-going',       label:CLOSING_LABELS['on-going'].label,           count:rawOnGoing.length },
+    { id:'ready-to-close', label:CLOSING_LABELS['ready-to-close'].label,     count:rawReadyToClose.length },
+    { id:'checking',       label:CLOSING_LABELS['checking-inventory'].label, count:rawChecking.length },
+    { id:'returned',       label:CLOSING_LABELS['returned-completed'].label, count:rawReturned.length },
+    { id:'transferred',    label:CLOSING_LABELS['transferred'].label,        count:rawTransferred.length },
+    { id:'invite',         label:'Invite User',                              count:null },
+  ];
+
+  const statusBadge = key => (
+    <span className={`badge ${CLOSING_LABELS[key].badgeClass}`} style={{ fontSize:10.5, flexShrink:0 }}>
+      {CLOSING_LABELS[key].label}
+    </span>
+  );
+
+  const searchBar = placeholder => (
+    <div style={{ display:'flex', gap:8, marginBottom:18, alignItems:'center' }}>
+      <div className="search-wrap" style={{ flex:1, maxWidth:320 }}>
+        <IconSearch />
+        <input className="search-input" type="text" placeholder={placeholder}
+          value={tabQuery} onChange={e => { setTabQuery(e.target.value); setTabPage(1); }} />
+      </div>
+      <button className="btn-print" onClick={() => window.print()}><IconPrint /> Print</button>
+    </div>
+  );
+
+  const hint = text => (
+    <p style={{ fontSize:12.5, color:'var(--text-muted)', marginTop:-10, marginBottom:16 }}>{text}</p>
+  );
+
+  const emptyState = text => (
+    <div className="card" style={{ padding:'56px 32px', textAlign:'center' }}>
+      <p style={{ fontSize:14, color:'var(--text-muted)' }}>
+        {tabQuery ? 'No events match your search.' : text}
+      </p>
+    </div>
+  );
+
+  const cardGrid = (list, emptyText) => list.length === 0 ? emptyState(emptyText) : (
+    <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(270px,1fr))', gap:14 }}>
+      {list.map(r => (
+        <EventCard key={r.id} r={r} onEdit={openEdit} onDelete={openDelete} navigate={navigate} readyToClose={readyToCloseOf(r)} onGoingByItems={onGoingByItemsOf(r)} />
+      ))}
+    </div>
+  );
+
+  const rowList = (list, emptyText, badgeKey) => list.length === 0 ? emptyState(emptyText) : (
+    <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+      {list.map(r => (
+        <PastEventRow key={r.id} r={r} onEdit={openEdit} onDelete={openDelete} navigate={navigate} extraBadge={statusBadge(badgeKey)} />
+      ))}
+    </div>
+  );
 
   return (
     <>
@@ -316,11 +453,12 @@ export default function EventPage() {
       </div>
 
       {/* Stats row */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12, marginBottom:22 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom:22 }}>
         {[
-          { label:'Total Events',   value:events.length, color:'var(--brand)',    bg:'var(--brand-bg)' },
-          { label:'Upcoming',       value:totalUp,        color:'var(--green)',    bg:'var(--green-bg)' },
-          { label:'Past Events',    value:totalPast,      color:'var(--text-muted)', bg:'var(--bg)' },
+          { label:'Total Events',       value:events.length,      color:'var(--brand)',      bg:'var(--brand-bg)' },
+          { label:'Active',             value:totalActive,        color:'var(--green)',      bg:'var(--green-bg)' },
+          { label:'Checking Inventory', value:rawChecking.length, color:'var(--orange)',     bg:'var(--orange-bg)' },
+          { label:'Completed',          value:totalCompleted,     color:'var(--text-muted)', bg:'var(--bg)' },
         ].map(s => (
           <div key={s.label} style={{
             background:'#fff', border:'1px solid var(--border)', borderRadius:10,
@@ -337,16 +475,12 @@ export default function EventPage() {
         ))}
       </div>
 
-      {/* Tab bar */}
-      <div style={{ display:'flex', borderBottom:'2px solid var(--border)', marginBottom:20, gap:0 }}>
-        {[
-          { id:'upcoming', label:'Upcoming',    count:totalUp },
-          { id:'past',     label:'Past Events', count:totalPast },
-          { id:'invite',   label:'Invite User', count:null },
-        ].map(t => (
-          <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
-            border:'none', background:'none', cursor:'pointer', padding:'10px 20px',
-            fontSize:13.5, fontWeight:600, display:'flex', alignItems:'center', gap:7,
+      {/* Tab bar — one tab per event status flag value */}
+      <div style={{ display:'flex', borderBottom:'2px solid var(--border)', marginBottom:20, gap:0, overflowX:'auto' }}>
+        {TABS.map(t => (
+          <button key={t.id} onClick={() => selectTab(t.id)} style={{
+            border:'none', background:'none', cursor:'pointer', padding:'10px 16px',
+            fontSize:13.5, fontWeight:600, display:'flex', alignItems:'center', gap:7, whiteSpace:'nowrap',
             color: activeTab===t.id ? 'var(--brand)' : 'var(--text-muted)',
             borderBottom: activeTab===t.id ? '2px solid var(--brand)' : '2px solid transparent',
             marginBottom:-2, transition:'color .15s',
@@ -363,64 +497,53 @@ export default function EventPage() {
         ))}
       </div>
 
-      {/* ── UPCOMING ── */}
       {activeTab === 'upcoming' && (
         <div>
-          <div style={{ display:'flex', gap:8, marginBottom:18, alignItems:'center' }}>
-            <div className="search-wrap" style={{ flex:1, maxWidth:320 }}>
-              <IconSearch />
-              <input className="search-input" type="text" placeholder="Search events…"
-                value={upQuery} onChange={e => setUpQuery(e.target.value)} />
-            </div>
-            <button className="btn-print" onClick={() => window.print()}><IconPrint /> Print</button>
-          </div>
-
-          {upEvents.length === 0 ? (
-            <div className="card" style={{ padding:'56px 32px', textAlign:'center' }}>
-              <p style={{ fontSize:14, color:'var(--text-muted)' }}>
-                {upQuery ? 'No events match your search.' : 'No upcoming events.'}
-              </p>
-            </div>
-          ) : (
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(270px,1fr))', gap:14 }}>
-              {upEvents.map(r => (
-                <EventCard key={r.id} r={r} onEdit={openEdit} onDelete={openDelete} navigate={navigate} />
-              ))}
-            </div>
-          )}
+          {searchBar('Search upcoming events…')}
+          {hint('Events with no items added yet. Adding items on Event Detail moves an event to On Going.')}
+          {cardGrid(upcomingEvents, 'No upcoming events.')}
         </div>
       )}
 
-      {/* ── PAST ── */}
-      {activeTab === 'past' && (
+      {activeTab === 'on-going' && (
         <div>
-          <div style={{ display:'flex', gap:8, marginBottom:18, alignItems:'center' }}>
-            <div className="search-wrap" style={{ flex:1, maxWidth:320 }}>
-              <IconSearch />
-              <input className="search-input" type="text" placeholder="Search past events…"
-                value={pastQuery} onChange={e => { setPastQuery(e.target.value); setPastPage(1); }} />
-            </div>
-            <button className="btn-print" onClick={() => window.print()}><IconPrint /> Print</button>
-          </div>
+          {searchBar('Search on-going events…')}
+          {hint('Events that already have items, at any Event Status stage before the last one.')}
+          {cardGrid(onGoingEvents, 'No on-going events.')}
+        </div>
+      )}
 
-          {pastEvents.length === 0 ? (
-            <div className="card" style={{ padding:'56px 32px', textAlign:'center' }}>
-              <p style={{ fontSize:14, color:'var(--text-muted)' }}>
-                {pastQuery ? 'No events match your search.' : 'No past events.'}
-              </p>
-            </div>
-          ) : pastQuery ? (
+      {activeTab === 'ready-to-close' && (
+        <div>
+          {searchBar('Search events ready to close…')}
+          {hint('Events at their last Event Status stage. Open one and press “Close & Start Checking” to begin checking inventory.')}
+          {cardGrid(readyToCloseEvents, 'No events are ready to close.')}
+        </div>
+      )}
+
+      {activeTab === 'checking' && (
+        <div>
+          {searchBar('Search events in checking…')}
+          {hint('Closed events whose items are being cross-checked, then returned or transferred item by item.')}
+          {rowList(checkingEvents, 'No events currently in Checking Inventory.', 'checking-inventory')}
+        </div>
+      )}
+
+      {activeTab === 'returned' && (
+        <div>
+          {searchBar('Search completed events…')}
+          {rawReturned.length === 0 || returnedEvents.length === 0 ? emptyState('No returned & completed events.') : tabQuery ? (
             <>
               <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                {pastFlat.map(r => (
-                  <PastEventRow key={r.id} r={r} onEdit={openEdit} onDelete={openDelete} navigate={navigate} />
+                {returnedFlat.map(r => (
+                  <PastEventRow key={r.id} r={r} onEdit={openEdit} onDelete={openDelete} navigate={navigate} extraBadge={returnedExtraBadge(r)} />
                 ))}
               </div>
-              <Pagination currentPage={pastPage} total={pastEvents.length} pageSize={PAGE_SIZE} onPage={setPastPage} label="events" />
+              <Pagination currentPage={tabPage} total={returnedEvents.length} pageSize={PAGE_SIZE} onPage={setTabPage} label="events" />
             </>
           ) : (
             <div style={{ display:'flex', flexDirection:'column', gap:24 }}>
-              {groupedPast.map(group => (
+              {groupedReturned.map(group => (
                 <div key={group.label}>
                   <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
                     <span style={{ fontSize:11.5, fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.07em' }}>
@@ -433,13 +556,21 @@ export default function EventPage() {
                   </div>
                   <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
                     {group.items.map(r => (
-                      <PastEventRow key={r.id} r={r} onEdit={openEdit} onDelete={openDelete} navigate={navigate} />
+                      <PastEventRow key={r.id} r={r} onEdit={openEdit} onDelete={openDelete} navigate={navigate} extraBadge={returnedExtraBadge(r)} />
                     ))}
                   </div>
                 </div>
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {activeTab === 'transferred' && (
+        <div>
+          {searchBar('Search transferred events…')}
+          {hint('Closed events where every item was moved to another event instead of returned.')}
+          {rowList(transferredEvents, 'No transferred events.', 'transferred')}
         </div>
       )}
 
@@ -512,21 +643,6 @@ export default function EventPage() {
             <input type="text" placeholder="Person in charge" value={form.pic} onChange={setF('pic')} />
           </div>
           <div className="form-group">
-            <label>Status</label>
-            <SearchableSelect
-              value={form.status}
-              onChange={v => setForm(f => ({ ...f, status: v }))}
-              options={['Created by admin up','On preparing items','Finish setup','Waiting scan in','Event running','Waiting scan out','Finished','Postphone','Disable'].map(s => ({ value: s, label: s }))}
-              placeholder="— Select Status —"
-            />
-          </div>
-        </div>
-        <div className="form-row">
-          <div className="form-group">
-            <label>Address</label>
-            <input type="text" placeholder="Event location / address" value={form.address} onChange={setF('address')} />
-          </div>
-          <div className="form-group">
             <label>QR Type</label>
             <SearchableSelect
               value={form.qrType}
@@ -541,6 +657,10 @@ export default function EventPage() {
               placeholder="Select QR Type"
             />
           </div>
+        </div>
+        <div className="form-group">
+          <label>Address</label>
+          <input type="text" placeholder="Event location / address" value={form.address} onChange={setF('address')} />
         </div>
 
         {/* ADDITIONAL */}

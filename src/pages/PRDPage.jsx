@@ -2,6 +2,7 @@ const SECTIONS = [
   { id: 'overview', label: 'Overview' },
   { id: 'lifecycle', label: 'Event Lifecycle' },
   { id: 'scan-gate', label: 'Scan Gate & Next' },
+  { id: 'closing', label: 'Closing & Return' },
   { id: 'packaging', label: 'Packaging (Grouping)' },
   { id: 'summary', label: 'Event Summary' },
   { id: 'auth', label: 'Authentication & Roles' },
@@ -96,6 +97,12 @@ export default function PRDPage() {
           <li>Disable</li>
         </Ul>
         <P>
+          Each Event Status row also has a short <strong>Code</strong> field (e.g.
+          &ldquo;ER&rdquo; for Event running) — editable in the New/Edit modal and
+          shown as its own column in the table. It&rsquo;s a label only; nothing
+          else in the app reads it yet.
+        </P>
+        <P>
           Add, rename, reorder, or remove a row on Event Status and every event&rsquo;s
           stepper reflects it immediately. Every item added to an event records which
           stage was active when it was added, which powers the item-list tabs on
@@ -147,17 +154,42 @@ export default function PRDPage() {
         </P>
       </Section>
 
+      <Section id="closing" title="Closing & Return">
+        <P>
+          What happens after an event finishes its normal Event Status stepper —
+          the gap between &ldquo;the event happened&rdquo; and &ldquo;it&rsquo;s
+          fully archived.&rdquo; This is a single event-level <strong>status
+          flag</strong> with 5 values, replacing an earlier 4-value version of this
+          same idea (Close this Event → Ready for Check → Ready for Return → Return)
+          built in an earlier round — see <code>docs/changes.md</code> if you need
+          the old shape.
+        </P>
+        <Ul>
+          <li><strong>On Going</strong> — default once an event has items. Splits into two badges on the same underlying value: <strong>Upcoming</strong> (gray, no items yet — either the seed <code>itemCount</code> is 0, or no item has ever been added via &ldquo;+ Add Item&rdquo; on Event Detail) and <strong>On Going</strong> (green, has items) — adding an item flips the badge live, on both the Event listing card and Event Detail, without needing a reload.</li>
+          <li><strong>Ready to Close</strong> — automatic, not a click-to-set status: as soon as the event&rsquo;s own Event Status stepper reaches its <strong>last</strong> configured stage while still On Going, this badge appears on both the Event listing card and Event Detail, and a <strong>&ldquo;Close &amp; Start Checking&rdquo;</strong> button replaces the usual Next button. Clicking it moves to Checking Inventory.</li>
+          <li><strong>Checking Inventory</strong> — the event&rsquo;s primary action becomes <strong>&ldquo;Ready for Return.&rdquo;</strong> A new <strong>&ldquo;Cross Check Items&rdquo;</strong> entry appears in the ⋮ menu — a dedicated checklist (separate from the item card itself) for going through every item and marking it checked, feeding an <strong>Event Logistics Summary</strong> (checked vs. never-checked counts).</li>
+          <li>Clicking <strong>&ldquo;Ready for Return&rdquo;</strong> opens the <strong>Return Item &amp; Transfer</strong> modal — the Logistics Summary at the top, then every item with two resolution actions: <strong>Return</strong> (marks it resolved, stays on the event with a &ldquo;Returned&rdquo; badge) or <strong>Transfer</strong> (picks a target event that&rsquo;s still On Going + a target Event Status stage, then removes the item here and queues it for that event to pick up next time it&rsquo;s opened). Every item must be resolved before <strong>Finalize</strong> is enabled.</li>
+          <li>Finalizing sets the event to <strong>Returned &amp; Completed</strong> if at least one item was actually Returned, or <strong>Transferred</strong> if every item ended up moved to other events instead (an assumption — see Open Assumptions). Both are terminal, and each has its own tab on the Event page (legacy seeded past events are folded into Returned &amp; Completed).</li>
+          <li>The Event list page&rsquo;s middle tab is now <strong>&ldquo;Checking Inventory&rdquo;</strong> (was &ldquo;Finished Event&rdquo;) — a single status now, not two.</li>
+          <li><strong>Known gap</strong> (inherited, not new): since Event Detail has no real per-event item store, a Transferred item only stays visible in its target event for as long as that page instance stays mounted — reopening it later re-seeds from the generic demo list and the transferred item is gone. The transfer itself (removal + Activity Log entry) is still real.</li>
+          <li>Every item also carries an <strong>ownership flag</strong> — IHC / IHP / Outsource — shown as a small badge next to its Area badge. It&rsquo;s <strong>click-to-cycle</strong> (IHC → IHP → Outsource → …), changeable any time at any stage, and there&rsquo;s a dedicated <strong>Ownership filter</strong> next to the Area filter to narrow the item list down to just one type.</li>
+          <li>The older <strong>&ldquo;Warehouse Item&rdquo;</strong> and always-visible <strong>&ldquo;Checked&rdquo;</strong> indicators have been removed from the item card display entirely — checking now happens through the Cross Check Items menu instead.</li>
+        </Ul>
+      </Section>
+
       <Section id="packaging" title="Packaging (Grouping)">
         <P>
           The real-world reason this exists: several items get physically put into
           one box, and a single QR code goes on that box — so scanning it once
           checks in everything inside instead of scanning each item one at a time.
-          The box-icon button in the Event Detail header groups items together to
-          match that.
+          A <strong>&ldquo;Group Items&rdquo;</strong> entry in the Event Detail
+          header&rsquo;s <strong>⋮ more-menu</strong> (alongside Summary and Print)
+          opens the grouping picker — it used to be its own standalone icon button
+          in the header, folded into the ⋮ menu to reduce header clutter.
         </P>
         <Ul>
-          <li>Only enabled at the event&rsquo;s <strong>first stage</strong> (whatever Event Status row has the lowest order — &ldquo;Created by admin up&rdquo; by default). Disabled everywhere else, with a tooltip explaining why.</li>
-          <li>Clicking it opens a picker limited to first-stage items that aren&rsquo;t already in a group; you name the group (the box) and select which items belong to it.</li>
+          <li>Usable on <strong>any ungrouped item regardless of stage</strong> — not limited to the event&rsquo;s first stage.</li>
+          <li>Clicking it opens a picker of every item not already in a group; you name the group (the box) and select which items belong to it.</li>
           <li>Grouped items show a purple group badge on their card, everywhere they appear.</li>
           <li>A dedicated <strong>&ldquo;Grouped&rdquo; tab</strong> (alongside Waiting Scan / All / Added New) shows every box as its own card — name, item count, and (only when the current stage has scan enabled) a single <strong>Scan Box</strong> button that scans every item inside at once. Individual items don&rsquo;t get their own Scan button inside a box card — scanning is a box-level action there, matching the one-QR-per-box reality. Outside the Grouped tab, an item card still shows its group badge and can still be scanned individually, which scans the whole group the same way.</li>
           <li>There&rsquo;s no &ldquo;remove from group&rdquo; UI yet, and groups are scoped to a single event — not reusable across events.</li>

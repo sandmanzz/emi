@@ -8,9 +8,21 @@ import { initialAreas, SUB_AREAS } from '../data/areas';
 import { inventoryData, categories } from '../data/inventory';
 import { initialWarehouses } from '../data/warehouses';
 import { wiData } from '../data/warehouseInventory';
-import { eiData } from '../data/eventInventory';
 import { getEventStageNames, isScanStage } from '../lib/eventStatuses';
-import { getEventProgress, saveEventProgress } from '../lib/eventProgress';
+import { resolveEventStage, saveEventProgress } from '../lib/eventProgress';
+import { getEventClosing, setEventClosing, isOnGoingByItems } from '../lib/eventClosing';
+import { CLOSING_LABELS } from '../lib/eventClosingLabels';
+import { markItemsAdded } from '../lib/eventItemsFlag';
+import { getIncomingItems, queueMovedItem, clearIncomingItems } from '../lib/movedItems';
+import { addActivityLog } from '../lib/activityLogStore';
+import { getCurrentTenantUser } from '../lib/tenantAuth';
+import { initialEvents } from '../data/events';
+
+// Matches the "<date> | <NAME>" key this page reads its own ?name= from, so a
+// candidate move-target event can be looked up in the same closing-status store.
+function eventKeyFor(e) {
+  return `${e.date} | ${(e.name || '').toUpperCase()}`;
+}
 
 const AREAS = initialAreas.map(a => a.name);
 const WAREHOUSES = [...new Set(initialWarehouses.map(w => w.name))];
@@ -42,32 +54,32 @@ function stockAtWarehouse(inv, warehouseName) {
 }
 
 const initialItems = [
-  { id:1, name:'Chiffon White 4-6×1,2m',        area:'CEREMONY',        subArea:'', stage:'On preparing items',  scanned:false, groupId:null, qty:2,   pic:'Anto',    checking:true,  warehouseItem:false, scanIn:'May 26, 2025 10:42 PM', scanOut:'May 26, 2025 9:33 PM',  note:"Please take care this item, it's luxury item" },
-  { id:2, name:'Hanging Rattan 1',               area:'PHOTOBOOTH',      subArea:'', stage:'On preparing items',  scanned:false, groupId:null, qty:2,   pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:"Please take care this item, it's luxury item" },
-  { id:3, name:'Hanging Rattan 2',               area:'RECEPTION',       subArea:'', stage:'On preparing items',  scanned:false, groupId:null, qty:10,  pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:"Please take care this item, it's luxury item" },
-  { id:4, name:'Hanging Rattan 3',               area:'RECEPTION',       subArea:'', stage:'On preparing items',  scanned:false, groupId:null, qty:10,  pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:"Please take care this item, it's luxury item" },
-  { id:5, name:'White Fabric 3m',                area:'ENTRANCE',        subArea:'', stage:'On preparing items',  scanned:false, groupId:null, qty:5,   pic:'Novi',    checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:'' },
-  { id:6, name:'Red Rose Flower',                area:'RECEPTION',       subArea:'', stage:'On preparing items',  scanned:false, groupId:null, qty:30,  pic:'Darmian', checking:true,  warehouseItem:false, scanIn:'Apr 9, 2026 08:00 AM',  scanOut:null,                    note:'' },
-  { id:7, name:'Standing Flower Tall',           area:'ENTRANCE',        subArea:'', stage:'On preparing items',  scanned:false, groupId:null, qty:4,   pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:'' },
-  { id:8, name:'Tealight Holder 15cm',           area:'GUEST TABLE',     subArea:'', stage:'On preparing items',  scanned:false, groupId:null, qty:50,  pic:'Anto',    checking:false, warehouseItem:true,  scanIn:null,                    scanOut:null,                    note:'' },
-  { id:9, name:'Gold Ribbon 5m',                 area:'CEREMONY',        subArea:'', stage:'On preparing items',  scanned:false, groupId:null, qty:20,  pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:'' },
-  { id:10,name:'White Candle 30cm',              area:'GUEST TABLE',     subArea:'', stage:'On preparing items',  scanned:false, groupId:null, qty:100, pic:'Novi',    checking:true,  warehouseItem:true,  scanIn:'Apr 9, 2026 07:30 AM',  scanOut:'Apr 9, 2026 09:00 AM', note:'' },
-  { id:11,name:'Backdrop Floral 3×2m',           area:'PHOTOBOOTH',      subArea:'', stage:'On preparing items',  scanned:false, groupId:null, qty:1,   pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:'' },
-  { id:12,name:'Tiffany Chair',                  area:'RECEPTION',       subArea:'', stage:'On preparing items',  scanned:false, groupId:null, qty:60,  pic:'Darmian', checking:false, warehouseItem:true,  scanIn:null,                    scanOut:null,                    note:'' },
-  { id:13,name:'Fairy Light Curtain 3x3m',       area:'CHAMPAGNE WALL',  subArea:'', stage:'Created by admin up',  scanned:false, groupId:null, qty:2,   pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:'' },
-  { id:14,name:'Champagne Tower Glass Set',      area:'CHAMPAGNE WALL',  subArea:'', stage:'Finish setup',   scanned:false, groupId:null, qty:150, pic:'Novi',    checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:'' },
-  { id:15,name:'Cocktail High Table',            area:'COCKTAIL',        subArea:'', stage:'Waiting scan in',scanned:false, groupId:null, qty:8,   pic:'Anto',    checking:true,  warehouseItem:true,  scanIn:null,                    scanOut:null,                    note:'' },
-  { id:16,name:'Gold Bar Stool',                 area:'COCKTAIL',        subArea:'', stage:'Waiting scan in',scanned:false, groupId:null, qty:16,  pic:'Anto',    checking:true,  warehouseItem:true,  scanIn:null,                    scanOut:null,                    note:'' },
-  { id:17,name:'Display Table Riser Set',        area:'DISPLAY TABLE',   subArea:'', stage:'Created by admin up',  scanned:false, groupId:null, qty:6,   pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:'' },
-  { id:18,name:'Fresh Flower Centerpiece',       area:'FLORIST',         subArea:'', stage:'Finish setup',   scanned:false, groupId:null, qty:12,  pic:'Dewi',    checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:'' },
-  { id:19,name:'Greenery Wall Panel',            area:'FLORIST',         subArea:'', stage:'Created by admin up',  scanned:false, groupId:null, qty:4,   pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:'' },
-  { id:20,name:'Labour Toolkit Bag',             area:'LABOUR',          subArea:'', stage:'On preparing items',  scanned:false, groupId:null, qty:3,   pic:'Hendra',  checking:true,  warehouseItem:true,  scanIn:null,                    scanOut:null,                    note:'' },
-  { id:21,name:'Lounge Sofa Set',                area:'LOUNGE',          subArea:'', stage:'Waiting scan in',scanned:false, groupId:null, qty:2,   pic:'Agus',    checking:true,  warehouseItem:true,  scanIn:null,                    scanOut:null,                    note:'' },
-  { id:22,name:'Round Coffee Table',             area:'LOUNGE',          subArea:'', stage:'Waiting scan in',scanned:false, groupId:null, qty:2,   pic:'Agus',    checking:true,  warehouseItem:true,  scanIn:null,                    scanOut:null,                    note:'' },
-  { id:23,name:'Bridal Backdrop Floral Wall',    area:'BRIDAL BACKDROP', subArea:'', stage:'Event running', scanned:false, groupId:null, qty:1,   pic:'Lina',    checking:true,  warehouseItem:false, scanIn:'Apr 9, 2026 09:10 AM',  scanOut:null,                    note:'' },
-  { id:24,name:'Bridal Room Mirror Stand',       area:'BRIDAL ROOM',     subArea:'', stage:'On preparing items',  scanned:false, groupId:null, qty:1,   pic:'Siti',    checking:false, warehouseItem:true,  scanIn:null,                    scanOut:null,                    note:'' },
-  { id:25,name:'Bridal Table Linen Set',         area:'BRIDAL TABLE',    subArea:'', stage:'Finish setup',   scanned:false, groupId:null, qty:3,   pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:'' },
-  { id:26,name:'Car Decoration Ribbon Kit',      area:'CAR DECOR',       subArea:'', stage:'Created by admin up',  scanned:false, groupId:null, qty:2,   pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:'' },
+  { id:1, name:'Chiffon White 4-6×1,2m',        area:'CEREMONY',        subArea:'', stage:'On preparing items',  scanned:false, groupId:null, qty:2,   pic:'Anto',    checking:true,  warehouseItem:false, scanIn:'May 26, 2025 10:42 PM', scanOut:'May 26, 2025 9:33 PM',  note:"Please take care this item, it's luxury item", checked:false, ownership:'IHC' },
+  { id:2, name:'Hanging Rattan 1',               area:'PHOTOBOOTH',      subArea:'', stage:'On preparing items',  scanned:false, groupId:null, qty:2,   pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:"Please take care this item, it's luxury item", checked:false, ownership:'IHC' },
+  { id:3, name:'Hanging Rattan 2',               area:'RECEPTION',       subArea:'', stage:'On preparing items',  scanned:false, groupId:null, qty:10,  pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:"Please take care this item, it's luxury item", checked:false, ownership:'IHC' },
+  { id:4, name:'Hanging Rattan 3',               area:'RECEPTION',       subArea:'', stage:'On preparing items',  scanned:false, groupId:null, qty:10,  pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:"Please take care this item, it's luxury item", checked:false, ownership:'IHC' },
+  { id:5, name:'White Fabric 3m',                area:'ENTRANCE',        subArea:'', stage:'On preparing items',  scanned:false, groupId:null, qty:5,   pic:'Novi',    checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:'', checked:false, ownership:'IHP' },
+  { id:6, name:'Red Rose Flower',                area:'RECEPTION',       subArea:'', stage:'On preparing items',  scanned:false, groupId:null, qty:30,  pic:'Darmian', checking:true,  warehouseItem:false, scanIn:'Apr 9, 2026 08:00 AM',  scanOut:null,                    note:'', checked:true,  ownership:'IHC' },
+  { id:7, name:'Standing Flower Tall',           area:'ENTRANCE',        subArea:'', stage:'On preparing items',  scanned:false, groupId:null, qty:4,   pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:'', checked:false, ownership:'IHC' },
+  { id:8, name:'Tealight Holder 15cm',           area:'GUEST TABLE',     subArea:'', stage:'On preparing items',  scanned:false, groupId:null, qty:50,  pic:'Anto',    checking:false, warehouseItem:true,  scanIn:null,                    scanOut:null,                    note:'', checked:false, ownership:'IHC' },
+  { id:9, name:'Gold Ribbon 5m',                 area:'CEREMONY',        subArea:'', stage:'On preparing items',  scanned:false, groupId:null, qty:20,  pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:'', checked:false, ownership:'Outsource' },
+  { id:10,name:'White Candle 30cm',              area:'GUEST TABLE',     subArea:'', stage:'On preparing items',  scanned:false, groupId:null, qty:100, pic:'Novi',    checking:true,  warehouseItem:true,  scanIn:'Apr 9, 2026 07:30 AM',  scanOut:'Apr 9, 2026 09:00 AM', note:'', checked:true,  ownership:'IHC' },
+  { id:11,name:'Backdrop Floral 3×2m',           area:'PHOTOBOOTH',      subArea:'', stage:'On preparing items',  scanned:false, groupId:null, qty:1,   pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:'', checked:false, ownership:'IHP' },
+  { id:12,name:'Tiffany Chair',                  area:'RECEPTION',       subArea:'', stage:'On preparing items',  scanned:false, groupId:null, qty:60,  pic:'Darmian', checking:false, warehouseItem:true,  scanIn:null,                    scanOut:null,                    note:'', checked:false, ownership:'IHC' },
+  { id:13,name:'Fairy Light Curtain 3x3m',       area:'CHAMPAGNE WALL',  subArea:'', stage:'Created by admin up',  scanned:false, groupId:null, qty:2,   pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:'', checked:false, ownership:'IHC' },
+  { id:14,name:'Champagne Tower Glass Set',      area:'CHAMPAGNE WALL',  subArea:'', stage:'Finish setup',   scanned:false, groupId:null, qty:150, pic:'Novi',    checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:'', checked:false, ownership:'Outsource' },
+  { id:15,name:'Cocktail High Table',            area:'COCKTAIL',        subArea:'', stage:'Waiting scan in',scanned:false, groupId:null, qty:8,   pic:'Anto',    checking:true,  warehouseItem:true,  scanIn:null,                    scanOut:null,                    note:'', checked:false, ownership:'IHC' },
+  { id:16,name:'Gold Bar Stool',                 area:'COCKTAIL',        subArea:'', stage:'Waiting scan in',scanned:false, groupId:null, qty:16,  pic:'Anto',    checking:true,  warehouseItem:true,  scanIn:null,                    scanOut:null,                    note:'', checked:false, ownership:'IHC' },
+  { id:17,name:'Display Table Riser Set',        area:'DISPLAY TABLE',   subArea:'', stage:'Created by admin up',  scanned:false, groupId:null, qty:6,   pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:'', checked:false, ownership:'IHP' },
+  { id:18,name:'Fresh Flower Centerpiece',       area:'FLORIST',         subArea:'', stage:'Finish setup',   scanned:false, groupId:null, qty:12,  pic:'Dewi',    checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:'', checked:false, ownership:'IHC' },
+  { id:19,name:'Greenery Wall Panel',            area:'FLORIST',         subArea:'', stage:'Created by admin up',  scanned:false, groupId:null, qty:4,   pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:'', checked:false, ownership:'IHC' },
+  { id:20,name:'Labour Toolkit Bag',             area:'LABOUR',          subArea:'', stage:'On preparing items',  scanned:false, groupId:null, qty:3,   pic:'Hendra',  checking:true,  warehouseItem:true,  scanIn:null,                    scanOut:null,                    note:'', checked:false, ownership:'Outsource' },
+  { id:21,name:'Lounge Sofa Set',                area:'LOUNGE',          subArea:'', stage:'Waiting scan in',scanned:false, groupId:null, qty:2,   pic:'Agus',    checking:true,  warehouseItem:true,  scanIn:null,                    scanOut:null,                    note:'', checked:false, ownership:'IHC' },
+  { id:22,name:'Round Coffee Table',             area:'LOUNGE',          subArea:'', stage:'Waiting scan in',scanned:false, groupId:null, qty:2,   pic:'Agus',    checking:true,  warehouseItem:true,  scanIn:null,                    scanOut:null,                    note:'', checked:false, ownership:'IHC' },
+  { id:23,name:'Bridal Backdrop Floral Wall',    area:'BRIDAL BACKDROP', subArea:'', stage:'Event running', scanned:false, groupId:null, qty:1,   pic:'Lina',    checking:true,  warehouseItem:false, scanIn:'Apr 9, 2026 09:10 AM',  scanOut:null,                    note:'', checked:false, ownership:'IHP' },
+  { id:24,name:'Bridal Room Mirror Stand',       area:'BRIDAL ROOM',     subArea:'', stage:'On preparing items',  scanned:false, groupId:null, qty:1,   pic:'Siti',    checking:false, warehouseItem:true,  scanIn:null,                    scanOut:null,                    note:'', checked:false, ownership:'IHC' },
+  { id:25,name:'Bridal Table Linen Set',         area:'BRIDAL TABLE',    subArea:'', stage:'Finish setup',   scanned:false, groupId:null, qty:3,   pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:'', checked:false, ownership:'IHC' },
+  { id:26,name:'Car Decoration Ribbon Kit',      area:'CAR DECOR',       subArea:'', stage:'Created by admin up',  scanned:false, groupId:null, qty:2,   pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:'', checked:false, ownership:'IHC' },
 ];
 
 function CheckIcon() {
@@ -96,7 +108,16 @@ function InvThumb() {
   );
 }
 
-function ItemCard({ item, group, showScanButton, onScanClick, onDelete }) {
+function ownershipBadgeClass(ownership) {
+  if (ownership === 'IHC') return 'badge-blue';
+  if (ownership === 'IHP') return 'badge-purple';
+  if (ownership === 'Outsource') return 'badge-orange';
+  return 'badge-gray';
+}
+
+const OWNERSHIP_CYCLE = ['IHC', 'IHP', 'Outsource'];
+
+function ItemCard({ item, group, showScanButton, onScanClick, onDelete, onCycleOwnership }) {
   return (
     <div className="item-card">
       <button className="item-card-delete" title="Delete" onClick={() => onDelete(item.id)}>
@@ -104,7 +125,23 @@ function ItemCard({ item, group, showScanButton, onScanClick, onDelete }) {
       </button>
       <ImagePlaceholder />
       <div className="item-body">
-        <span className={`area-badge ${areaBadgeClass(item.area)}`}>{item.area}</span>
+        <div className="item-badge-row">
+          <span className={`area-badge ${areaBadgeClass(item.area)}`}>{item.area}</span>
+          {item.ownership && (
+            <button
+              type="button"
+              className={`badge ${ownershipBadgeClass(item.ownership)} ownership-badge-btn`}
+              style={{ fontSize: 10 }}
+              title="Click to change ownership (IHC / IHP / Outsource)"
+              onClick={() => onCycleOwnership(item.id)}
+            >
+              {item.ownership}
+            </button>
+          )}
+          {item.resolution === 'returned' && (
+            <span className="badge badge-green" style={{ fontSize: 10 }}>Returned</span>
+          )}
+        </div>
         <div className="item-name-row">
           <span className="item-name">
             {item.name}
@@ -133,12 +170,6 @@ function ItemCard({ item, group, showScanButton, onScanClick, onDelete }) {
               {item.checking && <CheckIcon />}
             </span>
             Checking
-          </div>
-          <div className="indicator-row">
-            <span className={`indicator-box${item.warehouseItem ? ' checked' : ''}`}>
-              {item.warehouseItem && <CheckIcon />}
-            </span>
-            Warehouse Item
           </div>
         </div>
         <div className="scan-rows">
@@ -177,20 +208,38 @@ export default function EventDetailPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const eventName = searchParams.get('name') || '03/06/2023 | GUNTUR + CLARISSA';
+  const currentEventSeed = initialEvents.find(e => eventKeyFor(e) === eventName);
+  const onGoingByItems = isOnGoingByItems(eventName, currentEventSeed?.itemCount);
 
-  const [items, setItems] = useState(initialItems);
-  const [nextId, setNextId] = useState(27);
-  const [stages] = useState(() => getEventStageNames());
-  const [eventStatus, setEventStatus] = useState(() => {
-    const saved = getEventProgress(eventName);
-    if (saved && stages.includes(saved)) return saved;
-    // No saved progress yet (first-ever visit) — fall back to this event's mock
-    // status from Event Inventory instead of always starting at the first stage.
-    const mockRow = eiData.find(r => r.event === eventName);
-    if (mockRow && stages.includes(mockRow.status)) return mockRow.status;
-    return stages[0] || 'Preparation';
+  const currentUser = getCurrentTenantUser();
+
+  const [items, setItems] = useState(() => {
+    const incoming = getIncomingItems(eventName);
+    if (incoming.length === 0) return initialItems;
+    let id = 27;
+    const added = incoming.map(inc => ({
+      id: id++, name: inc.name, area: inc.area, subArea: inc.subArea || '', stage: inc.stage,
+      scanned: false, groupId: null, qty: inc.qty, pic: inc.pic || '', checking: false,
+      scanIn: null, scanOut: null, note: inc.note || '', checked: false, ownership: inc.ownership || 'IHC',
+    }));
+    return [...initialItems, ...added];
   });
+  const [nextId, setNextId] = useState(() => 27 + getIncomingItems(eventName).length);
+  const [stages] = useState(() => getEventStageNames());
+  const [eventStatus, setEventStatus] = useState(() => resolveEventStage(eventName) || 'Preparation');
   const stageScanEnabled = isScanStage(eventStatus);
+  const [closingStatus, setClosingStatus] = useState(() => getEventClosing(eventName));
+  const [crossCheckOpen, setCrossCheckOpen] = useState(false);
+  // Bulk Assign Ownership modal
+  const [bulkOwnOpen, setBulkOwnOpen] = useState(false);
+  const [bulkOwnTarget, setBulkOwnTarget] = useState('IHC');
+  const [bulkOwnSelected, setBulkOwnSelected] = useState([]);
+  const [bulkOwnQuery, setBulkOwnQuery] = useState('');
+  const [bulkOwnFrom, setBulkOwnFrom] = useState('');
+  const [returnTransferOpen, setReturnTransferOpen] = useState(false);
+  const [transferPickerItemId, setTransferPickerItemId] = useState(null);
+  const [transferTargetEvent, setTransferTargetEvent] = useState('');
+  const [transferTargetStage, setTransferTargetStage] = useState('');
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const moreMenuRef = useRef(null);
@@ -203,6 +252,16 @@ export default function EventDetailPage() {
     document.addEventListener('mousedown', onDocMouseDown);
     return () => document.removeEventListener('mousedown', onDocMouseDown);
   }, [moreMenuOpen]);
+
+  // Items transferred out of another event's Checking Inventory phase are
+  // queued here and merged into `items`/`nextId`'s initial state above (so the
+  // merge itself is a pure read at mount, not a setState-in-effect); this just
+  // clears the queue right after, so the same items aren't merged in again on
+  // a later visit.
+  useEffect(() => {
+    clearIncomingItems(eventName);
+  }, [eventName]);
+
   const [scanningItem, setScanningItem] = useState(null);
   const [scanPhase, setScanPhase] = useState('ready'); // ready | scanning | done
   const [stepperError, setStepperError] = useState('');
@@ -216,6 +275,7 @@ export default function EventDetailPage() {
 
   const [selectedArea, setSelectedArea] = useState('');
   const [kwSearch, setKwSearch] = useState('');
+  const [ownershipFilter, setOwnershipFilter] = useState('');
   const [stageFilter, setStageFilter] = useState('all'); // 'all' | 'previous' | 'current'
 
   // Cart — "add from inventory" e-commerce style flow
@@ -235,9 +295,10 @@ export default function EventDetailPage() {
 
   const filtered = useMemo(() => items.filter(it => {
     if (selectedArea && it.area !== selectedArea) return false;
+    if (ownershipFilter && it.ownership !== ownershipFilter) return false;
     if (kwSearch && !it.name.toLowerCase().includes(kwSearch.toLowerCase()) && !it.area.toLowerCase().includes(kwSearch.toLowerCase())) return false;
     return true;
-  }), [items, selectedArea, kwSearch]);
+  }), [items, selectedArea, ownershipFilter, kwSearch]);
 
   const stageIndex = stages.indexOf(eventStatus);
   // "All" only counts items added up through the current stage — not items whose
@@ -255,9 +316,26 @@ export default function EventDetailPage() {
     return map;
   }, [items]);
 
+  const ownershipCounts = useMemo(() => {
+    const map = {};
+    items.forEach(it => { map[it.ownership] = (map[it.ownership] || 0) + 1; });
+    return map;
+  }, [items]);
+
 
   const unscannedCount = useMemo(() => items.filter(it => !it.scanned).length, [items]);
   const hasNextStage = stageIndex < stages.length - 1;
+  // "Ready to Close" is a derived display state, not stored — see eventClosing.js.
+  const readyToClose = closingStatus === 'on-going' && !hasNextStage;
+
+  // Transfer target candidates — other events still "on-going" (upcoming, not
+  // yet in any closing phase), matching the same set EventPage.jsx's "Upcoming"
+  // tab shows.
+  const transferTargetCandidates = useMemo(() => initialEvents
+    .filter(e => e.type === 'upcoming')
+    .map(e => ({ ...e, key: eventKeyFor(e) }))
+    .filter(e => e.key !== eventName && getEventClosing(e.key) === 'on-going'),
+  [eventName]);
 
   function changeEventStatus(step) {
     const targetIndex = stages.indexOf(step);
@@ -326,6 +404,14 @@ export default function EventDetailPage() {
     navigate(`/event-summary?name=${encodeURIComponent(eventName)}`);
   }
 
+  // Event Logistics Summary — generated going into the Return & Transfer step.
+  // Items never marked "Checked" during Cross Check are flagged as missing.
+  const logisticsSummary = useMemo(() => {
+    const checkedItems = items.filter(it => it.checked);
+    const missingItems = items.filter(it => !it.checked);
+    return { total: items.length, checkedCount: checkedItems.length, missingItems };
+  }, [items]);
+
   function doScan(id) {
     const now = new Date().toLocaleString('en-US', { month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit', hour12:true });
     setItems(is => is.map(it => {
@@ -364,6 +450,136 @@ export default function EventDetailPage() {
   function deleteItem(id) {
     if (!window.confirm('Delete this item from the event?')) return;
     setItems(is => is.filter(i => i.id !== id));
+  }
+
+  function toggleItemChecked(id) {
+    setItems(is => is.map(it => it.id === id ? { ...it, checked: !it.checked } : it));
+  }
+
+  function cycleItemOwnership(id) {
+    setItems(is => is.map(it => {
+      if (it.id !== id) return it;
+      const next = OWNERSHIP_CYCLE[(OWNERSHIP_CYCLE.indexOf(it.ownership) + 1) % OWNERSHIP_CYCLE.length];
+      return { ...it, ownership: next };
+    }));
+  }
+
+  // --- Bulk Assign Ownership ---
+  const bulkOwnVisible = useMemo(() => items.filter(it => {
+    if (bulkOwnFrom && it.ownership !== bulkOwnFrom) return false;
+    if (bulkOwnQuery) {
+      const q = bulkOwnQuery.toLowerCase();
+      if (!it.name.toLowerCase().includes(q) && !it.area.toLowerCase().includes(q)) return false;
+    }
+    return true;
+  }), [items, bulkOwnFrom, bulkOwnQuery]);
+  const bulkOwnAllVisibleSelected = bulkOwnVisible.length > 0 && bulkOwnVisible.every(it => bulkOwnSelected.includes(it.id));
+
+  function openBulkOwnership() {
+    setBulkOwnTarget('IHC');
+    setBulkOwnSelected([]);
+    setBulkOwnQuery('');
+    setBulkOwnFrom('');
+    setBulkOwnOpen(true);
+  }
+
+  function toggleBulkOwnItem(id) {
+    setBulkOwnSelected(sel => sel.includes(id) ? sel.filter(x => x !== id) : [...sel, id]);
+  }
+
+  // Select/deselect only what's currently visible, so a filtered "select all"
+  // never silently touches items hidden by the search or ownership filter.
+  function toggleBulkOwnAllVisible() {
+    const visibleIds = bulkOwnVisible.map(it => it.id);
+    setBulkOwnSelected(sel => bulkOwnAllVisibleSelected
+      ? sel.filter(id => !visibleIds.includes(id))
+      : [...new Set([...sel, ...visibleIds])]);
+  }
+
+  function applyBulkOwnership() {
+    if (bulkOwnSelected.length === 0) return;
+    const changed = items.filter(it => bulkOwnSelected.includes(it.id) && it.ownership !== bulkOwnTarget);
+    setItems(is => is.map(it => bulkOwnSelected.includes(it.id) ? { ...it, ownership: bulkOwnTarget } : it));
+    if (changed.length > 0) {
+      addActivityLog({
+        userName: currentUser?.name || 'Admin', action: 'Update', module: 'Event Detail',
+        description: `Bulk-assigned ownership ${bulkOwnTarget} to ${changed.length} item(s) on ${eventName}`,
+      });
+    }
+    setBulkOwnOpen(false);
+  }
+
+  // --- Closing the event: On Going -> (Ready to Close) -> Checking Inventory
+  // -> Returned & Completed | Transferred ---
+  function handleReadyToClose() {
+    if (!window.confirm(`Close "${eventName}"? This moves it into Checking Inventory.`)) return;
+    setEventClosing(eventName, 'checking-inventory');
+    setClosingStatus('checking-inventory');
+  }
+
+  // --- Cross Check Items (checking-inventory phase) ---
+  function openCrossCheck() {
+    setCrossCheckOpen(true);
+  }
+
+  // --- Return Item & Transfer (checking-inventory's primary action) ---
+  function openReturnTransfer() {
+    setTransferPickerItemId(null);
+    setTransferTargetEvent('');
+    setTransferTargetStage('');
+    setReturnTransferOpen(true);
+  }
+
+  function closeReturnTransfer() {
+    setReturnTransferOpen(false);
+    setTransferPickerItemId(null);
+  }
+
+  function resolveItemReturn(id) {
+    setItems(is => is.map(it => it.id === id ? { ...it, resolution: 'returned' } : it));
+  }
+
+  function openTransferPicker(item) {
+    setTransferPickerItemId(item.id);
+    setTransferTargetEvent('');
+    setTransferTargetStage('');
+  }
+
+  function cancelTransferPicker() {
+    setTransferPickerItemId(null);
+  }
+
+  function confirmTransferItem() {
+    const item = items.find(it => it.id === transferPickerItemId);
+    if (!item || !transferTargetEvent || !transferTargetStage) return;
+    const target = transferTargetCandidates.find(e => e.key === transferTargetEvent);
+    queueMovedItem(transferTargetEvent, {
+      name: item.name, area: item.area, subArea: item.subArea,
+      stage: transferTargetStage, qty: item.qty, pic: item.pic,
+      ownership: item.ownership, note: item.note,
+    });
+    setItems(is => is.filter(it => it.id !== item.id));
+    addActivityLog({
+      userName: currentUser?.name || 'Admin', action: 'Transfer', module: 'Event Detail',
+      description: `Transferred "${item.name}" from ${eventName} to ${target?.name || transferTargetEvent} (${transferTargetStage})`,
+    });
+    setTransferPickerItemId(null);
+  }
+
+  const unresolvedItems = useMemo(() => items.filter(it => !it.resolution), [items]);
+
+  function finalizeReturnTransfer() {
+    if (unresolvedItems.length > 0) return;
+    const hasAnyReturned = items.some(it => it.resolution === 'returned');
+    const finalStatus = hasAnyReturned ? 'returned-completed' : 'transferred';
+    setEventClosing(eventName, finalStatus);
+    setClosingStatus(finalStatus);
+    addActivityLog({
+      userName: currentUser?.name || 'Admin', action: finalStatus === 'transferred' ? 'Transfer' : 'Return',
+      module: 'Event Detail',
+      description: `"${eventName}" finalized as ${CLOSING_LABELS[finalStatus].label}`,
+    });
+    closeReturnTransfer();
   }
 
   // --- Inventory picker → Cart ---
@@ -428,11 +644,13 @@ export default function EventDetailPage() {
         id: nextId + i, name: c.name, area: c.area, subArea: c.subArea, stage: eventStatus,
         qty: c.qty, pic: '', checking: false, scanned: false, groupId: null,
         warehouseItem: true, scanIn: null, scanOut: null, note: '',
+        checked: false, ownership: 'IHC',
       })),
     ]);
     setNextId(n => n + cart.length);
     setCart([]);
     setSelectedCartIds([]);
+    markItemsAdded(eventName);
   }
 
   return (
@@ -450,13 +668,6 @@ export default function EventDetailPage() {
           <div className="event-heading">{eventName}</div>
 
           <div className="event-actions-bar">
-            <button
-              className="action-icon-btn btn-pkg"
-              title="Packaging — group items to scan together"
-              onClick={openPackagingModal}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
-            </button>
             <button className="action-icon-btn btn-cart" title="Cart" onClick={() => setPickerOpen(true)}>
               <IconCart />
               {cart.length > 0 && <span className="action-icon-badge">{cart.length}</span>}
@@ -470,6 +681,20 @@ export default function EventDetailPage() {
               </button>
               {moreMenuOpen && (
                 <div className="more-menu-dropdown">
+                  {closingStatus === 'checking-inventory' && (
+                    <button className="more-menu-item" onClick={() => { openCrossCheck(); setMoreMenuOpen(false); }}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                      Cross Check Items
+                    </button>
+                  )}
+                  <button className="more-menu-item" onClick={() => { openPackagingModal(); setMoreMenuOpen(false); }}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+                    Group Items
+                  </button>
+                  <button className="more-menu-item" onClick={() => { openBulkOwnership(); setMoreMenuOpen(false); }}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+                    Bulk Assign Ownership
+                  </button>
                   <button className="more-menu-item" onClick={() => { setSummaryOpen(true); setMoreMenuOpen(false); }}>
                     <IconBarChart /> Summary
                   </button>
@@ -488,10 +713,15 @@ export default function EventDetailPage() {
             <Stepper
               steps={stages}
               currentIndex={stages.indexOf(eventStatus)}
-              onStepClick={changeEventStatus}
+              onStepClick={closingStatus === 'on-going' ? changeEventStatus : undefined}
             />
           </div>
-          {stageScanEnabled && hasNextStage && (
+          {closingStatus === 'on-going' && !readyToClose && (
+            <span className={`badge ${CLOSING_LABELS[onGoingByItems ? 'on-going' : 'upcoming'].badgeClass}`}>
+              {CLOSING_LABELS[onGoingByItems ? 'on-going' : 'upcoming'].label}
+            </span>
+          )}
+          {closingStatus === 'on-going' && !readyToClose && stageScanEnabled && hasNextStage && (
             <button
               type="button"
               className="btn-next-stage"
@@ -502,6 +732,27 @@ export default function EventDetailPage() {
               Next
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
             </button>
+          )}
+          {readyToClose && (
+            <>
+              <span className={`badge ${CLOSING_LABELS['ready-to-close'].badgeClass}`}>{CLOSING_LABELS['ready-to-close'].label}</span>
+              <button type="button" className="btn-next-stage" onClick={handleReadyToClose}>
+                Close &amp; Start Checking
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+              </button>
+            </>
+          )}
+          {closingStatus === 'checking-inventory' && (
+            <>
+              <span className={`badge ${CLOSING_LABELS['checking-inventory'].badgeClass}`}>{CLOSING_LABELS['checking-inventory'].label}</span>
+              <button type="button" className="btn-next-stage" onClick={openReturnTransfer}>
+                Ready for Return
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+              </button>
+            </>
+          )}
+          {(closingStatus === 'returned-completed' || closingStatus === 'transferred') && (
+            <span className={`badge ${CLOSING_LABELS[closingStatus].badgeClass}`}>{CLOSING_LABELS[closingStatus].label}</span>
           )}
         </div>
 
@@ -524,6 +775,20 @@ export default function EventDetailPage() {
               options={[
                 { value: '', label: 'All Place', meta: String(items.length) },
                 ...AREAS.map(a => ({ value: a, label: a, meta: String(areaCounts[a] || 0) })),
+              ]}
+            />
+          </div>
+
+          <div style={{ width: 170, flexShrink: 0 }}>
+            <SearchableSelect
+              value={ownershipFilter}
+              onChange={setOwnershipFilter}
+              placeholder="All Ownership"
+              options={[
+                { value: '', label: 'All Ownership', meta: String(items.length) },
+                { value: 'IHC', label: 'IHC', meta: String(ownershipCounts.IHC || 0) },
+                { value: 'IHP', label: 'IHP', meta: String(ownershipCounts.IHP || 0) },
+                { value: 'Outsource', label: 'Outsource', meta: String(ownershipCounts.Outsource || 0) },
               ]}
             />
           </div>
@@ -592,7 +857,10 @@ export default function EventDetailPage() {
                         </div>
                         <div className="items-grid package-items-grid">
                           {members.map(it => (
-                            <ItemCard key={it.id} item={it} group={pkg} showScanButton={false} onDelete={deleteItem} />
+                            <ItemCard
+                              key={it.id} item={it} group={pkg} showScanButton={false}
+                              onDelete={deleteItem} onCycleOwnership={cycleItemOwnership}
+                            />
                           ))}
                         </div>
                       </div>
@@ -624,6 +892,7 @@ export default function EventDetailPage() {
                       showScanButton={stageScanEnabled}
                       onScanClick={openScanPopup}
                       onDelete={deleteItem}
+                      onCycleOwnership={cycleItemOwnership}
                     />
                   ))}
                 </div>
@@ -924,6 +1193,212 @@ export default function EventDetailPage() {
             ))
           }
         </div>
+      </Modal>
+
+      <Modal
+        open={bulkOwnOpen}
+        title="Bulk Assign Ownership"
+        onClose={() => setBulkOwnOpen(false)}
+        size="lg"
+        footer={
+          <>
+            <button className="btn-cancel-modal" onClick={() => setBulkOwnOpen(false)}><IconClose /> Cancel</button>
+            <button className="btn-save-modal" onClick={applyBulkOwnership} disabled={bulkOwnSelected.length === 0}>
+              <IconCheck /> Assign {bulkOwnTarget} to {bulkOwnSelected.length} item{bulkOwnSelected.length === 1 ? '' : 's'}
+            </button>
+          </>
+        }
+      >
+        <div className="bulk-own-target">
+          <span className="bulk-own-label">Assign ownership</span>
+          <div className="bulk-own-segments" role="radiogroup" aria-label="Target ownership">
+            {OWNERSHIP_CYCLE.map(o => (
+              <button
+                key={o}
+                type="button"
+                role="radio"
+                aria-checked={bulkOwnTarget === o}
+                className={`bulk-own-segment${bulkOwnTarget === o ? ' active' : ''}`}
+                onClick={() => setBulkOwnTarget(o)}
+              >
+                <span className={`badge ${ownershipBadgeClass(o)}`}>{o}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="bulk-own-filters">
+          <div className="search-wrap" style={{ flex: 1 }}>
+            <IconSearch />
+            <input className="search-input" type="text" placeholder="Search item or area…"
+              value={bulkOwnQuery} onChange={e => setBulkOwnQuery(e.target.value)} />
+          </div>
+          <div style={{ width: 180 }}>
+            <SearchableSelect
+              value={bulkOwnFrom}
+              onChange={setBulkOwnFrom}
+              options={[{ value: '', label: 'All ownership' }, ...OWNERSHIP_CYCLE.map(o => ({ value: o, label: `Only ${o}` }))]}
+              placeholder="All ownership"
+            />
+          </div>
+        </div>
+
+        {bulkOwnVisible.length === 0
+          ? <div className="no-data">No items match.</div>
+          : (
+            <>
+              <div className="indicator-row indicator-row-clickable bulk-own-selectall" onClick={toggleBulkOwnAllVisible}>
+                <span className={`indicator-box${bulkOwnAllVisibleSelected ? ' checked' : ''}`}>
+                  {bulkOwnAllVisibleSelected && <CheckIcon />}
+                </span>
+                <span>Select all shown ({bulkOwnVisible.length})</span>
+                <span style={{ marginLeft: 'auto', color: 'var(--text-muted)', fontWeight: 500 }}>
+                  {bulkOwnSelected.length} selected
+                </span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 380, overflowY: 'auto' }}>
+                {bulkOwnVisible.map(it => {
+                  const sel = bulkOwnSelected.includes(it.id);
+                  return (
+                    <div
+                      key={it.id}
+                      className="indicator-row indicator-row-clickable"
+                      style={{ padding: '8px 10px', gap: 10, border: `1px solid ${sel ? 'var(--brand)' : 'var(--border-2)'}`, borderRadius: 'var(--r)' }}
+                      onClick={() => toggleBulkOwnItem(it.id)}
+                    >
+                      <span className={`indicator-box${sel ? ' checked' : ''}`}>
+                        {sel && <CheckIcon />}
+                      </span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text)' }}>{it.name}</div>
+                        <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{it.area} · {it.stage} · Qty: {it.qty}</div>
+                      </div>
+                      <span className={`badge ${ownershipBadgeClass(it.ownership)}`}>{it.ownership}</span>
+                      {sel && it.ownership !== bulkOwnTarget && (
+                        <>
+                          <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>→</span>
+                          <span className={`badge ${ownershipBadgeClass(bulkOwnTarget)}`}>{bulkOwnTarget}</span>
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )
+        }
+      </Modal>
+
+      <Modal
+        open={crossCheckOpen}
+        title="Cross Check Items"
+        onClose={() => setCrossCheckOpen(false)}
+        size="lg"
+        footer={
+          <button className="btn-save-modal" onClick={() => setCrossCheckOpen(false)}><IconCheck /> Done</button>
+        }
+      >
+        <p className="confirm-msg" style={{ marginBottom: 14 }}>
+          <strong>{logisticsSummary.checkedCount}</strong> of <strong>{logisticsSummary.total}</strong> items checked so far. Click a row to toggle it.
+        </p>
+        {items.length === 0
+          ? <div className="no-data">No items on this event.</div>
+          : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 420, overflowY: 'auto' }}>
+              {items.map(it => (
+                <div
+                  key={it.id}
+                  className="indicator-row indicator-row-clickable"
+                  style={{ padding: '8px 10px', border: '1px solid var(--border-2)', borderRadius: 'var(--r)' }}
+                  onClick={() => toggleItemChecked(it.id)}
+                >
+                  <span className={`indicator-box${it.checked ? ' checked' : ''}`}>
+                    {it.checked && <CheckIcon />}
+                  </span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text)' }}>{it.name}</div>
+                    <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{it.area} · Qty: {it.qty}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
+        }
+      </Modal>
+
+      <Modal
+        open={returnTransferOpen}
+        title="Return Item & Transfer"
+        onClose={closeReturnTransfer}
+        size="lg"
+        footer={
+          <>
+            <button className="btn-cancel-modal" onClick={closeReturnTransfer}><IconClose /> Close</button>
+            <button className="btn-save-modal" disabled={unresolvedItems.length > 0} onClick={finalizeReturnTransfer}>
+              <IconCheck /> Finalize ({items.length - unresolvedItems.length}/{items.length})
+            </button>
+          </>
+        }
+      >
+        <p className="confirm-msg" style={{ marginBottom: 14 }}>
+          <strong>Event Logistics Summary</strong> — <strong>{logisticsSummary.checkedCount}</strong> of <strong>{logisticsSummary.total}</strong> items were checked during Cross Check.
+          {logisticsSummary.missingItems.length > 0
+            ? <> <strong style={{ color: 'var(--red)' }}>{logisticsSummary.missingItems.length} item{logisticsSummary.missingItems.length === 1 ? '' : 's'}</strong> never got checked.</>
+            : ' Every item was checked.'
+          }
+        </p>
+        <p style={{ fontSize: 12.5, color: 'var(--text-muted)', marginBottom: 14 }}>
+          Resolve every item below — either <strong>Return</strong> it, or <strong>Transfer</strong> it to another
+          on-going event — before this event can be finalized.
+        </p>
+        {items.length === 0
+          ? <div className="no-data">No items left on this event — finalizing will mark it Transferred.</div>
+          : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 420, overflowY: 'auto' }}>
+              {items.map(it => (
+                <div key={it.id} style={{ border: '1px solid var(--border-2)', borderRadius: 'var(--r-lg)', padding: '10px 12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text)' }}>{it.name}</div>
+                      <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{it.area} · Qty: {it.qty}</div>
+                    </div>
+                    {it.resolution === 'returned' ? (
+                      <span className="badge badge-green" style={{ fontSize: 10, flexShrink: 0 }}>Returned</span>
+                    ) : transferPickerItemId !== it.id && (
+                      <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                        <button className="btn-ia-scan" style={{ flex: 'none', padding: '6px 12px' }} onClick={() => resolveItemReturn(it.id)}>Return</button>
+                        <button className="btn-ia-move" style={{ flex: 'none', padding: '6px 12px' }} onClick={() => openTransferPicker(it)}>Transfer</button>
+                      </div>
+                    )}
+                  </div>
+                  {transferPickerItemId === it.id && (
+                    <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <SearchableSelect
+                        value={transferTargetEvent}
+                        onChange={setTransferTargetEvent}
+                        placeholder="Select an on-going event"
+                        emptyText="No other on-going events"
+                        options={transferTargetCandidates.map(e => ({ value: e.key, label: `${e.name} (${e.code})` }))}
+                      />
+                      <SearchableSelect
+                        value={transferTargetStage}
+                        onChange={setTransferTargetStage}
+                        placeholder="Select event status stage"
+                        options={stages.map(s => ({ value: s, label: s }))}
+                      />
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button className="btn-save-modal" disabled={!transferTargetEvent || !transferTargetStage} onClick={confirmTransferItem}>
+                          <IconCheck /> Confirm Transfer
+                        </button>
+                        <button className="btn-cancel-m" onClick={cancelTransferPicker}>Cancel</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )
+        }
       </Modal>
     </>
   );

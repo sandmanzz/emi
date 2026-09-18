@@ -33,7 +33,7 @@ export default function EventStatusPage() {
   const [deleteModal,  setDeleteModal]  = useState(false);
   const [editingId,    setEditingId]    = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [form, setForm] = useState({ status: '', scan: 'None', order: '' });
+  const [form, setForm] = useState({ status: '', code: '', scan: 'None', order: '' });
 
   // Reordering is edit-mode + explicit Save, not instant-apply-per-click.
   const [reorderMode,    setReorderMode]    = useState(false);
@@ -77,7 +77,7 @@ export default function EventStatusPage() {
 
   function openNew() {
     setEditingId(null);
-    setForm({ status: '', scan: 'None', order: String(statuses.length + 1) });
+    setForm({ status: '', code: '', scan: 'None', order: String(statuses.length + 1) });
     setStatusModal(true);
   }
 
@@ -85,7 +85,7 @@ export default function EventStatusPage() {
     const r = statuses.find(x => x.id === id);
     if (!r) return;
     setEditingId(id);
-    setForm({ status: r.status, scan: r.scan, order: String(r.order) });
+    setForm({ status: r.status, code: r.code || '', scan: r.scan, order: String(r.order) });
     setStatusModal(true);
   }
 
@@ -94,11 +94,11 @@ export default function EventStatusPage() {
     const now = new Date().toISOString().slice(0, 10);
     if (editingId) {
       setStatuses(ss => ss.map(s => s.id === editingId
-        ? { ...s, status: form.status, scan: form.scan, order: parseInt(form.order) || s.order, updatedAt: now }
+        ? { ...s, status: form.status, code: form.code, scan: form.scan, order: parseInt(form.order) || s.order, updatedAt: now }
         : s
       ));
     } else {
-      setStatuses(ss => [...ss, { id: nextId, order: parseInt(form.order) || ss.length + 1, status: form.status, scan: form.scan, eventRunning: 0, updatedAt: now }]);
+      setStatuses(ss => [...ss, { id: nextId, order: parseInt(form.order) || ss.length + 1, status: form.status, code: form.code, scan: form.scan, eventRunning: 0, updatedAt: now }]);
       setNextId(n => n + 1);
     }
     setStatusModal(false);
@@ -217,6 +217,7 @@ export default function EventStatusPage() {
                 <SortTh label="Order"         colIndex={0} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width:70, textAlign:'center' }} />
                 <th style={{ width:80, textAlign:'center' }}>Edit Order</th>
                 <SortTh label="Status"        colIndex={1} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} />
+                <th style={{ width:80, textAlign:'center' }}>Code</th>
                 <th style={{ width:100, textAlign:'center' }}>Scan</th>
                 <SortTh label="Event Running" colIndex={4} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width:120, textAlign:'right' }} />
                 <SortTh label="Updated At"    colIndex={5} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width:120 }} />
@@ -225,7 +226,7 @@ export default function EventStatusPage() {
             </thead>
             <tbody>
               {pageData.length === 0
-                ? <tr><td colSpan={7} style={{ textAlign:'center', padding:40, color:'var(--text-muted)' }}>No statuses found.</td></tr>
+                ? <tr><td colSpan={8} style={{ textAlign:'center', padding:40, color:'var(--text-muted)' }}>No statuses found.</td></tr>
                 : pageData.map((r, idx) => (
                   <tr key={r.id}>
                     <td style={{ textAlign:'center' }}>
@@ -258,6 +259,9 @@ export default function EventStatusPage() {
                       )}
                     </td>
                     <td className="name-cell">{r.status}</td>
+                    <td style={{ textAlign:'center' }}>
+                      {r.code ? <span className="badge badge-gray" style={{ fontSize:11 }}>{r.code}</span> : <span style={{ color:'var(--text-muted)', fontSize:12 }}>—</span>}
+                    </td>
                     <td style={{ textAlign:'center' }}><ScanBadge scan={r.scan} /></td>
                     <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums', fontWeight:600 }}>
                       {r.eventRunning > 0
@@ -298,6 +302,10 @@ export default function EventStatusPage() {
         <div className="form-group">
           <label>Status Name <span style={{ color:'var(--red)' }}>*</span></label>
           <input type="text" placeholder="e.g. Event running" value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} />
+        </div>
+        <div className="form-group">
+          <label>Code</label>
+          <input type="text" placeholder="e.g. ER" value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value.toUpperCase() }))} />
         </div>
         <div className="form-group">
           <label>Scan</label>

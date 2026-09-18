@@ -50,6 +50,362 @@ explains a few non-obvious conventions that the entries below assume you already
 
 ---
 
+## Round 18 — Bulk Assign Ownership on Event Detail; `docs/backend.md`
+
+**Files:** `src/pages/EventDetailPage.jsx`, `src/style.css`, `docs/backend.md` (new)
+
+1. **⋮ menu → "Bulk Assign Ownership"** opens a modal. It has a segmented
+   target picker (IHC / IHP / Outsource, reusing `OWNERSHIP_CYCLE` +
+   `ownershipBadgeClass`), a search box, and a "current ownership" filter
+   (`SearchableSelect`). Items are selected with the same `indicator-box`
+   checkboxes as Cross Check Items. **"Select all shown"** only
+   selects/deselects the currently filtered rows, and the selection persists
+   while you change the search, so you can build it up across several
+   searches. Each selected row that will change shows `old → new`. The footer
+   button reads "Assign <X> to N items" and is disabled at 0.
+2. Applying updates `items` state in one pass and writes **one** activity-log
+   entry (only if something actually changed).
+3. New modal state: `bulkOwnOpen`, `bulkOwnTarget`, `bulkOwnSelected`,
+   `bulkOwnQuery`, `bulkOwnFrom`. New CSS: `.bulk-own-*`.
+4. **`docs/backend.md`**: new doc for the backend developer. It covers the
+   proposed `PATCH /events/{eventId}/items/ownership` contract and its rules
+   (atomic, tenant/event scoped, one log entry), the event stage vs.
+   closing-status model, and a table of every localStorage-mocked store that
+   needs a real endpoint.
+
+Verified live: selected 2 items across two searches ("curtain", "riser"),
+assigned Outsource, and both cards updated while the other items stayed
+unchanged. No console errors.
+
+---
+
+## Round 17 — Event tabs mirror the status flag; Status field hidden
+
+**Files:** `src/pages/EventPage.jsx`, `src/lib/eventProgress.js`,
+`src/pages/EventDetailPage.jsx`
+
+1. **Event page tabs rebuilt** — one tab per status flag value: Upcoming, On
+   Going, Ready to Close, Checking Inventory, Returned & Completed, Transferred
+   (+ Invite User). Each tab reads from its own "raw bucket" (`rawUpcoming`,
+   `rawOnGoing`, …) so tab counts don't change while typing in search. The
+   previous session had started this but was interrupted halfway — the render
+   still referenced removed variables (`upEvents`, `finishedEvents`,
+   `pastEvents`, …), so the non-Upcoming tabs would have crashed. Tab labels
+   come from `CLOSING_LABELS`, so they can't drift from the badges. Stats row:
+   Total / Active / Checking Inventory / Completed.
+2. **Status field removed from the New/Edit Event modal.** It was a hardcoded
+   copy of the 9 Event Status names, not connected to anything, and always
+   showed its placeholder. New events now get the first Event Status stage
+   written to `eventProgress.js` on save; editing leaves the stage alone. PIC
+   now shares a row with QR Type, and Address is full width.
+3. **`resolveEventStage(eventName)` added to `eventProgress.js`** — the
+   "saved progress → Event Inventory mock status → first stage" fallback that
+   used to live inline in `EventDetailPage.jsx`, moved into one shared place.
+
+Verified live: all 7 tabs render with no console errors; a new event lands in
+Upcoming, and its Event Detail opens at stage 1 with the Upcoming badge.
+
+---
+
+## Round 16 — "Upcoming" split out from "On Going"
+
+**Files:** `src/lib/eventItemsFlag.js` (new), `src/lib/eventClosing.js`,
+`src/lib/eventClosingLabels.js`, `src/pages/EventPage.jsx`,
+`src/pages/EventDetailPage.jsx`
+
+Direct follow-up to Round 15, same day: the 5-status flag was missing a 6th
+sub-state the user had forgotten to mention — an event with no items yet should
+read as **Upcoming**, flipping to **On Going** the moment items are actually
+added, regardless of whether the event's real-world date has arrived.
+
+1. **New `eventItemsFlag.js`** — `markItemsAdded(eventName)` /
+   `hasItemsAdded(eventName)`, a localStorage flag keyed by event name (same
+   pattern as `eventClosing`/`eventProgress`/`movedItems`). Set by
+   `EventDetailPage.jsx`'s `checkout()` right after items are added via the cart
+   flow — this is the one and only trigger; opening an event's Detail page (which
+   always shows the same generic 26-item demo seed regardless of the event's real
+   `itemCount`, per the long-standing architecture limitation) does **not** set it.
+2. **New `isOnGoingByItems(eventName, itemCount)` in `eventClosing.js`** —
+   `itemCount > 0 || hasItemsAdded(eventName)`. Both `'upcoming'` and `'on-going'`
+   are sub-states of the same stored `'on-going'` value; nothing new is persisted
+   to the closing-status store itself, this is purely a derived display split.
+3. **`eventClosingLabels.js`** gained an `'upcoming'` entry (`badge-gray`);
+   `'on-going'`'s own badge color moved from gray to green now that gray means
+   Upcoming.
+4. **`EventPage.jsx`** — new `onGoingByItemsOf(e)` helper; `EventCard` (Upcoming
+   tab) now shows an Upcoming-or-On-Going badge next to the event code whenever
+   it isn't already showing the more specific "Ready to Close" badge.
+5. **`EventDetailPage.jsx`** — looks up the current event's seed `itemCount` from
+   `initialEvents` (already imported for Transfer's target-event picker), computes
+   the same `isOnGoingByItems`, and shows the resulting badge next to the stepper
+   whenever the event is on-going and not yet Ready to Close. `checkout()` now
+   also calls `markItemsAdded(eventName)`.
+
+Verified live: a brand-new event showed "Upcoming" on both its listing card and
+Event Detail (0 items); after one Add Item → checkout, both flipped to "On Going"
+in the same session, no reload needed.
+
+---
+
+## Round 15 — Event closing lifecycle rebuilt around a single 5-value status flag
+
+**Files:** `src/lib/eventClosing.js` (rewritten), `src/lib/eventClosingLabels.js`
+(new), `src/pages/EventDetailPage.jsx`, `src/pages/EventPage.jsx`
+
+Requested as an explicit concept replacement ("saya ganti konsep saja"), not an
+incremental tweak — this replaces Round 12–14's 4-value closing model (Close this
+Event → Ready for Check → Ready for Return → Return, plus Round 14's standalone
+per-item Move to Another Event button) with **one status flag, 5 values**, and
+merges Return + Transfer into a single primary action flow. See
+`docs/context.md`'s new topic section for the full reasoning and every flagged
+interpretive call (there are several — this was a terse 5-bullet spec that needed
+real judgment calls to become concrete UI/state); this entry covers the "what" and
+"where," not the "why."
+
+1. **`eventClosing.js` rewritten.** `getEventClosing()` now always returns one of
+   `'on-going'` (default) / `'checking-inventory'` / `'returned-completed'` /
+   `'transferred'` — never `null`/falsy anymore, and it **migrates** old values on
+   read (`ready-for-check`/`ready-for-return` → `checking-inventory`, `returned` →
+   `returned-completed`) so existing demo localStorage from earlier rounds doesn't
+   end up stuck on a dead value. New `isReadyToClose(eventName)` derives the
+   5th value, **"Ready to Close,"** from `on-going` + the event's saved
+   `eventProgress` being at the last `eventStatuses` stage — it's a computed
+   display state, never written to storage.
+   - **Real bug caught before it shipped:** Round 14's
+     `moveTargetCandidates`/`transferTargetCandidates` filter used
+     `!getEventClosing(e.key)` (relying on the old falsy-default). Since
+     `getEventClosing` now always returns a truthy string, that filter would have
+     silently matched zero events. Fixed to
+     `getEventClosing(e.key) === 'on-going'`.
+2. **New `eventClosingLabels.js`** — a single `{ 'on-going': {label, badgeClass}, ... }`
+   map both `EventPage.jsx` and `EventDetailPage.jsx` import, specifically so the
+   status labels/colors can't drift between the two pages the way the *other*,
+   already-flagged status dropdown in `EventPage.jsx`'s Edit Event modal already
+   has (see Open Questions #10 — that one's still unfixed, just the cautionary
+   example for why this map exists).
+3. **`EventDetailPage.jsx`'s Event Status section rewritten** around the new flag:
+   - `readyToClose = closingStatus === 'on-going' && !hasNextStage` (computed
+     inline, live, rather than via the lib helper — this page already has the
+     stage info in React state).
+   - `handleReadyToClose()` replaces `handleCloseEvent()` — same confirm-then-set
+     pattern, now writing `'checking-inventory'`.
+   - The old whole-event "Return" button + Inventory Return Report modal, and the
+     standalone per-item "Move to Another Event" button + its own modal, are all
+     **removed**, replaced by:
+     - **"Cross Check Items"** — new ⋮ menu entry (visible only during
+       `checking-inventory`), opens a modal listing every item with a
+       click-to-toggle checked row (reuses `toggleItemChecked`, previously an
+       inline per-card control, now consolidated in one place). `ItemCard` no
+       longer renders a Checked row or a Move button at all.
+     - **"Return Item & Transfer"** — opened via the new primary action button
+       ("Ready for Return"). Shows the renamed `logisticsSummary` memo (same
+       computation as the old `returnReport`) as a banner, then every item with
+       **Return** (sets `item.resolution = 'returned'`, item stays with a green
+       badge) and **Transfer** (expands an inline target-event + target-stage
+       picker in that item's own row — no second modal-on-modal; reuses
+       `movedItems.js`/Activity Log exactly like Round 14's Move button did) side
+       by side. A `unresolvedItems` memo gates the **Finalize** button.
+     - `finalizeReturnTransfer()` — the new terminal-status decision point:
+       `items.some(it => it.resolution === 'returned')` ? `'returned-completed'`
+       : `'transferred'`. Logs one Activity Log entry either way.
+4. **`EventPage.jsx` updated to match:**
+   - `upEvents`/`totalUp` now just check `closingOf(e) === 'on-going'`.
+   - `finishedEvents`/`totalFinished` now just check `closingOf(e) ===
+     'checking-inventory'` (was a 2-value OR before).
+   - `pastEvents`/`totalPast` now include `returned-completed` OR `transferred`
+     (was just `returned`).
+   - The middle tab label changed from "Finished Event" to **"Checking
+     Inventory"** (matches the stats card and intro copy too).
+   - `EventCard` (Upcoming tab) gained a `readyToClose` prop — shows the "Ready to
+     Close" badge next to the event code when applicable.
+   - New `pastExtraBadge(e)` helper — shows a distinguishing badge on Past Events
+     rows that arrived via `returned-completed`/`transferred`, so they're visually
+     distinct from plain seeded `type: 'past'` events (which get no badge) and
+     from each other.
+
+---
+
+## Round 14 — Move to Another Event, Event Status "Code" field, item-card decluttering, Packaging folded into ⋮ menu
+
+**Files:** `src/lib/movedItems.js` (new), `src/data/eventStatuses.js`,
+`src/pages/EventStatusPage.jsx`, `src/pages/EventDetailPage.jsx`, `src/style.css`
+
+Four independent changes requested together:
+
+1. **Move to Another Event.** During the **Ready for Return** closing phase, every
+   item card now shows a **"Move to Another Event"** button (`.btn-ia-move`) next to
+   where the Scan button would be. Clicking it opens a modal to pick a target event
+   (from `initialEvents`, filtered to `type: 'upcoming'` and not itself in any
+   closing phase — the same set `EventPage.jsx`'s "Upcoming" tab shows) and a target
+   Event Status stage (the same global `stages` list every event's stepper uses).
+   Confirming:
+   - Removes the item from the current event's `items` state.
+   - Calls `queueMovedItem(targetEventKey, itemPayload)` (new `src/lib/movedItems.js`
+     — a localStorage queue keyed by the same `"<date> | <NAME>"` string
+     `eventClosing.js`/`eventProgress.js` already use, since there's no real
+     cross-event item store).
+   - Logs an Activity Log entry (module "Event Detail", action "Move").
+   - `EventDetailPage.jsx`'s `items`/`nextId` lazy `useState` initializers now
+     read `getIncomingItems(eventName)` and merge any queued items in at mount
+     time (stamped with the chosen target stage, fresh sequential ids), and a
+     separate `useEffect` calls `clearIncomingItems(eventName)` right after so
+     they aren't merged in again later. Deliberately *not* a `setItems(...)`
+     inside the effect itself — doing the merge in the effect body first tripped
+     the `react-hooks/set-state-in-effect` lint rule (cascading-render warning),
+     so the merge moved into the initializers, leaving the effect to only clear
+     the now-consumed queue (a plain side effect, no state update).
+   - **Gotcha #1:** a moved item only becomes visible in the target event once
+     that event's own stepper reaches (or passes) the stage it was moved into —
+     this follows the pre-existing `scopedItems` rule ("All" only shows items
+     whose `stage` is at or before the event's current stage), not a new
+     restriction. Verified live: moved an item from "Corporate Summit 2026" into
+     "Wedding Bali Season" at stage "Event running" — it didn't show in "All"
+     until the target event's stepper was advanced to "Event running."
+   - **Gotcha #2 (bigger one):** `EventDetailPage.jsx` has no real per-event item
+     store — every event's `items` are seeded fresh from the same generic
+     26-item `initialItems` list on every mount, a pre-existing limitation this
+     feature inherits rather than fixes. Since the moved-items queue is consumed
+     exactly once, the merged item only stays visible for as long as that
+     particular mounted page instance stays alive. Verified live: after the
+     queue was cleared, opening the target event again in a brand-new tab showed
+     26 items again, not 27 — the merge doesn't survive a remount. The move
+     itself is still real (source removal + Activity Log entry both persist),
+     but "landed in the target event" should be understood as "queued and
+     merged into whichever session next has that page open," not "permanently
+     added to that event's item list" — there's no such persisted list to add
+     it to yet.
+2. **Event Status gained a `code` field.** Added to `initialStatuses` in
+   `src/data/eventStatuses.js` (short seeded codes like `CBA`, `OPI`, `ER`), the
+   New/Edit modal in `EventStatusPage.jsx` (plain text input, uppercased on input),
+   and a new "Code" column in the table (rendered as a `badge-gray` pill, or "—" if
+   blank). Purely a label — nothing else reads it yet.
+3. **Item card decluttering.** In `ItemCard` (`EventDetailPage.jsx`):
+   - The "Warehouse Item" indicator row is removed from rendering entirely (the
+     `item.warehouseItem` data field itself is untouched, just no longer displayed
+     — nothing else in the codebase reads it).
+   - The "Checked" indicator row is now conditional on a new `showCheckedToggle`
+     prop, passed as `closingStatus === 'ready-for-check'` from both `ItemCard`
+     call sites — so it only appears during the phase it's actually for, instead of
+     on every card at every stage. It still writes to the same `item.checked` field
+     the Inventory Return Report reads at Confirm Return time.
+4. **Packaging folded into the ⋮ more-menu.** The standalone orange box-icon button
+   (`.action-icon-btn.btn-pkg`) is removed from the header actions bar. A new "Group
+   Items" entry (same `openPackagingModal` handler) was added to `.more-menu-dropdown`
+   above Summary and Print. Dead CSS (`.btn-pkg`, `.action-icon-btn.btn-pkg`) removed
+   from `style.css`.
+
+See `docs/context.md`'s new topic section and open-questions #15–16 for the
+interpretive calls made on this request (the "2 return options" wording, and what
+happens to the Checked toggle once hidden from default view) — flag if either
+reading is wrong.
+
+---
+
+## Round 13 — Ownership flag: clickable/editable + a real filter
+
+**Files:** `src/pages/EventDetailPage.jsx`, `src/style.css`
+
+Round 12 added the IHC/IHP/Outsource ownership flag as a read-only badge with no
+way to change it after the fact, and no way to filter by it. Both fixed:
+
+1. **The ownership badge is now a `<button>`, not a `<span>`**, and clicking it
+   cycles `OWNERSHIP_CYCLE = ['IHC', 'IHP', 'Outsource']` via
+   `cycleItemOwnership(id)` — `(currentIndex + 1) % 3`. Available on every item
+   card at any Event Status stage or closing phase, matching "manual and
+   flexible, can change anytime" from the request. New `.ownership-badge-btn`
+   CSS just strips default `<button>` chrome (border/font) so it still looks
+   like the existing `.badge` pill; a `:hover { filter: brightness(0.94) }` is
+   the only visual affordance that it's clickable, plus a `title` tooltip.
+2. **New Ownership filter** — a `SearchableSelect` next to the existing Area
+   filter (`All Ownership` / `IHC` / `IHP` / `Outsource`, each with a live count
+   via a new `ownershipCounts` memo, same shape as the pre-existing
+   `areaCounts`). Wired into the same base `filtered` memo the Area filter and
+   keyword search already go through, so it composes with every stage tab
+   (Waiting Scan / Grouped / All / Added New) automatically rather than needing
+   separate filtering logic per tab.
+
+---
+
+## Round 12 — Event closing lifecycle (Close → Ready for Check → Ready for Return → Return), item Checked flag, IHC/IHP/Outsource
+
+**Files:** `src/lib/eventClosing.js` (new), `src/pages/EventDetailPage.jsx`,
+`src/pages/EventPage.jsx`, `src/style.css`
+
+A new phase was added covering what happens *after* an event finishes its
+normal Event Status stepper — the gap between "the event happened" and "it's
+fully archived/returned" wasn't modeled anywhere before this.
+
+1. **New closing-phase state machine**, tracked independently of the normal
+   Event Status stage: `null` (still in normal lifecycle) → `'ready-for-check'`
+   → `'ready-for-return'` → `'returned'`. Persisted in new
+   `src/lib/eventClosing.js` (`getEventClosing`/`setEventClosing`,
+   localStorage key `emi_event_closing`), keyed by the exact same
+   `"<date> | <NAME>"` string `EventDetailPage.jsx` already reads from its
+   `?name=` query param — chosen specifically so `EventPage.jsx` (a different
+   route entirely) can look up the same key via
+   `` `${e.date} | ${e.name.toUpperCase()}` `` without a real join/backend.
+2. **`EventDetailPage.jsx`'s "Next" button slot now has four possible faces**,
+   swapped by `closingStatus`:
+   - Normal lifecycle, at the last Event Status row (`!hasNextStage`): **"Close
+     this Event"** (was previously nothing — the stepper just dead-ended with no
+     button once you hit the last row). `handleCloseEvent()` confirms via
+     `window.confirm`, then sets `closingStatus` to `'ready-for-check'`.
+   - `'ready-for-check'`: an orange "Ready for Check" badge + a **"Ready for
+     Return"** button (`handleReadyForReturn`, sets `'ready-for-return'`).
+   - `'ready-for-return'`: a blue "Ready for Return" badge + a **"Return"**
+     button that opens the new Inventory Return Report modal instead of
+     transitioning directly.
+   - `'returned'`: a green "Returned" badge, no further action.
+   - The `Stepper`'s `onStepClick` is now `closingStatus ? undefined :
+     changeEventStatus` — once an event enters the closing phase, its stage
+     stepper freezes (no more moving between Event Status rows).
+   - **Assumption, flagged in `docs/context.md`:** this progression is a plain
+     3-click sequence, **not gated** on all items being Checked first. A "button
+     stays disabled until 100% checked" reading was also plausible from the
+     request's wording, but was rejected because it would make the Return
+     report's "how many are missing" number always zero (nothing could reach
+     Return with anything left unchecked). Easy to flip later if that reading
+     was actually wanted — the gate would live in `handleReadyForReturn`.
+3. **Inventory Return Report** (new `Modal`, opens from "Return"): reports
+   `returnReport.checkedCount` of `returnReport.total` items were ever marked
+   Checked, and lists every item that wasn't as "possibly missing." Purely
+   informational — it's not a real stock reconciliation against Warehouse
+   Inventory, just a review step before confirming. Confirming calls
+   `confirmReturn()`, which sets `closingStatus` to `'returned'`.
+4. **New "Checked" item indicator**, deliberately separate from the
+   pre-existing "Checking" indicator (an older, different, always-static
+   concept — `item.checking`, no toggle UI, unrelated to this). "Checked"
+   (`item.checked`) is a third `indicator-row` under "Warehouse Item," but
+   unlike the other two it's **clickable** (`onToggleChecked` prop threaded
+   through `ItemCard`, new `.indicator-row-clickable` CSS for the hover
+   affordance) and toggles on click via `toggleItemChecked(id)`. Available on
+   every item card regardless of the current Event Status stage or closing
+   phase — its only consequence today is what the Return report counts.
+5. **New per-item ownership flag**: `'IHC'` / `'IHP'` / `'Outsource'`
+   (`item.ownership`), rendered as a small colored badge next to the Area badge
+   (new `.item-badge-row` wrapper — the Area badge's own `margin-bottom` moved
+   onto this wrapper since it's no longer a lone element). All 26 seed items in
+   `initialItems` were given a plausible mixed distribution; items added via
+   the cart/checkout flow (`checkout()`) default to `'IHC'` since they're
+   always pulled from the company's own warehouse stock in that flow — there's
+   no picker yet to choose a different ownership per cart line.
+6. **`EventPage.jsx` gained a "Finished Event" tab**, inserted between
+   Upcoming and Past Events (tab bar + a 4th stats card, `repeat(3,1fr)` →
+   `repeat(4,1fr)` in the header stats grid). It lists every event whose
+   closing status is `'ready-for-check'` or `'ready-for-return'` — i.e.
+   genuinely closed but not yet returned — with a small badge per row showing
+   which of the two sub-phases it's in (reused `PastEventRow` via a new
+   `extraBadge` prop rather than building a separate row component).
+   `upEvents` now excludes anything that has entered the closing phase at all;
+   `pastEvents` now also includes anything `'returned'`, on top of the
+   original seed `type: 'past'` events. **Gotcha:** "only ready-for-check" was
+   read literally in the initial request, but interpreted as "the whole closed-
+   and-awaiting-return phase" (both sub-statuses) instead — a strictly-literal
+   reading would make an event vanish from every single tab the moment it moved
+   from Ready for Check to Ready for Return, which didn't seem like the intent.
+
+---
+
 ## Round 11 — Item Loan: Listing + Detail split, multi-item orders, new/external items
 
 **Files:** `src/data/itemLoans.js`, `src/lib/itemLoanStore.js` (new),
@@ -658,7 +1014,7 @@ Several features landed in this stretch:
 
 Add new entries at the **top** (right below "Context every dev should know", above
 the current newest round), numbered one higher than the current top entry (the next
-one after this file's Round 11 is "Round 12"). Each entry should say **what**
+one after this file's Round 16 is "Round 17"). Each entry should say **what**
 changed, **why** (the product reason, not just "user asked"), which **files** were
 touched, and any **gotcha** a future dev would otherwise have to rediscover the hard
 way. As of Round 6, this is a standing rule for every change, not just the big ones —
