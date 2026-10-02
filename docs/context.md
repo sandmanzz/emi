@@ -728,6 +728,47 @@ Two follow-ups to the 5(+1)-status redesign above:
   to context.md and changes.md and should be updated whenever a feature
   implies backend behavior.
 
+### Returned & Completed / Transferred are view-only; mock data expanded for every status + inventory (2026-09-28)
+- **View-only lock**: once an event reaches a terminal status — **Returned &
+  Completed** or **Transferred** — its row in the Event listing (`PastEventRow`)
+  no longer shows Edit, Delete, or History; only **Detail/Cart** (view) and
+  **Summary** (dashboard) remain. New `readOnly` prop on `PastEventRow`, passed
+  `true` from the `returned` and `transferred` tabs only — `checking` (Checking
+  Inventory) keeps full actions, since that event is still actively being worked
+  on. Applies uniformly to every row in those two tabs, including plain legacy
+  seed `type: 'past'` events folded into Returned & Completed (they're visually
+  indistinguishable rows in the same list, so partial locking would look like a
+  bug). **Interpretation flagged:** the request said "ketika sudah returned"
+  (once Returned) — applied the same lock to Transferred too, since it's the
+  other terminal status and leaving it editable would be an odd asymmetry; say
+  so if Transferred should stay editable.
+- **Mock data for every status flag value**: added 5 new seed events to
+  `src/data/events.js` (ids 90–94) specifically so each of the 6 statuses has at
+  least one demo row without the user manually walking one through the whole
+  flow first: *Autumn Garden Party* (itemCount 0 → Upcoming), *Rooftop Sunset
+  Mixer* (seeded at the last Event Status stage → Ready to Close), *Harvest
+  Festival Bazaar* (seeded `checking-inventory`), *Downtown Product Launch*
+  (seeded `transferred`), *Beachside Anniversary* (seeded `returned-completed`).
+  - New seed mechanism: `eventClosing.js` gained a `SEED_CLOSING` map (event
+    key → status) and `eventProgress.js` gained `SEED_AT_LAST_STAGE` (a list of
+    event keys resolved to whatever the *current* last Event Status stage is,
+    not a hardcoded stage name, since that list is itself user-editable). Both
+    are read **only** as a fallback when nothing has been explicitly stored for
+    that event — any real action through the UI (closing an event, moving its
+    stepper) permanently overrides the seed for that event, same
+    override-a-default pattern `eventStatuses.js` already uses.
+  - `EventPage.jsx`'s `nextId` counter bumped from 90 to 95 so a newly created
+    event never collides with these 5 seed ids.
+- **Inventory mock data roughly doubled**: `src/data/inventory.js` grew from 32
+  to 72 items (40 new, spanning all 6 existing categories) and
+  `src/data/warehouseInventory.js` grew from 40 to 80 rows to match — every new
+  inventory item has a corresponding warehouse-stock row (same name, one home
+  warehouse), since Event Detail's "Add Item" picker looks up real-time stock by
+  `name` + `warehouseName` and would otherwise show a new item as permanently
+  Out of Stock. No new warehouses were added — the 40 new rows are distributed
+  across the same 5 real warehouses (`categories`/`stockStatuses` constants
+  unchanged, since no new category was requested).
+
 ### Product knowledge page
 - All of the above (plus everything already in this file) is also recapped as an
   in-app, navigable page — not just this markdown file — per the request "product
@@ -838,10 +879,112 @@ clashes or seems off) — proceeding with the stated assumption unless corrected
     #15 above) carries over unchanged into the new Transfer flow — still `type:
     'upcoming'` + closing status `on-going`, not a stricter "currently at the Event
     running stage" reading.
+20. **Pre-existing bug noticed while verifying the mock-data expansion (not caused
+    by this session, not fixed):** the browser console logs `Encountered two
+    children with the same key, "5"` on **every** page, including `/dashboard`
+    (confirmed via `git status` — `DashboardPage.jsx`, `Sidebar.jsx`, `Layout.jsx`,
+    and `GlobalSearch.jsx` all show zero pending changes and were last touched
+    2026-09-07, well before any of this session's work). It's a real React
+    reconciliation warning (traced its origin to `reconcileChildrenArray` via a
+    captured stack, confirming it's a genuine duplicate `key` prop somewhere in a
+    persistently-mounted component — not a stale-console artifact), but its exact
+    source wasn't pinned down: checked `Sidebar.jsx` (including the `/event-status`
+    entry that legitimately appears in two different sections' *separate* arrays —
+    ruled out, since each section reconciles independently), `GlobalSearch.jsx`,
+    `LanguageSwitcher.jsx`, and `DashboardPage.jsx`'s own list renders, all keyed by
+    strings or unique ids, no obvious literal `5`. Worth a fresh, focused look —
+    flagging rather than guessing further, per the standing process.
 
 ---
 
 ## Raw instruction log
+
+### 2026-10-03 — Item detail drawer, Modify item, Production Item flag + Request Production
+> 1. ss 1, jika barang di klik akan muncul detail drawer untuk barang tersebut
+> 2. tambahkan di event setting untuk true false di setiap state terkait production item
+> 3. ss 2, selain ada delete icon ada juga tambahan icon untuk feature "modify"
+> 4. ketika event setting enable di sebuah state, maka akan muncul action baru untuk
+> request production
+
+Clarified with the user: "Request Production" means **asking for a brand-new item
+(not in inventory) to be produced** for the event. It is not tied to an existing item.
+
+Decisions:
+- Clicking an item card opens a **right-side detail drawer**: all fields plus
+  Delete, Modify and (at scan stages) Scan. Buttons inside the card (ownership
+  badge, Scan, Modify, Delete) don't open the drawer.
+- The card's hover actions are now **Modify (pencil) + Delete**. Modify edits qty,
+  ownership, area, sub area, PIC and note. The item name is read-only because it
+  comes from inventory.
+- New per-status flag **Production Item (True/False)** in Event Settings. Seeded True for
+  "On preparing items" and "Finish setup".
+- At a stage with the flag on, the header shows **Request Production**. The form asks for
+  name, qty, area, sub area, needed-by date and notes. Requests appear in a new **Production** tab and move
+  Requested → In Production → Done. Requests can be cancelled while still Requested.
+  **Done adds the item to the event**, with ownership **IHP** and a purple
+  "Production" badge (assumption: IHP = in-house production; flagged to the user).
+- Requests are persisted per event (`emi_production_requests`). The Production tab
+  stays visible at later stages if requests exist, but new requests can only be made at
+  a flagged stage.
+
+### 2026-10-03 — Next button is the only way forward; confirm popup; Cutting Stock flag
+> 1. saya mau untuk next step harus ada button nya jadi tidak sekedar ganti.
+> 2. sebelum klik next maka user cuman bisa lihat tapi tidak bisa diklik, dalam artian
+> di dropdown pilih event itu muncul semua tapi klo dia belum klik next maka belum bisa
+> 3. terus di event setting tambahkan flag untuk cutting stock, value nya true or false
+
+Clarified with the user (asked before building):
+- Cutting Stock is **per status row** (like Scan), not one global toggle.
+- Going back **is** allowed, but only to stages already reached through Next.
+  Every Next click needs a **confirmation**, especially when cutting stock applies.
+
+Decisions:
+- The **Next** button now shows at every stage while the event is on-going, labelled
+  "Next: <stage>". Before, it only appeared at scan stages. At scan stages it stays
+  disabled until every item is scanned.
+- The status dropdown still lists every stage. Stages after the furthest one reached
+  with Next are locked (lock icon, not clickable). Earlier reached stages can be reopened.
+  The furthest stage is stored per event in localStorage (`emi_event_furthest_stage`).
+- Every stage change, whether Next or reopening a stage, opens a confirmation popup
+  showing "current → target".
+- **Cutting Stock** (`cuttingStock: true/false` on each Event Status row): when moving
+  forward into a stage with the flag on, the popup warns how many items and pcs will
+  be deducted, and the button reads "Confirm & Cut Stock". Confirming marks those
+  items `stockCut` (an orange "Stock cut" badge on the card) and writes an activity
+  log. Moving back does not restore stock. Each item is only cut once.
+- Seed: only "Waiting scan in" starts with Cutting Stock = True (as a demo). All others are False.
+- ⚠️ **Mock only:** warehouse quantities are not actually reduced. The app has no shared
+  live stock store (`warehouseInventory.js` is static seed data), and item state on
+  Event Detail isn't persisted across reloads. Real deduction belongs to the backend.
+- Open question: items added *after* the stock was already cut aren't cut
+  automatically. They're cut the next time the event enters a Cutting Stock stage.
+
+### 2026-10-03 — Simplify the Event Detail header (status, filters, tabs)
+> masuk ke event - on going, bisa tolong perbaiki UI nya dibagian ini, masih terlalu
+> rumit. saya mau lebih sederhana tanpa menghilangkan fungsi apapun.
+
+Scope: the top of Event Detail (title/actions, Event Status stepper, filters, tabs).
+Decisions:
+- The 9-dot numbered stepper is now a compact status control: the current status is a
+  dropdown (any stage can still be picked) plus a thin segmented progress bar (each
+  segment is clickable and shows the stage name on hover). Same `changeEventStatus`
+  gate, so the scan rule still blocks moving forward.
+- The lifecycle badge (Upcoming / On Going / Ready to Close / Checking Inventory /
+  Returned / Transferred) moved next to the event title, as one badge.
+- Search, Place and Ownership filters share one row. The **"Check" button was
+  removed** because it had no handler (`onClick={() => {}}`) and the filters already
+  apply live. Flagged to the user; easy to restore if it was meant for something.
+- Tabs reordered so the default comes first: All → Added New → Waiting Scan → Grouped.
+- Summary line shortened to "N items · <Area>" (the status is already shown above).
+
+### 2026-09-28 — Lock Returned/Transferred events to view-only; expand mock data
+> 1. ketika sudah returned, tidak bisa edit, delete, hanya bisa view dan dashboard
+> saja
+> 2. tambahkan mock data untuk segala status event, perbanyak mock data untuk
+> inventory item nya juga
+
+See "Returned & Completed / Transferred are view-only; mock data expanded for
+every status + inventory" above for the full breakdown.
 
 ### 2026-09-18 — Bulk assign ownership; backend notes; commit & push
 > tambahkan bulk assign untuk mengganti ownership di event details.

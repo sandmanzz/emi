@@ -34,3 +34,15 @@ export function isScanStage(statusName) {
   const record = statuses.find(s => s.status === statusName);
   return record?.scan === 'Scan';
 }
+
+// Missing field (statuses saved before this flag existed) counts as false.
+export function isCuttingStockStage(statusName) {
+  const record = getEventStatuses().find(s => s.status === statusName);
+  return record?.cuttingStock === true;
+}
+
+// While an event sits at a stage with this flag, Event Detail offers "Request Production".
+export function isProductionStage(statusName) {
+  const record = getEventStatuses().find(s => s.status === statusName);
+  return record?.productionItem === true;
+}

@@ -198,7 +198,7 @@ function EventCard({ r, onEdit, onDelete, navigate, readyToClose, onGoingByItems
   );
 }
 
-function PastEventRow({ r, onEdit, onDelete, navigate, extraBadge }) {
+function PastEventRow({ r, onEdit, onDelete, navigate, extraBadge, readOnly }) {
   const day   = r.date && r.date !== '-' ? parseInt(r.date.split('-')[2]) : '—';
   const month = r.date && r.date !== '-' ? MONTHS_SHORT[parseInt(r.date.split('-')[1]) - 1] : '';
 
@@ -253,9 +253,13 @@ function PastEventRow({ r, onEdit, onDelete, navigate, extraBadge }) {
           onClick={() => navigate(`/event-summary?name=${encodeURIComponent(r.name.toUpperCase())}`)}>
           <IconBarChart />
         </button>
-        <button className="btn-icon edit"    title="Edit"    onClick={() => onEdit(r.id)}><IconEdit /></button>
-        <button className="btn-icon delete"  title="Delete"  onClick={() => onDelete(r.id)}><IconDelete /></button>
-        <button className="btn-icon history" title="History"><IconHistory /></button>
+        {!readOnly && (
+          <>
+            <button className="btn-icon edit"    title="Edit"    onClick={() => onEdit(r.id)}><IconEdit /></button>
+            <button className="btn-icon delete"  title="Delete"  onClick={() => onDelete(r.id)}><IconDelete /></button>
+            <button className="btn-icon history" title="History"><IconHistory /></button>
+          </>
+        )}
       </div>
     </div>
   );
@@ -269,7 +273,7 @@ export default function EventPage() {
     itemCount: Number.isFinite(e.itemCount) ? e.itemCount : 0,
     updatedAt: e.updatedAt || e.date || e.start || '-',
   })));
-  const [nextId, setNextId] = useState(90);
+  const [nextId, setNextId] = useState(95);
 
   // One shared search query + page, reset whenever the active tab changes —
   // simpler than a separate pair per tab now that there are 6 of them.
@@ -436,10 +440,10 @@ export default function EventPage() {
     </div>
   );
 
-  const rowList = (list, emptyText, badgeKey) => list.length === 0 ? emptyState(emptyText) : (
+  const rowList = (list, emptyText, badgeKey, readOnly) => list.length === 0 ? emptyState(emptyText) : (
     <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
       {list.map(r => (
-        <PastEventRow key={r.id} r={r} onEdit={openEdit} onDelete={openDelete} navigate={navigate} extraBadge={statusBadge(badgeKey)} />
+        <PastEventRow key={r.id} r={r} onEdit={openEdit} onDelete={openDelete} navigate={navigate} extraBadge={statusBadge(badgeKey)} readOnly={readOnly} />
       ))}
     </div>
   );
@@ -536,7 +540,7 @@ export default function EventPage() {
             <>
               <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
                 {returnedFlat.map(r => (
-                  <PastEventRow key={r.id} r={r} onEdit={openEdit} onDelete={openDelete} navigate={navigate} extraBadge={returnedExtraBadge(r)} />
+                  <PastEventRow key={r.id} r={r} onEdit={openEdit} onDelete={openDelete} navigate={navigate} extraBadge={returnedExtraBadge(r)} readOnly />
                 ))}
               </div>
               <Pagination currentPage={tabPage} total={returnedEvents.length} pageSize={PAGE_SIZE} onPage={setTabPage} label="events" />
@@ -556,7 +560,7 @@ export default function EventPage() {
                   </div>
                   <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
                     {group.items.map(r => (
-                      <PastEventRow key={r.id} r={r} onEdit={openEdit} onDelete={openDelete} navigate={navigate} extraBadge={returnedExtraBadge(r)} />
+                      <PastEventRow key={r.id} r={r} onEdit={openEdit} onDelete={openDelete} navigate={navigate} extraBadge={returnedExtraBadge(r)} readOnly />
                     ))}
                   </div>
                 </div>
@@ -570,7 +574,7 @@ export default function EventPage() {
         <div>
           {searchBar('Search transferred events…')}
           {hint('Closed events where every item was moved to another event instead of returned.')}
-          {rowList(transferredEvents, 'No transferred events.', 'transferred')}
+          {rowList(transferredEvents, 'No transferred events.', 'transferred', true)}
         </div>
       )}
 

@@ -4,6 +4,17 @@ import { hasItemsAdded } from './eventItemsFlag';
 
 const KEY = 'emi_event_closing';
 
+// Seed defaults for a few demo events (src/data/events.js ids 92/93/94) so
+// "Checking Inventory" / "Transferred" / "Returned & Completed" each have at
+// least one row to show out of the box. Only used when nothing has been
+// explicitly stored for that event yet — any real action (via setEventClosing)
+// overrides it permanently, same as eventStatuses.js's seed/override pattern.
+const SEED_CLOSING = {
+  '2026-06-10 | HARVEST FESTIVAL BAZAAR': 'checking-inventory',
+  '2026-05-12 | DOWNTOWN PRODUCT LAUNCH': 'transferred',
+  '2026-04-18 | BEACHSIDE ANNIVERSARY':   'returned-completed',
+};
+
 // A single event-level status flag, 5 values:
 //  'on-going'           — default. Items exist on the event; it hasn't reached
 //                          closing yet. Not persisted — the absence of a saved
@@ -39,8 +50,8 @@ export function getEventClosing(eventName) {
   const raw = readAll()[eventName];
   if (raw === 'ready-for-check' || raw === 'ready-for-return') return 'checking-inventory';
   if (raw === 'returned') return 'returned-completed';
-  if (raw === 'checking-inventory' || raw === 'returned-completed' || raw === 'transferred') return raw;
-  return 'on-going';
+  if (raw === 'checking-inventory' || raw === 'returned-completed' || raw === 'transferred' || raw === 'on-going') return raw;
+  return SEED_CLOSING[eventName] || 'on-going';
 }
 
 export function setEventClosing(eventName, status) {

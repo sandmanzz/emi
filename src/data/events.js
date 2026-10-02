@@ -18,4 +18,14 @@ export const initialEvents = [
   { id:87, name:'Wedding Bali Season',         desc:'Luxury Bali wedding',                start:'2026-07-14', finish:'2026-07-15', date:'2026-07-10', code:'WBS',    location:'Bali',        type:'upcoming', itemCount:211, updatedAt:'2026-07-10' },
   { id:88, name:'Festival Musik Nusantara',    desc:'Music festival',                     start:'2026-08-17', finish:'2026-08-19', date:'2026-08-15', code:'FMN',    location:'Surabaya',    type:'upcoming', itemCount:132, updatedAt:'2026-08-15' },
   { id:89, name:'Grand Gala Night',            desc:'Exclusive gala dinner',              start:'2026-09-05', finish:'2026-09-05', date:'2026-09-03', code:'GGN',    location:'Semarang',    type:'upcoming', itemCount:88,  updatedAt:'2026-09-03' },
+  // The 5 below exist purely so every value of the event-closing status flag
+  // has at least one demo row to show, without the user having to manually
+  // walk each one through the flow first — see eventClosing.js / eventProgress.js
+  // for how "Ready to Close" / "Checking Inventory" / "Transferred" /
+  // "Returned & Completed" get seeded onto these specific events.
+  { id:90, name:'Autumn Garden Party',         desc:'Garden reception, still in planning', start:'2026-10-05', finish:'2026-10-05', date:'2026-10-01', code:'AGP',    location:'Bandung',     type:'upcoming', itemCount:0,   updatedAt:'2026-10-01' }, // Upcoming (no items yet)
+  { id:91, name:'Rooftop Sunset Mixer',        desc:'Corporate rooftop mixer',            start:'2026-10-20', finish:'2026-10-20', date:'2026-10-18', code:'RSM',    location:'Jakarta',     type:'upcoming', itemCount:58,  updatedAt:'2026-10-18' }, // Ready to Close
+  { id:92, name:'Harvest Festival Bazaar',     desc:'Community harvest bazaar',           start:'2026-06-12', finish:'2026-06-14', date:'2026-06-10', code:'HFB',    location:'Malang',      type:'upcoming', itemCount:140, updatedAt:'2026-06-10' }, // Checking Inventory
+  { id:93, name:'Downtown Product Launch',     desc:'Tech product launch event',          start:'2026-05-15', finish:'2026-05-15', date:'2026-05-12', code:'DPL',    location:'Surabaya',    type:'upcoming', itemCount:0,   updatedAt:'2026-05-12' }, // Transferred
+  { id:94, name:'Beachside Anniversary',       desc:'10th anniversary beach celebration', start:'2026-04-20', finish:'2026-04-21', date:'2026-04-18', code:'BSA',    location:'Bali',        type:'upcoming', itemCount:64,  updatedAt:'2026-04-18' }, // Returned & Completed
 ];

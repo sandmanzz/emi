@@ -50,6 +50,137 @@ explains a few non-obvious conventions that the entries below assume you already
 
 ---
 
+## Round 22 — Item detail drawer, Modify item, Production Item flag + Request Production
+
+**Files:** `src/components/Drawer.jsx` (new), `src/lib/productionRequests.js` (new),
+`src/pages/EventDetailPage.jsx`, `src/pages/EventStatusPage.jsx`,
+`src/data/eventStatuses.js`, `src/lib/eventStatuses.js`, `src/style.css`
+
+- **`Drawer`**: a generic right-side panel with the same `open/onClose/footer` contract
+  as `Modal`, closed with Esc or by clicking the backdrop. Its z-index is 190, so Modals
+  (200) such as Modify or Scan open *above* it.
+- **ItemCard** takes `onOpen` and `onModify`. The card is `role="button"` and
+  keyboard-focusable. Inner buttons call `stopPropagation()`. `.item-card-delete` was
+  replaced by `.item-card-actions` (Modify + Delete). The actions are always visible on touch
+  devices (`hover: none`). The drawer reads the item live from `items` by id, so edits
+  show immediately.
+- **Production Item flag** (`productionItem` on Event Status rows): new column, KPI card
+  and form field. Helper `isProductionStage(name)`. A missing field counts as false.
+- **Production requests** (`lib/productionRequests.js`, `PRODUCTION_STATUSES`) are persisted per
+  event. `advanceProductionRequest()` moves a request one status forward. On Done it pushes a
+  new item (`fromProduction: true`, `ownership: 'IHP'`) using `nextId`.
+- **Gotcha:** Modify and the produced items live in Event Detail component state, like the
+  rest of the items, so they reset on reload. The requests themselves persist.
+
+---
+
+## Round 21 — Next-only stage advance, stage-change confirmation, Cutting Stock flag
+
+**Files:** `src/components/Stepper.jsx`, `src/pages/EventDetailPage.jsx`,
+`src/pages/EventStatusPage.jsx`, `src/data/eventStatuses.js`, `src/lib/eventStatuses.js`,
+`src/lib/eventProgress.js`, `src/style.css`
+
+Moving an event forward should be a deliberate step, not a side effect of clicking a
+stage name. So:
+- **Next is the only way forward.** It always shows while on-going ("Next: <stage>"),
+  and is disabled at scan stages until everything is scanned. `Stepper` gained a `maxIndex`
+  prop. Stages after it are listed with a lock icon and can't be clicked. Stages
+  up to it can be reopened (going back).
+- **Furthest stage reached** is persisted per event via
+  `getEventFurthestStage` / `saveEventFurthestStage` (`lib/eventProgress.js`, key
+  `emi_event_furthest_stage`, stored by stage *name* because the Event Status list
+  is editable). `maxReachedIndex = max(furthest, current)`.
+- **All stage changes go through `requestStageChange()`**, which applies the scan gate
+  and opens a confirmation modal. `confirmStageChange()` then applies it. The old
+  `changeEventStatus()` was folded into these two.
+- **Cutting Stock** is a new boolean per Event Status row (`cuttingStock`). There is a new
+  column, a KPI card and a True/False field in the New/Edit modal. Helper:
+  `isCuttingStockStage(name)`. A missing field counts as false, so statuses saved in
+  localStorage before this change still work. When the move goes forward across or
+  into a cutting stage (`cuttingStagesBetween()`), the modal shows an orange warning.
+  Confirming sets `stockCut: true` on every not-yet-cut item and writes an activity log.
+- **Gotcha:** the deduction is display-only for now (no real warehouse stock store;
+  Event Detail items aren't persisted across reloads). Wire `confirmStageChange()` to the
+  backend when one exists. See `docs/context.md`.
+
+---
+
+## Round 20 — Simpler Event Detail header
+
+**Files:** `src/components/Stepper.jsx`, `src/pages/EventDetailPage.jsx`, `src/style.css`
+
+The top of Event Detail had four separate bands (title, a 9-dot stepper that needed
+horizontal scrolling, two filter rows, tabs). Users found it too busy, so it was cut
+down without dropping any feature:
+- **`Stepper.jsx` rewritten** (same props: `steps`, `currentIndex`, `onStepClick`). It
+  now shows the current status as a dropdown button + "Step N of M", with a thin
+  segmented progress track underneath. Picking from the menu or clicking a segment
+  calls `onStepClick`, so `changeEventStatus()`'s scan gate still applies. When
+  `onStepClick` is undefined (event past on-going), both are disabled (read-only).
+  The old `.stepper*` / `.event-status-stepper-wrap` CSS was deleted; it was used
+  only here.
+- **One lifecycle badge next to the title** (`phaseBadge`, derived from
+  `closingStatus` / `readyToClose` / `onGoingByItems`) replaces the badges that used
+  to sit in the stepper row. The action buttons (Next, Close & Start Checking, Ready
+  for Return) stay in the status panel.
+- **Filters on one row** (`.ed-toolbar`): search, Place, Ownership. The **"Check"
+  button was removed**, since it was a no-op. Filters already apply as you type or select.
+- **Tabs reordered**: All, Added New, Waiting Scan (scan stages only), Grouped.
+- The Cart button is now an outline icon so the green **Add Item** is the only filled CTA.
+  Both still open the same picker modal.
+- **Gotcha:** the status dropdown closes on outside `mousedown`, the same pattern
+  as the ⋮ menu. If you put it inside a modal, check that the modal doesn't stop
+  propagation.
+
+---
+
+## Round 19 — View-only lock on completed events; mock data expansion
+
+**Files:** `src/pages/EventPage.jsx`, `src/lib/eventClosing.js`,
+`src/lib/eventProgress.js`, `src/data/events.js`, `src/data/inventory.js`,
+`src/data/warehouseInventory.js`
+
+1. **View-only lock for Returned & Completed / Transferred.** `PastEventRow`
+   gained a `readOnly` prop — when true, the Edit/Delete/History icons are
+   omitted, leaving only Detail/Cart and Summary. Passed `true` from the
+   `returned` and `transferred` tab renders (all 3 call sites: the plain
+   `rowList` helper for Transferred, and both the paginated-search and
+   grouped-by-month branches for Returned & Completed); the `checking` tab
+   (Checking Inventory) keeps full actions since that event is still active.
+2. **5 new seed events** (`src/data/events.js` ids 90–94) so every value of the
+   status flag has a demo row out of the box:
+   - *Autumn Garden Party* — `itemCount: 0` → shows as Upcoming.
+   - *Rooftop Sunset Mixer* — no `itemCount`/closing seed, but
+     `eventProgress.js`'s new `SEED_AT_LAST_STAGE` list resolves its progress to
+     whatever `getEventStageNames()` currently reports as the last stage → shows
+     as Ready to Close.
+   - *Harvest Festival Bazaar* / *Downtown Product Launch* / *Beachside
+     Anniversary* — `eventClosing.js`'s new `SEED_CLOSING` map keys their event
+     name to `'checking-inventory'` / `'transferred'` / `'returned-completed'`
+     respectively.
+   - Both seed maps are read only when nothing's been explicitly stored for
+     that event (`getEventClosing`/`getEventProgress` check real storage
+     first) — same "seed is a fallback default, real writes always win"
+     pattern as `eventStatuses.js`'s `getEventStatuses()`.
+   - `EventPage.jsx`'s `nextId` bumped 90 → 95 to avoid colliding with the new
+     seed ids.
+3. **Inventory mock data expansion.** `src/data/inventory.js`: 32 → 72 items (40
+   new, ids 33–72, spanning all 6 existing categories). `src/data/
+   warehouseInventory.js`: 40 → 80 rows (ids 41–80) — one new row per new
+   inventory item, same name + a home warehouse from the 5 real ones already in
+   use, since `EventDetailPage.jsx`'s `stockAtWarehouse()` looks up stock by
+   `name` + `warehouseName` and a new item with no matching row would show as
+   permanently Out of Stock in the "Add Item" picker.
+
+Verified live: all 4 new non-Upcoming seed events render with the correct
+badge in their respective tabs (Ready to Close / Checking Inventory /
+Transferred / Returned & Completed); Transferred and Returned & Completed rows
+show only 2 action icons instead of 5; searched the Add Item picker for
+"Generator" (one of the 40 new inventory items) and it appeared with real stock
+(0, Out of Stock) pulled from the matching new `warehouseInventory.js` row.
+
+---
+
 ## Round 18 — Bulk Assign Ownership on Event Detail; `docs/backend.md`
 
 **Files:** `src/pages/EventDetailPage.jsx`, `src/style.css`, `docs/backend.md` (new)
@@ -1014,7 +1145,7 @@ Several features landed in this stretch:
 
 Add new entries at the **top** (right below "Context every dev should know", above
 the current newest round), numbered one higher than the current top entry (the next
-one after this file's Round 16 is "Round 17"). Each entry should say **what**
+one after this file's Round 22 is "Round 23"). Each entry should say **what**
 changed, **why** (the product reason, not just "user asked"), which **files** were
 touched, and any **gotcha** a future dev would otherwise have to rediscover the hard
 way. As of Round 6, this is a standing rule for every change, not just the big ones —

@@ -1,15 +1,17 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal';
+import Drawer from '../components/Drawer';
 import Stepper from '../components/Stepper';
 import SearchableSelect from '../components/SearchableSelect';
-import { IconSearch, IconPlus, IconDelete, IconClose, IconCheck, IconCart, IconPrint, IconBarChart, IconMoreVertical } from '../components/icons';
+import { IconSearch, IconPlus, IconEdit, IconDelete, IconClose, IconCheck, IconCart, IconPrint, IconBarChart, IconMoreVertical } from '../components/icons';
 import { initialAreas, SUB_AREAS } from '../data/areas';
 import { inventoryData, categories } from '../data/inventory';
 import { initialWarehouses } from '../data/warehouses';
 import { wiData } from '../data/warehouseInventory';
-import { getEventStageNames, isScanStage } from '../lib/eventStatuses';
-import { resolveEventStage, saveEventProgress } from '../lib/eventProgress';
+import { getEventStageNames, isScanStage, isCuttingStockStage, isProductionStage } from '../lib/eventStatuses';
+import { getProductionRequests, saveProductionRequests, PRODUCTION_STATUSES, PRODUCTION_BADGE } from '../lib/productionRequests';
+import { resolveEventStage, saveEventProgress, getEventFurthestStage, saveEventFurthestStage } from '../lib/eventProgress';
 import { getEventClosing, setEventClosing, isOnGoingByItems } from '../lib/eventClosing';
 import { CLOSING_LABELS } from '../lib/eventClosingLabels';
 import { markItemsAdded } from '../lib/eventItemsFlag';
@@ -117,12 +119,29 @@ function ownershipBadgeClass(ownership) {
 
 const OWNERSHIP_CYCLE = ['IHC', 'IHP', 'Outsource'];
 
-function ItemCard({ item, group, showScanButton, onScanClick, onDelete, onCycleOwnership }) {
+function ItemCard({ item, group, showScanButton, onScanClick, onDelete, onCycleOwnership, onOpen, onModify }) {
+  // The whole card opens the detail drawer; buttons inside stop propagation so
+  // they keep doing their own job.
+  const stop = fn => e => { e.stopPropagation(); fn(); };
   return (
-    <div className="item-card">
-      <button className="item-card-delete" title="Delete" onClick={() => onDelete(item.id)}>
-        <IconDelete />
-      </button>
+    <div
+      className={`item-card${onOpen ? ' clickable' : ''}`}
+      onClick={onOpen ? () => onOpen(item) : undefined}
+      onKeyDown={onOpen ? e => { if (e.key === 'Enter' && e.target === e.currentTarget) onOpen(item); } : undefined}
+      tabIndex={onOpen ? 0 : undefined}
+      role={onOpen ? 'button' : undefined}
+      aria-label={onOpen ? `View details for ${item.name}` : undefined}
+    >
+      <div className="item-card-actions">
+        {onModify && (
+          <button className="item-card-action modify" title="Modify" aria-label="Modify item" onClick={stop(() => onModify(item))}>
+            <IconEdit />
+          </button>
+        )}
+        <button className="item-card-action delete" title="Delete" aria-label="Delete item" onClick={stop(() => onDelete(item.id))}>
+          <IconDelete />
+        </button>
+      </div>
       <ImagePlaceholder />
       <div className="item-body">
         <div className="item-badge-row">
@@ -133,10 +152,16 @@ function ItemCard({ item, group, showScanButton, onScanClick, onDelete, onCycleO
               className={`badge ${ownershipBadgeClass(item.ownership)} ownership-badge-btn`}
               style={{ fontSize: 10 }}
               title="Click to change ownership (IHC / IHP / Outsource)"
-              onClick={() => onCycleOwnership(item.id)}
+              onClick={e => { e.stopPropagation(); onCycleOwnership(item.id); }}
             >
               {item.ownership}
             </button>
+          )}
+          {item.stockCut && (
+            <span className="badge badge-orange" style={{ fontSize: 10 }} title="Deducted from warehouse stock">Stock cut</span>
+          )}
+          {item.fromProduction && (
+            <span className="badge badge-purple" style={{ fontSize: 10 }} title="Produced via a production request">Production</span>
           )}
           {item.resolution === 'returned' && (
             <span className="badge badge-green" style={{ fontSize: 10 }}>Returned</span>
@@ -193,7 +218,7 @@ function ItemCard({ item, group, showScanButton, onScanClick, onDelete, onCycleO
         {item.note && <div className="item-note">{item.note}</div>}
         {showScanButton && (
           <div className="item-actions">
-            <button className={`btn-ia-scan${item.scanned ? ' scanned' : ''}`} onClick={() => onScanClick(item)}>
+            <button className={`btn-ia-scan${item.scanned ? ' scanned' : ''}`} onClick={e => { e.stopPropagation(); onScanClick(item); }}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h.01M14 17h3v3M17 14h3"/></svg>
               {item.scanned ? 'Re-scan' : 'Scan'}
             </button>
@@ -228,6 +253,10 @@ export default function EventDetailPage() {
   const [stages] = useState(() => getEventStageNames());
   const [eventStatus, setEventStatus] = useState(() => resolveEventStage(eventName) || 'Preparation');
   const stageScanEnabled = isScanStage(eventStatus);
+  // Furthest stage reached via Next — stages up to here can be reopened from the
+  // status dropdown; later ones stay locked until Next is clicked.
+  const [furthestIndex, setFurthestIndex] = useState(() => stages.indexOf(getEventFurthestStage(eventName)));
+  const [pendingStage, setPendingStage] = useState(null); // stage awaiting confirmation
   const [closingStatus, setClosingStatus] = useState(() => getEventClosing(eventName));
   const [crossCheckOpen, setCrossCheckOpen] = useState(false);
   // Bulk Assign Ownership modal
@@ -278,6 +307,17 @@ export default function EventDetailPage() {
   const [ownershipFilter, setOwnershipFilter] = useState('');
   const [stageFilter, setStageFilter] = useState('all'); // 'all' | 'previous' | 'current'
 
+  // Item detail drawer + Modify modal
+  const [detailItemId, setDetailItemId] = useState(null);
+  const [editItemId, setEditItemId] = useState(null);
+  const [editForm, setEditForm] = useState({ qty: 1, area: '', subArea: '', pic: '', ownership: 'IHC', note: '' });
+
+  // Production requests (only offered at stages with productionItem: true)
+  const productionEnabled = isProductionStage(eventStatus);
+  const [productionRequests, setProductionRequestsState] = useState(() => getProductionRequests(eventName));
+  const [productionOpen, setProductionOpen] = useState(false);
+  const [productionForm, setProductionForm] = useState({ name: '', qty: 1, area: '', subArea: '', neededBy: '', note: '' });
+
   // Cart — "add from inventory" e-commerce style flow
   const [cart, setCart] = useState([]);
   const [nextCartId, setNextCartId] = useState(1);
@@ -327,6 +367,12 @@ export default function EventDetailPage() {
   const hasNextStage = stageIndex < stages.length - 1;
   // "Ready to Close" is a derived display state, not stored — see eventClosing.js.
   const readyToClose = closingStatus === 'on-going' && !hasNextStage;
+  // Single lifecycle badge shown next to the event title.
+  const phaseBadge = CLOSING_LABELS[
+    closingStatus !== 'on-going' ? closingStatus
+      : readyToClose ? 'ready-to-close'
+      : onGoingByItems ? 'on-going' : 'upcoming'
+  ];
 
   // Transfer target candidates — other events still "on-going" (upcoming, not
   // yet in any closing phase), matching the same set EventPage.jsx's "Upcoming"
@@ -337,21 +383,59 @@ export default function EventDetailPage() {
     .filter(e => e.key !== eventName && getEventClosing(e.key) === 'on-going'),
   [eventName]);
 
-  function changeEventStatus(step) {
+  const maxReachedIndex = Math.max(furthestIndex, stageIndex);
+
+  // Every stage change (Next, or reopening an already-reached stage from the
+  // dropdown) goes through a confirmation popup first.
+  function requestStageChange(step) {
     const targetIndex = stages.indexOf(step);
+    if (targetIndex === stageIndex) return;
+    if (targetIndex > maxReachedIndex + 1) return; // locked — only reachable via Next
     if (stageScanEnabled && targetIndex > stageIndex && unscannedCount > 0) {
       setStepperError(`${unscannedCount} item${unscannedCount === 1 ? '' : 's'} still need${unscannedCount === 1 ? 's' : ''} to be scanned before moving to the next stage.`);
       return;
     }
     setStepperError('');
-    setEventStatus(step);
-    saveEventProgress(eventName, step);
-    setStageFilter('all');
+    setPendingStage(step);
   }
 
   function handleNextClick() {
-    if (!hasNextStage || unscannedCount > 0) return;
-    changeEventStatus(stages[stageIndex + 1]);
+    if (!hasNextStage) return;
+    requestStageChange(stages[stageIndex + 1]);
+  }
+
+  // Cutting-stock stages crossed when moving forward from the current stage to
+  // `step` (current stage excluded, target included). Moving back never cuts.
+  function cuttingStagesBetween(step) {
+    const targetIndex = stages.indexOf(step);
+    if (targetIndex <= stageIndex) return [];
+    return stages.slice(stageIndex + 1, targetIndex + 1).filter(isCuttingStockStage);
+  }
+
+  const pendingCutStages = pendingStage ? cuttingStagesBetween(pendingStage) : [];
+  const itemsToCut = useMemo(() => items.filter(it => !it.stockCut), [items]);
+
+  function confirmStageChange() {
+    const step = pendingStage;
+    if (!step) return;
+    const targetIndex = stages.indexOf(step);
+    if (cuttingStagesBetween(step).length > 0 && itemsToCut.length > 0) {
+      const cutIds = new Set(itemsToCut.map(it => it.id));
+      const totalQty = itemsToCut.reduce((sum, it) => sum + it.qty, 0);
+      setItems(is => is.map(it => cutIds.has(it.id) ? { ...it, stockCut: true } : it));
+      addActivityLog({
+        userName: currentUser?.name || 'Admin', action: 'Update', module: 'Event Detail',
+        description: `Cut stock for ${cutIds.size} item(s) (${totalQty} pcs) on ${eventName} at "${step}"`,
+      });
+    }
+    setEventStatus(step);
+    saveEventProgress(eventName, step);
+    if (targetIndex > furthestIndex) {
+      setFurthestIndex(targetIndex);
+      saveEventFurthestStage(eventName, step);
+    }
+    setStageFilter('all');
+    setPendingStage(null);
   }
 
   // --- Packaging (group items so they scan together) — usable at any stage ---
@@ -582,6 +666,93 @@ export default function EventDetailPage() {
     closeReturnTransfer();
   }
 
+  // --- Item detail drawer & Modify ---
+  const detailItem = detailItemId != null ? items.find(it => it.id === detailItemId) : null;
+  const editItem = editItemId != null ? items.find(it => it.id === editItemId) : null;
+
+  function openModifyItem(item) {
+    setEditForm({ qty: item.qty, area: item.area, subArea: item.subArea || '', pic: item.pic || '', ownership: item.ownership || 'IHC', note: item.note || '' });
+    setEditItemId(item.id);
+  }
+
+  function saveModifyItem() {
+    if (!editItem || !editForm.area || !(Number(editForm.qty) >= 1)) return;
+    const qty = Math.floor(Number(editForm.qty));
+    setItems(is => is.map(it => it.id === editItem.id
+      ? { ...it, qty, area: editForm.area, subArea: editForm.subArea, pic: editForm.pic.trim(), ownership: editForm.ownership, note: editForm.note.trim() }
+      : it));
+    addActivityLog({
+      userName: currentUser?.name || 'Admin', action: 'Update', module: 'Event Detail',
+      description: `Modified "${editItem.name}" on ${eventName}`,
+    });
+    setEditItemId(null);
+  }
+
+  function deleteItemFromDrawer(id) {
+    if (!window.confirm('Delete this item from the event?')) return;
+    setItems(is => is.filter(i => i.id !== id));
+    setDetailItemId(null);
+  }
+
+  // --- Production requests ---
+  function setProductionRequests(updater) {
+    setProductionRequestsState(current => {
+      const next = typeof updater === 'function' ? updater(current) : updater;
+      saveProductionRequests(eventName, next);
+      return next;
+    });
+  }
+
+  function openProductionRequest() {
+    setProductionForm({ name: '', qty: 1, area: '', subArea: '', neededBy: '', note: '' });
+    setProductionOpen(true);
+  }
+
+  const productionFormValid = productionForm.name.trim() && Number(productionForm.qty) >= 1 && productionForm.area;
+
+  function submitProductionRequest() {
+    if (!productionFormValid) return;
+    const id = Math.max(0, ...productionRequests.map(r => r.id)) + 1;
+    const req = {
+      id, name: productionForm.name.trim(), qty: Math.floor(Number(productionForm.qty)),
+      area: productionForm.area, subArea: productionForm.subArea, neededBy: productionForm.neededBy,
+      note: productionForm.note.trim(), status: 'Requested', stage: eventStatus,
+      requestedBy: currentUser?.name || 'Admin', requestedAt: new Date().toLocaleDateString('en-CA'), // local YYYY-MM-DD
+    };
+    setProductionRequests(rs => [req, ...rs]);
+    addActivityLog({
+      userName: req.requestedBy, action: 'Create', module: 'Event Detail',
+      description: `Requested production of "${req.name}" (${req.qty} pcs) for ${eventName}`,
+    });
+    setProductionOpen(false);
+    setStageFilter('production');
+  }
+
+  // Requested -> In Production -> Done. Done adds the produced item to the event.
+  function advanceProductionRequest(req) {
+    const nextStatus = PRODUCTION_STATUSES[PRODUCTION_STATUSES.indexOf(req.status) + 1];
+    if (!nextStatus) return;
+    if (nextStatus === 'Done') {
+      if (!window.confirm(`Mark "${req.name}" as done? It will be added to this event's items.`)) return;
+      setItems(is => [...is, {
+        id: nextId, name: req.name, area: req.area, subArea: req.subArea, stage: eventStatus,
+        qty: req.qty, pic: '', checking: false, scanned: false, groupId: null, warehouseItem: false,
+        scanIn: null, scanOut: null, note: req.note, checked: false, ownership: 'IHP', fromProduction: true,
+      }]);
+      setNextId(n => n + 1);
+    }
+    setProductionRequests(rs => rs.map(r => r.id === req.id ? { ...r, status: nextStatus } : r));
+    addActivityLog({
+      userName: currentUser?.name || 'Admin', action: 'Update', module: 'Event Detail',
+      description: `Production request "${req.name}" on ${eventName} → ${nextStatus}`,
+    });
+  }
+
+  function cancelProductionRequest(req) {
+    if (!window.confirm(`Cancel the production request for "${req.name}"?`)) return;
+    setProductionRequests(rs => rs.filter(r => r.id !== req.id));
+  }
+
   // --- Inventory picker → Cart ---
   function addToCart(inv, qty, warehouse) {
     const stockHere = stockAtWarehouse(inv, warehouse);
@@ -657,18 +828,25 @@ export default function EventDetailPage() {
     <>
       <h1 className="page-title">Event Detail</h1>
       <div className="card">
-        <div style={{ marginBottom: 14 }}>
-          <button onClick={() => navigate('/event')} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: '12.5px', color: 'var(--brand)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: 14, height: 14 }}><polyline points="15 18 9 12 15 6"/></svg>
-            Back to Event
-          </button>
-        </div>
+        <button className="ed-back-link" onClick={() => navigate('/event')}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          Back to Event
+        </button>
 
         <div className="event-header-row">
-          <div className="event-heading">{eventName}</div>
+          <div className="event-title-wrap">
+            <div className="event-heading">{eventName}</div>
+            <span className={`badge ${phaseBadge.badgeClass}`}>{phaseBadge.label}</span>
+          </div>
 
           <div className="event-actions-bar">
-            <button className="action-icon-btn btn-cart" title="Cart" onClick={() => setPickerOpen(true)}>
+            {productionEnabled && closingStatus === 'on-going' && (
+              <button className="btn btn-ghost btn-request-production" onClick={openProductionRequest}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+                Request Production
+              </button>
+            )}
+            <button className="action-icon-btn btn-cart-outline" title="Cart" onClick={() => setPickerOpen(true)}>
               <IconCart />
               {cart.length > 0 && <span className="action-icon-badge">{cart.length}</span>}
             </button>
@@ -709,50 +887,35 @@ export default function EventDetailPage() {
 
         <div className="event-status-section">
           <span className="event-status-section-label">Event Status</span>
-          <div className="event-status-stepper-wrap">
-            <Stepper
-              steps={stages}
-              currentIndex={stages.indexOf(eventStatus)}
-              onStepClick={closingStatus === 'on-going' ? changeEventStatus : undefined}
-            />
-          </div>
-          {closingStatus === 'on-going' && !readyToClose && (
-            <span className={`badge ${CLOSING_LABELS[onGoingByItems ? 'on-going' : 'upcoming'].badgeClass}`}>
-              {CLOSING_LABELS[onGoingByItems ? 'on-going' : 'upcoming'].label}
-            </span>
-          )}
-          {closingStatus === 'on-going' && !readyToClose && stageScanEnabled && hasNextStage && (
+          <Stepper
+            steps={stages}
+            currentIndex={stageIndex}
+            maxIndex={maxReachedIndex}
+            onStepClick={closingStatus === 'on-going' ? requestStageChange : undefined}
+          />
+          {closingStatus === 'on-going' && !readyToClose && hasNextStage && (
             <button
               type="button"
               className="btn-next-stage"
-              disabled={unscannedCount > 0}
-              title={unscannedCount > 0 ? `${unscannedCount} item(s) still need to be scanned` : `Move to "${stages[stageIndex + 1]}"`}
+              disabled={stageScanEnabled && unscannedCount > 0}
+              title={stageScanEnabled && unscannedCount > 0 ? `${unscannedCount} item(s) still need to be scanned` : `Move to "${stages[stageIndex + 1]}"`}
               onClick={handleNextClick}
             >
-              Next
+              Next: {stages[stageIndex + 1]}
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
             </button>
           )}
           {readyToClose && (
-            <>
-              <span className={`badge ${CLOSING_LABELS['ready-to-close'].badgeClass}`}>{CLOSING_LABELS['ready-to-close'].label}</span>
-              <button type="button" className="btn-next-stage" onClick={handleReadyToClose}>
-                Close &amp; Start Checking
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-              </button>
-            </>
+            <button type="button" className="btn-next-stage" onClick={handleReadyToClose}>
+              Close &amp; Start Checking
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
           )}
           {closingStatus === 'checking-inventory' && (
-            <>
-              <span className={`badge ${CLOSING_LABELS['checking-inventory'].badgeClass}`}>{CLOSING_LABELS['checking-inventory'].label}</span>
-              <button type="button" className="btn-next-stage" onClick={openReturnTransfer}>
-                Ready for Return
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-              </button>
-            </>
-          )}
-          {(closingStatus === 'returned-completed' || closingStatus === 'transferred') && (
-            <span className={`badge ${CLOSING_LABELS[closingStatus].badgeClass}`}>{CLOSING_LABELS[closingStatus].label}</span>
+            <button type="button" className="btn-next-stage" onClick={openReturnTransfer}>
+              Ready for Return
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
           )}
         </div>
 
@@ -764,8 +927,13 @@ export default function EventDetailPage() {
           </div>
         )}
 
-        <div className="filter-row">
-          <div style={{ flex: 1, minWidth: 190 }}>
+        <div className="ed-toolbar">
+          <div className="search-wrap ed-toolbar-search">
+            <IconSearch />
+            <input className="search-input" type="text" placeholder="Search item or area…" value={kwSearch} onChange={e => setKwSearch(e.target.value)} />
+          </div>
+
+          <div className="ed-toolbar-select">
             <SearchableSelect
               value={selectedArea}
               onChange={setSelectedArea}
@@ -779,7 +947,7 @@ export default function EventDetailPage() {
             />
           </div>
 
-          <div style={{ width: 170, flexShrink: 0 }}>
+          <div className="ed-toolbar-select">
             <SearchableSelect
               value={ownershipFilter}
               onChange={setOwnershipFilter}
@@ -792,22 +960,15 @@ export default function EventDetailPage() {
               ]}
             />
           </div>
-
-          <div className="filter-row-right">
-            <button className="btn btn-check" onClick={() => {}}>
-              <IconSearch /> Check
-            </button>
-          </div>
-        </div>
-
-        <div className="search-row">
-          <div className="search-wrap">
-            <IconSearch />
-            <input className="search-input" type="text" placeholder="Keyword Search" value={kwSearch} onChange={e => setKwSearch(e.target.value)} />
-          </div>
         </div>
 
         <div className="stage-tabs">
+          <button type="button" className={`stage-tab${effectiveStageFilter === 'all' ? ' active' : ''}`} onClick={() => setStageFilter('all')}>
+            All <span className="stage-tab-count">{scopedItems.length}</span>
+          </button>
+          <button type="button" className={`stage-tab${effectiveStageFilter === 'added' ? ' active' : ''}`} onClick={() => setStageFilter('added')}>
+            Added New <span className="stage-tab-count">{currentStageItems.length}</span>
+          </button>
           {stageScanEnabled && (
             <button type="button" className={`stage-tab${effectiveStageFilter === 'waiting' ? ' active' : ''}`} onClick={() => setStageFilter('waiting')}>
               Waiting Scan <span className="stage-tab-count">{waitingScanItems.length}</span>
@@ -816,15 +977,60 @@ export default function EventDetailPage() {
           <button type="button" className={`stage-tab${effectiveStageFilter === 'grouped' ? ' active' : ''}`} onClick={() => setStageFilter('grouped')}>
             Grouped <span className="stage-tab-count">{packages.length}</span>
           </button>
-          <button type="button" className={`stage-tab${effectiveStageFilter === 'all' ? ' active' : ''}`} onClick={() => setStageFilter('all')}>
-            All <span className="stage-tab-count">{scopedItems.length}</span>
-          </button>
-          <button type="button" className={`stage-tab${effectiveStageFilter === 'added' ? ' active' : ''}`} onClick={() => setStageFilter('added')}>
-            Added New <span className="stage-tab-count">{currentStageItems.length}</span>
-          </button>
+          {(productionEnabled || productionRequests.length > 0) && (
+            <button type="button" className={`stage-tab${effectiveStageFilter === 'production' ? ' active' : ''}`} onClick={() => setStageFilter('production')}>
+              Production <span className="stage-tab-count">{productionRequests.length}</span>
+            </button>
+          )}
         </div>
 
-        {effectiveStageFilter === 'grouped' ? (
+        {effectiveStageFilter === 'production' ? (
+          <>
+            <p className="summary-text">
+              <strong>{productionRequests.length}</strong> production request{productionRequests.length === 1 ? '' : 's'}
+              {productionEnabled ? '' : ' · new requests can only be made at a stage with Production Item enabled'}
+            </p>
+            {productionRequests.length === 0
+              ? <div className="no-data">No production requests yet. Use &ldquo;Request Production&rdquo; above to ask for a new item.</div>
+              : (
+                <div className="production-list">
+                  {productionRequests.map(req => {
+                    const nextStatus = PRODUCTION_STATUSES[PRODUCTION_STATUSES.indexOf(req.status) + 1];
+                    return (
+                      <div key={req.id} className="production-card">
+                        <div className="production-card-main">
+                          <div className="production-card-title">
+                            {req.name}
+                            <span className={`badge ${PRODUCTION_BADGE[req.status]}`} style={{ fontSize: 10.5 }}>{req.status}</span>
+                          </div>
+                          <div className="production-card-meta">
+                            <span>Qty {req.qty}</span>
+                            <span>{req.area}{req.subArea ? ` · ${req.subArea}` : ''}</span>
+                            {req.neededBy && <span>Needed by {req.neededBy}</span>}
+                            <span>Requested by {req.requestedBy} on {req.requestedAt}</span>
+                          </div>
+                          {req.note && <div className="production-card-note">{req.note}</div>}
+                        </div>
+                        <div className="production-card-actions">
+                          {req.status === 'Requested' && (
+                            <button type="button" className="btn btn-ghost" onClick={() => cancelProductionRequest(req)}>Cancel</button>
+                          )}
+                          {nextStatus && (
+                            <button type="button" className="btn-save-modal" onClick={() => advanceProductionRequest(req)}>
+                              {nextStatus === 'In Production' ? 'Start Production' : 'Mark Done'}
+                            </button>
+                          )}
+                          {!nextStatus && <span className="production-done-note">Added to event items</span>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )
+            }
+          </>
+        ) : effectiveStageFilter === 'grouped' ? (
+
           <>
             <p className="summary-text">
               <strong>{packages.length}</strong> box{packages.length === 1 ? '' : 'es'} packaged &mdash; each box scans as one QR code instead of scanning every item inside it one by one.
@@ -860,6 +1066,7 @@ export default function EventDetailPage() {
                             <ItemCard
                               key={it.id} item={it} group={pkg} showScanButton={false}
                               onDelete={deleteItem} onCycleOwnership={cycleItemOwnership}
+                              onOpen={it => setDetailItemId(it.id)} onModify={openModifyItem}
                             />
                           ))}
                         </div>
@@ -874,9 +1081,9 @@ export default function EventDetailPage() {
           <>
             <p className="summary-text">
               {effectiveStageFilter === 'waiting' ? (
-                <><strong>{stageFiltered.length}</strong> item{stageFiltered.length === 1 ? '' : 's'} still need{stageFiltered.length === 1 ? 's' : ''} scanning at event status <strong>&ldquo;{eventStatus}&rdquo;</strong> in Area <strong>&ldquo;{areaLabel}&rdquo;</strong></>
+                <><strong>{stageFiltered.length}</strong> item{stageFiltered.length === 1 ? '' : 's'} waiting to be scanned &middot; {areaLabel}</>
               ) : (
-                <><strong>{stageFiltered.length}</strong> pcs items at event status <strong>&ldquo;{eventStatus}&rdquo;</strong> in Area <strong>&ldquo;{areaLabel}&rdquo;</strong></>
+                <><strong>{stageFiltered.length}</strong> item{stageFiltered.length === 1 ? '' : 's'} &middot; {areaLabel}</>
               )}
             </p>
 
@@ -893,6 +1100,8 @@ export default function EventDetailPage() {
                       onScanClick={openScanPopup}
                       onDelete={deleteItem}
                       onCycleOwnership={cycleItemOwnership}
+                      onOpen={it => setDetailItemId(it.id)}
+                      onModify={openModifyItem}
                     />
                   ))}
                 </div>
@@ -1098,6 +1307,216 @@ export default function EventDetailPage() {
         <button type="button" className="summary-popup-view-detail" onClick={goToFullSummary}>
           <IconBarChart /> View Full Detail
         </button>
+      </Modal>
+
+      {/* Item detail drawer — opens when an item card is clicked */}
+      <Drawer
+        open={!!detailItem}
+        title={detailItem?.name}
+        subtitle={detailItem ? `${detailItem.area}${detailItem.subArea ? ` · ${detailItem.subArea}` : ''}` : ''}
+        onClose={() => setDetailItemId(null)}
+        footer={detailItem && (
+          <>
+            <button className="btn-del-ok" style={{ marginRight: 'auto' }} onClick={() => deleteItemFromDrawer(detailItem.id)}><IconDelete /> Delete</button>
+            {stageScanEnabled && (
+              <button className="btn btn-ghost" onClick={() => openScanPopup(detailItem)}>{detailItem.scanned ? 'Re-scan' : 'Scan'}</button>
+            )}
+            <button className="btn-save-modal" onClick={() => openModifyItem(detailItem)}><IconEdit /> Modify</button>
+          </>
+        )}
+      >
+        {detailItem && (() => {
+          const group = detailItem.groupId ? packages.find(p => p.id === detailItem.groupId) : null;
+          const rows = [
+            ['Quantity', detailItem.qty],
+            ['PIC', detailItem.pic || '—'],
+            ['Area', detailItem.area],
+            ['Sub Area', detailItem.subArea || '—'],
+            ['Ownership', detailItem.ownership || '—'],
+            ['Added at stage', detailItem.stage],
+            ['Source', detailItem.fromProduction ? 'Production request' : detailItem.warehouseItem ? 'Warehouse inventory' : 'Non-warehouse item'],
+            ['Group', group ? group.name : '—'],
+            ['Checking', detailItem.checking ? 'Yes' : 'No'],
+            ['Cross-checked', detailItem.checked ? 'Yes' : 'No'],
+            ['Scan In', detailItem.scanIn || 'Not yet'],
+            ['Scan Out', detailItem.scanOut || 'Not yet'],
+          ];
+          return (
+            <>
+              <div className="drawer-img"><ImagePlaceholder /></div>
+              <div className="item-badge-row" style={{ marginBottom: 14 }}>
+                <span className={`area-badge ${areaBadgeClass(detailItem.area)}`}>{detailItem.area}</span>
+                {detailItem.ownership && <span className={`badge ${ownershipBadgeClass(detailItem.ownership)}`} style={{ fontSize: 10 }}>{detailItem.ownership}</span>}
+                {detailItem.scanned && <span className="badge badge-green" style={{ fontSize: 10 }}>Scanned</span>}
+                {detailItem.stockCut && <span className="badge badge-orange" style={{ fontSize: 10 }}>Stock cut</span>}
+                {detailItem.resolution === 'returned' && <span className="badge badge-green" style={{ fontSize: 10 }}>Returned</span>}
+              </div>
+              <dl className="drawer-dl">
+                {rows.map(([k, v]) => (
+                  <div key={k} className="drawer-dl-row"><dt>{k}</dt><dd>{v}</dd></div>
+                ))}
+              </dl>
+              <div className="drawer-section-label">Note</div>
+              {detailItem.note ? <div className="item-note" style={{ marginTop: 0 }}>{detailItem.note}</div> : <p className="drawer-empty">No note.</p>}
+            </>
+          );
+        })()}
+      </Drawer>
+
+      {/* Modify item */}
+      <Modal
+        open={!!editItem}
+        title="Modify Item"
+        onClose={() => setEditItemId(null)}
+        footer={
+          <>
+            <button className="btn-cancel-modal" onClick={() => setEditItemId(null)}><IconClose /> Cancel</button>
+            <button className="btn-save-modal" onClick={saveModifyItem} disabled={!editForm.area || !(Number(editForm.qty) >= 1)}><IconCheck /> Save</button>
+          </>
+        }
+      >
+        {editItem && (
+          <>
+            <div className="form-group">
+              <label>Item</label>
+              <input type="text" value={editItem.name} disabled />
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Quantity <span style={{ color: 'var(--red)' }}>*</span></label>
+                <input type="number" min="1" value={editForm.qty} onChange={e => setEditForm(f => ({ ...f, qty: e.target.value }))} />
+              </div>
+              <div className="form-group">
+                <label>Ownership</label>
+                <SearchableSelect
+                  value={editForm.ownership}
+                  onChange={v => setEditForm(f => ({ ...f, ownership: v }))}
+                  options={OWNERSHIP_CYCLE.map(o => ({ value: o, label: o }))}
+                />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Area <span style={{ color: 'var(--red)' }}>*</span></label>
+                <SearchableSelect
+                  value={editForm.area}
+                  onChange={v => setEditForm(f => ({ ...f, area: v, subArea: '' }))}
+                  placeholder="Select Area"
+                  options={AREAS.map(a => ({ value: a, label: a }))}
+                />
+              </div>
+              <div className="form-group">
+                <label>Sub Area</label>
+                <SearchableSelect
+                  value={editForm.subArea}
+                  onChange={v => setEditForm(f => ({ ...f, subArea: v }))}
+                  placeholder={(SUB_AREAS[editForm.area] || []).length ? 'Select Sub Area' : '(No Sub Area)'}
+                  options={[{ value: '', label: '—' }, ...(SUB_AREAS[editForm.area] || []).map(s => ({ value: s, label: s }))]}
+                />
+              </div>
+            </div>
+            <div className="form-group">
+              <label>PIC</label>
+              <input type="text" placeholder="Person in charge" value={editForm.pic} onChange={e => setEditForm(f => ({ ...f, pic: e.target.value }))} />
+            </div>
+            <div className="form-group">
+              <label>Note</label>
+              <textarea placeholder="e.g. Handle with care" value={editForm.note} onChange={e => setEditForm(f => ({ ...f, note: e.target.value }))} />
+            </div>
+          </>
+        )}
+      </Modal>
+
+      {/* Request Production — ask for a new item to be produced */}
+      <Modal
+        open={productionOpen}
+        title="Request Production"
+        onClose={() => setProductionOpen(false)}
+        footer={
+          <>
+            <button className="btn-cancel-modal" onClick={() => setProductionOpen(false)}><IconClose /> Cancel</button>
+            <button className="btn-save-modal" onClick={submitProductionRequest} disabled={!productionFormValid}><IconCheck /> Submit Request</button>
+          </>
+        }
+      >
+        <p className="confirm-msg" style={{ marginTop: 0, marginBottom: 16 }}>
+          Ask for a new item that isn&rsquo;t in inventory to be produced for this event. Once it&rsquo;s marked done, it&rsquo;s added to the event&rsquo;s items.
+        </p>
+        <div className="form-group">
+          <label>Item Name <span style={{ color: 'var(--red)' }}>*</span></label>
+          <input type="text" placeholder="e.g. Custom Welcome Sign 1×2m" value={productionForm.name} onChange={e => setProductionForm(f => ({ ...f, name: e.target.value }))} />
+        </div>
+        <div className="form-row">
+          <div className="form-group">
+            <label>Quantity <span style={{ color: 'var(--red)' }}>*</span></label>
+            <input type="number" min="1" value={productionForm.qty} onChange={e => setProductionForm(f => ({ ...f, qty: e.target.value }))} />
+          </div>
+          <div className="form-group">
+            <label>Needed By</label>
+            <input type="date" value={productionForm.neededBy} onChange={e => setProductionForm(f => ({ ...f, neededBy: e.target.value }))} />
+          </div>
+        </div>
+        <div className="form-row">
+          <div className="form-group">
+            <label>Area <span style={{ color: 'var(--red)' }}>*</span></label>
+            <SearchableSelect
+              value={productionForm.area}
+              onChange={v => setProductionForm(f => ({ ...f, area: v, subArea: '' }))}
+              placeholder="Select Area"
+              options={AREAS.map(a => ({ value: a, label: a }))}
+            />
+          </div>
+          <div className="form-group">
+            <label>Sub Area</label>
+            <SearchableSelect
+              value={productionForm.subArea}
+              onChange={v => setProductionForm(f => ({ ...f, subArea: v }))}
+              placeholder={(SUB_AREAS[productionForm.area] || []).length ? 'Select Sub Area' : '(No Sub Area)'}
+              options={[{ value: '', label: '—' }, ...(SUB_AREAS[productionForm.area] || []).map(s => ({ value: s, label: s }))]}
+            />
+          </div>
+        </div>
+        <div className="form-group">
+          <label>Notes</label>
+          <textarea placeholder="Size, material, color, reference…" value={productionForm.note} onChange={e => setProductionForm(f => ({ ...f, note: e.target.value }))} />
+        </div>
+      </Modal>
+
+      {/* Stage change confirmation — Next or reopening an earlier stage */}
+      <Modal
+        open={!!pendingStage}
+        title={pendingStage && stages.indexOf(pendingStage) > stageIndex ? 'Move to next stage?' : 'Go back to an earlier stage?'}
+        onClose={() => setPendingStage(null)}
+        footer={
+          <>
+            <button className="btn-cancel-modal" onClick={() => setPendingStage(null)}><IconClose /> Cancel</button>
+            <button className="btn-save-modal" onClick={confirmStageChange}>
+              <IconCheck /> {pendingCutStages.length > 0 && itemsToCut.length > 0 ? 'Confirm & Cut Stock' : 'Confirm'}
+            </button>
+          </>
+        }
+      >
+        <div className="stage-confirm-route">
+          <span>{eventStatus}</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          <strong>{pendingStage}</strong>
+        </div>
+        {pendingStage && isScanStage(pendingStage) && (
+          <p className="confirm-msg">Items must be scanned at this stage before the event can move on.</p>
+        )}
+        {pendingCutStages.length > 0 && (
+          <div className="stage-confirm-cut">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <div>
+              <strong>Cutting Stock is on for {pendingCutStages.map(s => `“${s}”`).join(', ')}.</strong>
+              {itemsToCut.length > 0 ? (
+                <> Confirming deducts <strong>{itemsToCut.length} item{itemsToCut.length === 1 ? '' : 's'}</strong> ({itemsToCut.reduce((sum, it) => sum + it.qty, 0)} pcs) from warehouse stock. Going back to an earlier stage does not restore it.</>
+              ) : (
+                <> All items on this event have already been deducted, so nothing more will be cut.</>
+              )}
+            </div>
+          </div>
+        )}
       </Modal>
 
       <Modal open={!!scanningItem} title="Scan Item" onClose={closeScanPopup}>
