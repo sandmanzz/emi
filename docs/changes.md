@@ -50,6 +50,27 @@ explains a few non-obvious conventions that the entries below assume you already
 
 ---
 
+## Round 23 — Exclusive Cutting Stock, Stock Return, list view, checking lock
+
+**Files:** `src/pages/EventDetailPage.jsx`, `src/pages/EventStatusPage.jsx`,
+`src/data/eventStatuses.js`, `src/lib/eventStatuses.js`, `src/style.css`
+
+- **Exclusive flags** in `EventStatusPage`: `cuttingOwner` / `returnOwner` are the *other*
+  row holding each flag. The form disables "True" via `SearchableSelect`'s `disabled`
+  option, and `save()` re-checks the rule. New `stockReturn` field (column, KPI, form) and
+  helper `isStockReturnStage()`.
+- **Stock Return on Event Detail**: `returnStagesBetween()` mirrors
+  `cuttingStagesBetween()`. If one jump crosses both the cutting and the return stage, all items
+  get cut and then returned. `addLocked` is based on `maxReachedIndex >= stockReturnIndex`, so it
+  doesn't unlock when the user goes back.
+- **`itemsLocked`** (`closingStatus !== 'on-going'`) feeds `itemActionProps`, which is shared by
+  `ItemCard` and the new `ItemTable`. Locked actions are passed as `undefined`, and both
+  components hide what they don't receive. `deleteItem()` also guards on its own.
+- **`ItemTable`** + `StockBadge` are new components in the same file. The view mode is stored in
+  `localStorage['emi_event_detail_view']` (a per-viewer preference, wrapped in try/catch).
+
+---
+
 ## Round 22 — Item detail drawer, Modify item, Production Item flag + Request Production
 
 **Files:** `src/components/Drawer.jsx` (new), `src/lib/productionRequests.js` (new),
@@ -1145,7 +1166,7 @@ Several features landed in this stretch:
 
 Add new entries at the **top** (right below "Context every dev should know", above
 the current newest round), numbered one higher than the current top entry (the next
-one after this file's Round 22 is "Round 23"). Each entry should say **what**
+one after this file's Round 23 is "Round 24"). Each entry should say **what**
 changed, **why** (the product reason, not just "user asked"), which **files** were
 touched, and any **gotcha** a future dev would otherwise have to rediscover the hard
 way. As of Round 6, this is a standing rule for every change, not just the big ones —

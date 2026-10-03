@@ -9,7 +9,7 @@ import { initialAreas, SUB_AREAS } from '../data/areas';
 import { inventoryData, categories } from '../data/inventory';
 import { initialWarehouses } from '../data/warehouses';
 import { wiData } from '../data/warehouseInventory';
-import { getEventStageNames, isScanStage, isCuttingStockStage, isProductionStage } from '../lib/eventStatuses';
+import { getEventStageNames, isScanStage, isCuttingStockStage, isStockReturnStage, isProductionStage } from '../lib/eventStatuses';
 import { getProductionRequests, saveProductionRequests, PRODUCTION_STATUSES, PRODUCTION_BADGE } from '../lib/productionRequests';
 import { resolveEventStage, saveEventProgress, getEventFurthestStage, saveEventFurthestStage } from '../lib/eventProgress';
 import { getEventClosing, setEventClosing, isOnGoingByItems } from '../lib/eventClosing';
@@ -132,21 +132,25 @@ function ItemCard({ item, group, showScanButton, onScanClick, onDelete, onCycleO
       role={onOpen ? 'button' : undefined}
       aria-label={onOpen ? `View details for ${item.name}` : undefined}
     >
-      <div className="item-card-actions">
-        {onModify && (
-          <button className="item-card-action modify" title="Modify" aria-label="Modify item" onClick={stop(() => onModify(item))}>
-            <IconEdit />
-          </button>
-        )}
-        <button className="item-card-action delete" title="Delete" aria-label="Delete item" onClick={stop(() => onDelete(item.id))}>
-          <IconDelete />
-        </button>
-      </div>
+      {(onModify || onDelete) && (
+        <div className="item-card-actions">
+          {onModify && (
+            <button className="item-card-action modify" title="Modify" aria-label="Modify item" onClick={stop(() => onModify(item))}>
+              <IconEdit />
+            </button>
+          )}
+          {onDelete && (
+            <button className="item-card-action delete" title="Delete" aria-label="Delete item" onClick={stop(() => onDelete(item.id))}>
+              <IconDelete />
+            </button>
+          )}
+        </div>
+      )}
       <ImagePlaceholder />
       <div className="item-body">
         <div className="item-badge-row">
           <span className={`area-badge ${areaBadgeClass(item.area)}`}>{item.area}</span>
-          {item.ownership && (
+          {item.ownership && onCycleOwnership && (
             <button
               type="button"
               className={`badge ${ownershipBadgeClass(item.ownership)} ownership-badge-btn`}
@@ -157,9 +161,10 @@ function ItemCard({ item, group, showScanButton, onScanClick, onDelete, onCycleO
               {item.ownership}
             </button>
           )}
-          {item.stockCut && (
-            <span className="badge badge-orange" style={{ fontSize: 10 }} title="Deducted from warehouse stock">Stock cut</span>
+          {item.ownership && !onCycleOwnership && (
+            <span className={`badge ${ownershipBadgeClass(item.ownership)}`} style={{ fontSize: 10 }}>{item.ownership}</span>
           )}
+          <StockBadge item={item} />
           {item.fromProduction && (
             <span className="badge badge-purple" style={{ fontSize: 10 }} title="Produced via a production request">Production</span>
           )}
@@ -227,6 +232,101 @@ function ItemCard({ item, group, showScanButton, onScanClick, onDelete, onCycleO
       </div>
     </div>
   );
+}
+
+// List (table) alternative to the card grid. Same callbacks as ItemCard; a missing
+// onModify/onDelete/onCycleOwnership means that action is locked.
+function ItemTable({ items, packages, showScanButton, onScanClick, onDelete, onCycleOwnership, onOpen, onModify }) {
+  const stop = fn => e => { e.stopPropagation(); fn(); };
+  return (
+    <div className="table-wrap item-table-wrap">
+      <table className="item-table">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Area</th>
+            <th style={{ textAlign: 'right' }}>Qty</th>
+            <th>PIC</th>
+            <th>Ownership</th>
+            <th style={{ textAlign: 'center' }}>Checking</th>
+            <th>Scan In</th>
+            <th>Scan Out</th>
+            <th style={{ textAlign: 'right' }}>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map(item => {
+            const group = item.groupId ? packages.find(p => p.id === item.groupId) : null;
+            return (
+              <tr
+                key={item.id}
+                className="item-table-row"
+                onClick={() => onOpen(item)}
+                onKeyDown={e => { if (e.key === 'Enter' && e.target === e.currentTarget) onOpen(item); }}
+                tabIndex={0}
+                aria-label={`View details for ${item.name}`}
+              >
+                <td>
+                  <div className="item-table-name">{item.name}</div>
+                  <div className="item-table-flags">
+                    {group && <span className="badge badge-gray" style={{ fontSize: 10 }}>{group.name}</span>}
+                    {item.scanned && <span className="badge badge-green" style={{ fontSize: 10 }}>Scanned</span>}
+                    <StockBadge item={item} />
+                    {item.fromProduction && <span className="badge badge-purple" style={{ fontSize: 10 }}>Production</span>}
+                    {item.resolution === 'returned' && <span className="badge badge-green" style={{ fontSize: 10 }}>Returned</span>}
+                  </div>
+                  {item.note && <div className="item-table-note">{item.note}</div>}
+                </td>
+                <td>
+                  <span className={`area-badge ${areaBadgeClass(item.area)}`}>{item.area}</span>
+                  {item.subArea && <div className="item-table-sub">{item.subArea}</div>}
+                </td>
+                <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{item.qty}</td>
+                <td>{item.pic || '—'}</td>
+                <td>
+                  {onCycleOwnership ? (
+                    <button type="button" className={`badge ${ownershipBadgeClass(item.ownership)} ownership-badge-btn`} style={{ fontSize: 10 }}
+                      title="Click to change ownership (IHC / IHP / Outsource)" onClick={stop(() => onCycleOwnership(item.id))}>
+                      {item.ownership}
+                    </button>
+                  ) : (
+                    <span className={`badge ${ownershipBadgeClass(item.ownership)}`} style={{ fontSize: 10 }}>{item.ownership}</span>
+                  )}
+                </td>
+                <td style={{ textAlign: 'center' }}>
+                  <span className={`indicator-box${item.checking ? ' checked' : ''}`} style={{ margin: '0 auto' }}>{item.checking && <CheckIcon />}</span>
+                </td>
+                <td className="item-table-scan">{item.scanIn || <span className="item-table-muted">—</span>}</td>
+                <td className="item-table-scan">{item.scanOut || <span className="item-table-muted">—</span>}</td>
+                <td>
+                  <div className="item-table-actions">
+                    {showScanButton && (
+                      <button className={`btn-ia-scan${item.scanned ? ' scanned' : ''}`} style={{ flex: '0 0 auto', padding: '5px 10px' }} onClick={stop(() => onScanClick(item))}>
+                        {item.scanned ? 'Re-scan' : 'Scan'}
+                      </button>
+                    )}
+                    {onModify && (
+                      <button className="btn-icon edit" title="Modify" aria-label="Modify item" onClick={stop(() => onModify(item))}><IconEdit /></button>
+                    )}
+                    {onDelete && (
+                      <button className="btn-icon delete" title="Delete" aria-label="Delete item" onClick={stop(() => onDelete(item.id))}><IconDelete /></button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// "Stock cut" until the item has been returned to stock, then "Stock returned".
+function StockBadge({ item }) {
+  if (item.stockReturned) return <span className="badge badge-green" style={{ fontSize: 10 }} title="Returned to warehouse stock">Stock returned</span>;
+  if (item.stockCut) return <span className="badge badge-orange" style={{ fontSize: 10 }} title="Deducted from warehouse stock">Stock cut</span>;
+  return null;
 }
 
 export default function EventDetailPage() {
@@ -415,6 +515,18 @@ export default function EventDetailPage() {
   const pendingCutStages = pendingStage ? cuttingStagesBetween(pendingStage) : [];
   const itemsToCut = useMemo(() => items.filter(it => !it.stockCut), [items]);
 
+  // Stock-return stages crossed going forward (same rule as cutting).
+  function returnStagesBetween(step) {
+    const targetIndex = stages.indexOf(step);
+    if (targetIndex <= stageIndex) return [];
+    return stages.slice(stageIndex + 1, targetIndex + 1).filter(isStockReturnStage);
+  }
+  const pendingReturnStages = pendingStage ? returnStagesBetween(pendingStage) : [];
+  // Items that will be returned: already cut (or about to be cut in this same move)
+  // and not yet returned.
+  const pendingReturnCount = pendingReturnStages.length === 0 ? 0 : items.filter(it =>
+    !it.stockReturned && (it.stockCut || pendingCutStages.length > 0)).length;
+
   function confirmStageChange() {
     const step = pendingStage;
     if (!step) return;
@@ -428,6 +540,17 @@ export default function EventDetailPage() {
         description: `Cut stock for ${cutIds.size} item(s) (${totalQty} pcs) on ${eventName} at "${step}"`,
       });
     }
+    if (returnStagesBetween(step).length > 0 && pendingReturnCount > 0) {
+      const cutting = cuttingStagesBetween(step).length > 0;
+      const toReturn = items.filter(it => !it.stockReturned && (it.stockCut || cutting));
+      const returnIds = new Set(toReturn.map(it => it.id));
+      const totalQty = toReturn.reduce((sum, it) => sum + it.qty, 0);
+      setItems(is => is.map(it => returnIds.has(it.id) ? { ...it, stockCut: true, stockReturned: true } : it));
+      addActivityLog({
+        userName: currentUser?.name || 'Admin', action: 'Return', module: 'Event Detail',
+        description: `Returned stock for ${returnIds.size} item(s) (${totalQty} pcs) on ${eventName} at "${step}"`,
+      });
+    }
     setEventStatus(step);
     saveEventProgress(eventName, step);
     if (targetIndex > furthestIndex) {
@@ -437,6 +560,30 @@ export default function EventDetailPage() {
     setStageFilter('all');
     setPendingStage(null);
   }
+
+  // Once the event has reached the Stock Return stage, it can't take new items
+  // (Add Item, Cart, Request Production). Stays locked even if the user goes back.
+  const stockReturnIndex = stages.findIndex(isStockReturnStage);
+  const addLocked = stockReturnIndex >= 0 && maxReachedIndex >= stockReturnIndex;
+  // From Checking Inventory onward, items can't be modified or deleted.
+  const itemsLocked = closingStatus !== 'on-going';
+
+  // Card vs list view — a per-viewer preference, so localStorage is fine.
+  const [viewMode, setViewMode] = useState(() => {
+    try { return localStorage.getItem('emi_event_detail_view') === 'list' ? 'list' : 'card'; } catch { return 'card'; }
+  });
+  function changeViewMode(mode) {
+    setViewMode(mode);
+    try { localStorage.setItem('emi_event_detail_view', mode); } catch { /* ignore */ }
+  }
+
+  // Shared props for ItemCard / ItemTable; locked actions are passed as undefined.
+  const itemActionProps = {
+    onOpen: it => setDetailItemId(it.id),
+    onModify: itemsLocked ? undefined : openModifyItem,
+    onDelete: itemsLocked ? undefined : deleteItem,
+    onCycleOwnership: itemsLocked ? undefined : cycleItemOwnership,
+  };
 
   // --- Packaging (group items so they scan together) — usable at any stage ---
   const packableItems = useMemo(
@@ -532,6 +679,7 @@ export default function EventDetailPage() {
   }
 
   function deleteItem(id) {
+    if (closingStatus !== 'on-going') return;
     if (!window.confirm('Delete this item from the event?')) return;
     setItems(is => is.filter(i => i.id !== id));
   }
@@ -840,17 +988,22 @@ export default function EventDetailPage() {
           </div>
 
           <div className="event-actions-bar">
-            {productionEnabled && closingStatus === 'on-going' && (
+            {productionEnabled && closingStatus === 'on-going' && !addLocked && (
               <button className="btn btn-ghost btn-request-production" onClick={openProductionRequest}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
                 Request Production
               </button>
             )}
-            <button className="action-icon-btn btn-cart-outline" title="Cart" onClick={() => setPickerOpen(true)}>
+            <button className="action-icon-btn btn-cart-outline" title={addLocked ? 'Stock has been returned — no more items can be added' : 'Cart'} disabled={addLocked} onClick={() => setPickerOpen(true)}>
               <IconCart />
               {cart.length > 0 && <span className="action-icon-badge">{cart.length}</span>}
             </button>
-            <button className="btn-new" onClick={() => { setPickerQuery(''); setPickerCategory(''); setPickerOpen(true); }}>
+            <button
+              className="btn-new"
+              disabled={addLocked}
+              title={addLocked ? 'Stock has been returned — no more items can be added' : undefined}
+              onClick={() => { setPickerQuery(''); setPickerCategory(''); setPickerOpen(true); }}
+            >
               <IconPlus /> Add Item
             </button>
             <div className="more-menu-wrap" ref={moreMenuRef}>
@@ -869,10 +1022,12 @@ export default function EventDetailPage() {
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
                     Group Items
                   </button>
-                  <button className="more-menu-item" onClick={() => { openBulkOwnership(); setMoreMenuOpen(false); }}>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
-                    Bulk Assign Ownership
-                  </button>
+                  {!itemsLocked && (
+                    <button className="more-menu-item" onClick={() => { openBulkOwnership(); setMoreMenuOpen(false); }}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+                      Bulk Assign Ownership
+                    </button>
+                  )}
                   <button className="more-menu-item" onClick={() => { setSummaryOpen(true); setMoreMenuOpen(false); }}>
                     <IconBarChart /> Summary
                   </button>
@@ -919,6 +1074,15 @@ export default function EventDetailPage() {
           )}
         </div>
 
+        {(addLocked || itemsLocked) && (
+          <div className="ed-lock-note">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            {itemsLocked
+              ? 'This event is in Checking Inventory or later — items can no longer be modified or deleted.'
+              : 'Stock has been returned for this event — no more items can be added.'}
+          </div>
+        )}
+
         {stepperError && (
           <div className="stepper-error-banner">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
@@ -962,6 +1126,7 @@ export default function EventDetailPage() {
           </div>
         </div>
 
+        <div className="stage-tabs-row">
         <div className="stage-tabs">
           <button type="button" className={`stage-tab${effectiveStageFilter === 'all' ? ' active' : ''}`} onClick={() => setStageFilter('all')}>
             All <span className="stage-tab-count">{scopedItems.length}</span>
@@ -982,6 +1147,15 @@ export default function EventDetailPage() {
               Production <span className="stage-tab-count">{productionRequests.length}</span>
             </button>
           )}
+        </div>
+          <div className="view-toggle" role="group" aria-label="Item view">
+            <button type="button" className={viewMode === 'card' ? 'active' : ''} aria-pressed={viewMode === 'card'} title="Card view" onClick={() => changeViewMode('card')}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+            </button>
+            <button type="button" className={viewMode === 'list' ? 'active' : ''} aria-pressed={viewMode === 'list'} title="List view" onClick={() => changeViewMode('list')}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+            </button>
+          </div>
         </div>
 
         {effectiveStageFilter === 'production' ? (
@@ -1061,15 +1235,15 @@ export default function EventDetailPage() {
                             </button>
                           )}
                         </div>
-                        <div className="items-grid package-items-grid">
-                          {members.map(it => (
-                            <ItemCard
-                              key={it.id} item={it} group={pkg} showScanButton={false}
-                              onDelete={deleteItem} onCycleOwnership={cycleItemOwnership}
-                              onOpen={it => setDetailItemId(it.id)} onModify={openModifyItem}
-                            />
-                          ))}
-                        </div>
+                        {viewMode === 'list' ? (
+                          <ItemTable items={members} packages={packages} showScanButton={false} {...itemActionProps} />
+                        ) : (
+                          <div className="items-grid package-items-grid">
+                            {members.map(it => (
+                              <ItemCard key={it.id} item={it} group={pkg} showScanButton={false} {...itemActionProps} />
+                            ))}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -1090,21 +1264,22 @@ export default function EventDetailPage() {
             {stageFiltered.length === 0
               ? <div className="no-data">No Data</div>
               : (
-                <div className="items-grid">
-                  {stageFiltered.map(it => (
-                    <ItemCard
-                      key={it.id}
-                      item={it}
-                      group={it.groupId ? packages.find(p => p.id === it.groupId) : null}
-                      showScanButton={stageScanEnabled}
-                      onScanClick={openScanPopup}
-                      onDelete={deleteItem}
-                      onCycleOwnership={cycleItemOwnership}
-                      onOpen={it => setDetailItemId(it.id)}
-                      onModify={openModifyItem}
-                    />
-                  ))}
-                </div>
+                viewMode === 'list' ? (
+                  <ItemTable items={stageFiltered} packages={packages} showScanButton={stageScanEnabled} onScanClick={openScanPopup} {...itemActionProps} />
+                ) : (
+                  <div className="items-grid">
+                    {stageFiltered.map(it => (
+                      <ItemCard
+                        key={it.id}
+                        item={it}
+                        group={it.groupId ? packages.find(p => p.id === it.groupId) : null}
+                        showScanButton={stageScanEnabled}
+                        onScanClick={openScanPopup}
+                        {...itemActionProps}
+                      />
+                    ))}
+                  </div>
+                )
               )
             }
           </>
@@ -1317,11 +1492,17 @@ export default function EventDetailPage() {
         onClose={() => setDetailItemId(null)}
         footer={detailItem && (
           <>
-            <button className="btn-del-ok" style={{ marginRight: 'auto' }} onClick={() => deleteItemFromDrawer(detailItem.id)}><IconDelete /> Delete</button>
+            {itemsLocked ? (
+              <span className="drawer-lock-note">Locked — event is in {CLOSING_LABELS[closingStatus]?.label || 'closing'}</span>
+            ) : (
+              <button className="btn-del-ok" style={{ marginRight: 'auto' }} onClick={() => deleteItemFromDrawer(detailItem.id)}><IconDelete /> Delete</button>
+            )}
             {stageScanEnabled && (
               <button className="btn btn-ghost" onClick={() => openScanPopup(detailItem)}>{detailItem.scanned ? 'Re-scan' : 'Scan'}</button>
             )}
-            <button className="btn-save-modal" onClick={() => openModifyItem(detailItem)}><IconEdit /> Modify</button>
+            {!itemsLocked && (
+              <button className="btn-save-modal" onClick={() => openModifyItem(detailItem)}><IconEdit /> Modify</button>
+            )}
           </>
         )}
       >
@@ -1348,7 +1529,7 @@ export default function EventDetailPage() {
                 <span className={`area-badge ${areaBadgeClass(detailItem.area)}`}>{detailItem.area}</span>
                 {detailItem.ownership && <span className={`badge ${ownershipBadgeClass(detailItem.ownership)}`} style={{ fontSize: 10 }}>{detailItem.ownership}</span>}
                 {detailItem.scanned && <span className="badge badge-green" style={{ fontSize: 10 }}>Scanned</span>}
-                {detailItem.stockCut && <span className="badge badge-orange" style={{ fontSize: 10 }}>Stock cut</span>}
+                <StockBadge item={detailItem} />
                 {detailItem.resolution === 'returned' && <span className="badge badge-green" style={{ fontSize: 10 }}>Returned</span>}
               </div>
               <dl className="drawer-dl">
@@ -1491,7 +1672,8 @@ export default function EventDetailPage() {
           <>
             <button className="btn-cancel-modal" onClick={() => setPendingStage(null)}><IconClose /> Cancel</button>
             <button className="btn-save-modal" onClick={confirmStageChange}>
-              <IconCheck /> {pendingCutStages.length > 0 && itemsToCut.length > 0 ? 'Confirm & Cut Stock' : 'Confirm'}
+              <IconCheck /> {pendingReturnStages.length > 0 && pendingReturnCount > 0 ? 'Confirm & Return Stock'
+                : pendingCutStages.length > 0 && itemsToCut.length > 0 ? 'Confirm & Cut Stock' : 'Confirm'}
             </button>
           </>
         }
@@ -1517,8 +1699,21 @@ export default function EventDetailPage() {
             </div>
           </div>
         )}
+        {pendingReturnStages.length > 0 && (
+          <div className="stage-confirm-cut stage-confirm-return">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+            <div>
+              <strong>Stock Return is on for {pendingReturnStages.map(s => `“${s}”`).join(', ')}.</strong>
+              {pendingReturnCount > 0 ? (
+                <> Confirming returns <strong>{pendingReturnCount} item{pendingReturnCount === 1 ? '' : 's'}</strong> to warehouse stock.</>
+              ) : (
+                <> No items have had their stock cut, so nothing will be returned.</>
+              )}
+              {' '}After this, <strong>no more items can be added</strong> to this event.
+            </div>
+          </div>
+        )}
       </Modal>
-
       <Modal open={!!scanningItem} title="Scan Item" onClose={closeScanPopup}>
         {scanningItem && (() => {
           const group = scanningItem.groupId ? packages.find(p => p.id === scanningItem.groupId) : null;

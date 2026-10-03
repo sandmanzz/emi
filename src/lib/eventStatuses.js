@@ -46,3 +46,10 @@ export function isProductionStage(statusName) {
   const record = getEventStatuses().find(s => s.status === statusName);
   return record?.productionItem === true;
 }
+
+// Moving into this stage returns cut items to warehouse stock; after it, the event
+// can't take new items.
+export function isStockReturnStage(statusName) {
+  const record = getEventStatuses().find(s => s.status === statusName);
+  return record?.stockReturn === true;
+}

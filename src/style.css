@@ -2166,3 +2166,44 @@ td.id-cell   { color: var(--text-muted); font-size: 12px; }
   padding: 8px 10px; margin-bottom: 6px; font-size: 12.5px; font-weight: 600;
   background: var(--bg); border-radius: var(--r); gap: 10px;
 }
+
+/* Event Detail — tabs row with card/list toggle */
+.stage-tabs-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.view-toggle {
+  display: inline-flex; padding: 3px; gap: 2px; margin-bottom: 12px;
+  border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--white);
+}
+.view-toggle button {
+  width: 32px; height: 28px; display: flex; align-items: center; justify-content: center;
+  border: none; background: none; border-radius: var(--r); color: var(--text-muted); cursor: pointer;
+  transition: background .12s, color .12s;
+}
+.view-toggle button svg { width: 15px; height: 15px; }
+.view-toggle button:hover { color: var(--text); }
+.view-toggle button.active { background: var(--brand-bg); color: var(--brand); }
+
+/* Event Detail — list view */
+.item-table-wrap { border: 1px solid var(--border); border-radius: var(--r-lg); }
+.item-table td { vertical-align: top; }
+.item-table-row { cursor: pointer; }
+.item-table-row:hover td { background: var(--bg); }
+.item-table-row:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+.item-table-name { font-weight: 600; color: var(--text); }
+.item-table-flags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.item-table-flags:empty { display: none; }
+.item-table-note { font-size: 11.5px; color: var(--orange); margin-top: 4px; }
+.item-table-sub { font-size: 11.5px; color: var(--text-muted); margin-top: 3px; }
+.item-table-scan { font-size: 12px; color: var(--text-2); white-space: nowrap; }
+.item-table-muted { color: var(--text-muted); }
+.item-table-actions { display: flex; align-items: center; justify-content: flex-end; gap: 4px; }
+
+/* Locks: stock returned (no adding) / checking inventory (no edit/delete) */
+.btn-new:disabled { opacity: .45; cursor: not-allowed; filter: none; }
+.ed-lock-note {
+  display: flex; align-items: center; gap: 8px; margin: -4px 0 14px; padding: 9px 14px;
+  font-size: 12.5px; color: var(--text-2); background: var(--bg); border: 1px dashed var(--border);
+  border-radius: var(--r-lg);
+}
+.ed-lock-note svg { width: 14px; height: 14px; color: var(--text-muted); flex-shrink: 0; }
+.drawer-lock-note { margin-right: auto; font-size: 12px; color: var(--text-muted); }
+.stage-confirm-return { background: var(--green-bg); color: var(--green); }

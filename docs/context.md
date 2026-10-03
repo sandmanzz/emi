@@ -899,6 +899,32 @@ clashes or seems off) — proceeding with the stated assumption unless corrected
 
 ## Raw instruction log
 
+### 2026-10-04 — Exclusive Cutting Stock, Stock Return flag, list view, checking lock
+> 1. cuttingstock hanya bisa 1 saja, jadi kalau 1 sudah di enable maka yang lain tidak
+> bisa memakai. tambahkan juga stock return konsep nya sama dengan cutting stock
+> 2. jika ketika event state = stock return, maka setelah itu user sudah bisa
+> menambahkan barang apa apa lagi
+> 3. tambahkan fitur untuk melihat dalam bentuk list instead of card style
+> 4. ketika sudah masuk checking maka sudah tidak bisa edit ataupun hapus.
+
+Decisions:
+- **Cutting Stock is exclusive**: only one status can have it. In the form, "True" is
+  disabled with "already used by <status>". The same applies to the new **Stock Return** flag. A
+  status can't have both flags. Seed: Cutting = "Waiting scan in", Return = "Waiting scan out".
+- **Stock Return** mirrors cutting. Moving forward into that stage opens a green section in the
+  confirmation popup and the button reads "Confirm & Return Stock". Cut items are marked
+  `stockReturned`, and the badge "Stock cut" becomes "Stock returned".
+- ⚠️ Read #2 as **"tidak bisa"** (can *no longer* add items), since adding items
+  after stock is returned makes no sense. Flagged to the user. Once the event has
+  reached the Stock Return stage, Add Item and Cart are disabled and Request Production is hidden.
+  This stays locked even after going back to an earlier stage.
+- **List view**: a card/list toggle next to the tabs, remembered per browser. The list
+  is a table (item and flags, area, qty, PIC, ownership, checking, scan in/out, actions).
+  Clicking a row opens the same detail drawer.
+- **Checking lock**: from Checking Inventory onward (also Returned/Transferred), Modify
+  and Delete are hidden on cards, rows and in the drawer. Ownership can't be cycled and Bulk Assign
+  Ownership is hidden. A lock note explains why. Add Item is still allowed (not asked).
+
 ### 2026-10-03 — Item detail drawer, Modify item, Production Item flag + Request Production
 > 1. ss 1, jika barang di klik akan muncul detail drawer untuk barang tersebut
 > 2. tambahkan di event setting untuk true false di setiap state terkait production item
