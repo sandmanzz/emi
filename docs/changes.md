@@ -50,6 +50,24 @@ explains a few non-obvious conventions that the entries below assume you already
 
 ---
 
+## Round 25 — Request Production: New Production + Convert tabs, Stock History
+
+**Files:** `src/pages/EventDetailPage.jsx`, `src/pages/WarehouseInventoryPage.jsx`,
+`src/lib/stockOpnameStore.js`, `src/style.css`
+
+- The Request Production modal has tabs `productionTab` = `'new' | 'convert'`. `neededBy` is gone.
+- **Convert** requests are stored with the production requests (`type: 'convert'`, status
+  `Pending` → `Converted`). `applyConversions(targetStage)` runs from `confirmStageChange()` only
+  when `targetIndex > stageIndex`. It calls the new `applyStockMovement(rowId, delta, info)` in
+  `stockOpnameStore.js`, which updates the live inventory row and appends to an in-memory ledger
+  (`getStockMovements()`). The ledger resets on a full page reload, like the stock rows.
+- **Warehouse Inventory** gets a **Stock History** tab reading that ledger.
+- **Gotcha:** stock rows live in a module-level store, so check stock only after client-side
+  navigation. A full `navigate()` reload resets them. `conversionRows` is re-read each time
+  the modal opens.
+
+---
+
 ## Round 24 — Cutting Stock removed from Event Settings
 
 **Files:** `src/pages/EventStatusPage.jsx`, `src/data/eventStatuses.js`
@@ -1177,7 +1195,7 @@ Several features landed in this stretch:
 
 Add new entries at the **top** (right below "Context every dev should know", above
 the current newest round), numbered one higher than the current top entry (the next
-one after this file's Round 24 is "Round 25"). Each entry should say **what**
+one after this file's Round 25 is "Round 26"). Each entry should say **what**
 changed, **why** (the product reason, not just "user asked"), which **files** were
 touched, and any **gotcha** a future dev would otherwise have to rediscover the hard
 way. As of Round 6, this is a standing rule for every change, not just the big ones —

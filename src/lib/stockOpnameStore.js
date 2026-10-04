@@ -56,3 +56,43 @@ export function resolveOpname(id, status, approvedBy) {
     });
   }
 }
+
+// --- Stock history (ledger) ---------------------------------------------------
+// Every stock change made outside Warehouse Inventory itself (e.g. an event's
+// Convert request being applied) is recorded here, so it can be tracked in the
+// Warehouse Inventory "Stock History" tab. In-memory like the rows above.
+let stockMovements = [];
+let nextMovementId = 1;
+
+export function getStockMovements() {
+  return stockMovements;
+}
+
+function fmtDate(d) {
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${String(d.getDate()).padStart(2, '0')} ${months[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+// Changes one warehouse-inventory row's stock by `delta` (never below 0) and logs it.
+// `info` = { reason, eventName, stage, note, by }. Returns the log entry, or null if
+// the row doesn't exist.
+export function applyStockMovement(rowId, delta, info) {
+  const row = inventoryRows.find(r => r.id === rowId);
+  if (!row) return null;
+  const before = row.itemStock;
+  const after = Math.max(0, before + delta);
+  inventoryRows = inventoryRows.map(r => r.id !== rowId ? r : {
+    ...r,
+    itemStock: after,
+    warehouseStock: after,
+    totalValuation: r.valuation * after,
+    minStatus: !r.stokMin ? 'Not Set' : after <= r.stokMin ? 'Critical' : after <= r.stokMin * 1.5 ? 'Warning' : 'Safe',
+    updatedAt: fmtDate(new Date()),
+  });
+  const entry = {
+    id: nextMovementId++, at: new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+    itemName: row.name, warehouse: row.warehouseName, change: after - before, before, after, ...info,
+  };
+  stockMovements = [entry, ...stockMovements];
+  return entry;
+}

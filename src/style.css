@@ -2207,3 +2207,15 @@ td.id-cell   { color: var(--text-muted); font-size: 12px; }
 .ed-lock-note svg { width: 14px; height: 14px; color: var(--text-muted); flex-shrink: 0; }
 .drawer-lock-note { margin-right: auto; font-size: 12px; color: var(--text-muted); }
 .stage-confirm-return { background: var(--green-bg); color: var(--green); }
+
+/* Production / Convert */
+.prod-notice {
+  display: flex; gap: 10px; align-items: flex-start; padding: 10px 14px; margin-bottom: 16px;
+  border-radius: var(--r-lg); font-size: 12.5px; line-height: 1.5;
+}
+.prod-notice svg { width: 16px; height: 16px; flex-shrink: 0; margin-top: 1px; }
+.prod-notice-info { background: var(--brand-bg); color: var(--brand-dark); }
+.prod-notice-warn { background: var(--orange-bg); color: var(--orange); }
+.production-arrow { color: var(--text-muted); font-weight: 400; }
+.production-card-note.warn { color: var(--orange); font-weight: 600; }
+.production-card-note.info { color: var(--brand); font-size: 12px; }

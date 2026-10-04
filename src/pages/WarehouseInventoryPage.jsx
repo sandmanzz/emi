@@ -7,7 +7,7 @@ import SearchableSelect from '../components/SearchableSelect';
 import { IconSearch, IconPlus, IconDelete, IconClose, IconCheck, IconEdit } from '../components/icons';
 import { wiData } from '../data/warehouseInventory';
 import { initialWarehouses } from '../data/warehouses';
-import { getInventoryRows, setInventoryRows as saveInventoryRows, getOpnameHistory, hasPendingOpname, resolveOpname } from '../lib/stockOpnameStore';
+import { getInventoryRows, setInventoryRows as saveInventoryRows, getOpnameHistory, hasPendingOpname, resolveOpname, getStockMovements } from '../lib/stockOpnameStore';
 import { isTenantAdmin, getCurrentTenantUser } from '../lib/tenantAuth';
 
 const PAGE_SIZE = 10;
@@ -167,6 +167,7 @@ export default function WarehouseInventoryPage() {
   const [opnameHistory,    setOpnameHistory]    = useState(() => getOpnameHistory());
   const [historyWarehouse, setHistoryWarehouse] = useState('');
   const [historyDetail,    setHistoryDetail]    = useState(null);
+  const [stockMovements] = useState(() => getStockMovements());
   const pendingOpname = opnameHistory.some(h => h.status === 'Pending');
 
   const warehouseNames = useMemo(() => {
@@ -512,6 +513,7 @@ export default function WarehouseInventoryPage() {
           { id:'inventory',      label:'Inventory' },
           { id:'movingorder',    label:'Moving Order' },
           { id:'opnamehistory',  label:'Opname History' },
+          { id:'stockhistory',   label:'Stock History' },
         ].map(t => (
           <button key={t.id} className={`wi-tab-btn${tab === t.id ? ' active' : ''}`} onClick={() => setTab(t.id)}>
             {t.label}
@@ -945,6 +947,51 @@ export default function WarehouseInventoryPage() {
           </div>
         )}
       </Modal>
+
+      {tab === 'stockhistory' && (
+        <div className="card">
+          <p style={{ fontSize: 12.5, color: 'var(--text-muted)', margin: '0 0 14px' }}>
+            Stock changes made from other modules, such as an event&rsquo;s Convert request being applied
+            when the event moves to its next stage, so every change stays traceable.
+          </p>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Item</th>
+                  <th>Warehouse</th>
+                  <th style={{ textAlign: 'right' }}>Change</th>
+                  <th style={{ textAlign: 'right' }}>Stock</th>
+                  <th>Reason</th>
+                  <th>Event</th>
+                  <th>By</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stockMovements.length === 0
+                  ? <tr><td colSpan={8} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 32 }}>No stock changes recorded yet.</td></tr>
+                  : stockMovements.map(m => (
+                    <tr key={m.id}>
+                      <td style={{ color: 'var(--text-muted)', fontSize: '12.5px', whiteSpace: 'nowrap' }}>{m.at}</td>
+                      <td className="name-cell">{m.itemName}</td>
+                      <td>{m.warehouse}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: m.change < 0 ? 'var(--red)' : 'var(--green)' }}>{m.change > 0 ? '+' : ''}{m.change}</td>
+                      <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: 'var(--text-muted)' }}>{m.before} → {m.after}</td>
+                      <td>
+                        <span className="badge badge-orange" style={{ fontSize: 11 }}>{m.reason}</span>
+                        {m.note && <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 3 }}>{m.note}</div>}
+                      </td>
+                      <td style={{ fontSize: 12.5 }}>{m.eventName}{m.stage ? <div style={{ color: 'var(--text-muted)', fontSize: 11.5 }}>at {m.stage}</div> : null}</td>
+                      <td>{m.by}</td>
+                    </tr>
+                  ))
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {tab === 'opnamehistory' && (
         <div className="card">

@@ -10,6 +10,7 @@ import { inventoryData, categories } from '../data/inventory';
 import { initialWarehouses } from '../data/warehouses';
 import { wiData } from '../data/warehouseInventory';
 import { getEventStageNames, isScanStage, isCuttingStockStage, isStockReturnStage, isProductionStage } from '../lib/eventStatuses';
+import { getInventoryRows, applyStockMovement } from '../lib/stockOpnameStore';
 import { getProductionRequests, saveProductionRequests, PRODUCTION_STATUSES, PRODUCTION_BADGE } from '../lib/productionRequests';
 import { resolveEventStage, saveEventProgress, getEventFurthestStage, saveEventFurthestStage } from '../lib/eventProgress';
 import { getEventClosing, setEventClosing, isOnGoingByItems } from '../lib/eventClosing';
@@ -165,6 +166,9 @@ function ItemCard({ item, group, showScanButton, onScanClick, onDelete, onCycleO
             <span className={`badge ${ownershipBadgeClass(item.ownership)}`} style={{ fontSize: 10 }}>{item.ownership}</span>
           )}
           <StockBadge item={item} />
+          {item.fromConvert && (
+            <span className="badge badge-blue" style={{ fontSize: 10 }} title="Converted from another inventory item">Converted</span>
+          )}
           {item.fromProduction && (
             <span className="badge badge-purple" style={{ fontSize: 10 }} title="Produced via a production request">Production</span>
           )}
@@ -416,7 +420,9 @@ export default function EventDetailPage() {
   const productionEnabled = isProductionStage(eventStatus);
   const [productionRequests, setProductionRequestsState] = useState(() => getProductionRequests(eventName));
   const [productionOpen, setProductionOpen] = useState(false);
-  const [productionForm, setProductionForm] = useState({ name: '', qty: 1, area: '', subArea: '', neededBy: '', note: '' });
+  const [productionForm, setProductionForm] = useState({ name: '', qty: 1, area: '', subArea: '', note: '' });
+  const [productionTab, setProductionTab] = useState('new'); // 'new' | 'convert'
+  const [convertForm, setConvertForm] = useState({ fromRowId: '', fromQty: 1, toName: '', toQty: 1 });
 
   // Cart — "add from inventory" e-commerce style flow
   const [cart, setCart] = useState([]);
@@ -551,6 +557,7 @@ export default function EventDetailPage() {
         description: `Returned stock for ${returnIds.size} item(s) (${totalQty} pcs) on ${eventName} at "${step}"`,
       });
     }
+    if (targetIndex > stageIndex) applyConversions(step);
     setEventStatus(step);
     saveEventProgress(eventName, step);
     if (targetIndex > furthestIndex) {
@@ -852,7 +859,9 @@ export default function EventDetailPage() {
   }
 
   function openProductionRequest() {
-    setProductionForm({ name: '', qty: 1, area: '', subArea: '', neededBy: '', note: '' });
+    setProductionForm({ name: '', qty: 1, area: '', subArea: '', note: '' });
+    setConvertForm({ fromRowId: '', fromQty: 1, toName: '', toQty: 1 });
+    setProductionTab('new');
     setProductionOpen(true);
   }
 
@@ -863,7 +872,7 @@ export default function EventDetailPage() {
     const id = Math.max(0, ...productionRequests.map(r => r.id)) + 1;
     const req = {
       id, name: productionForm.name.trim(), qty: Math.floor(Number(productionForm.qty)),
-      area: productionForm.area, subArea: productionForm.subArea, neededBy: productionForm.neededBy,
+      area: productionForm.area, subArea: productionForm.subArea, type: 'production',
       note: productionForm.note.trim(), status: 'Requested', stage: eventStatus,
       requestedBy: currentUser?.name || 'Admin', requestedAt: new Date().toLocaleDateString('en-CA'), // local YYYY-MM-DD
     };
@@ -897,8 +906,78 @@ export default function EventDetailPage() {
   }
 
   function cancelProductionRequest(req) {
-    if (!window.confirm(`Cancel the production request for "${req.name}"?`)) return;
+    if (!window.confirm(`Cancel this ${req.type === 'convert' ? 'convert' : 'production'} request for "${req.name || req.fromName}"?`)) return;
     setProductionRequests(rs => rs.filter(r => r.id !== req.id));
+  }
+
+  // --- Convert requests: swap stock of an existing item for another inventory item.
+  // Stock is NOT touched when the request is made. It is deducted when the event
+  // moves to its next stage (see applyConversions, called from confirmStageChange).
+  const conversionRows = useMemo(
+    () => getInventoryRows().filter(r => r.itemStock > 0),
+    [productionOpen] // eslint-disable-line react-hooks/exhaustive-deps -- re-read live stock whenever the modal opens
+  );
+  const pendingConversions = useMemo(
+    () => productionRequests.filter(r => r.type === 'convert' && r.status === 'Pending'),
+    [productionRequests]
+  );
+  const convertFromRow = conversionRows.find(r => String(r.id) === String(convertForm.fromRowId));
+  // Stock already promised to other pending conversions from the same row.
+  const reservedQty = convertFromRow
+    ? pendingConversions.filter(r => r.fromRowId === convertFromRow.id).reduce((sum, r) => sum + r.fromQty, 0)
+    : 0;
+  const convertAvailable = convertFromRow ? Math.max(0, convertFromRow.itemStock - reservedQty) : 0;
+  const convertFromQty = Math.floor(Number(convertForm.fromQty));
+  const convertToQty = Math.floor(Number(convertForm.toQty));
+  const convertFormValid = !!convertFromRow && !!convertForm.toName && convertFromQty >= 1 && convertFromQty <= convertAvailable
+    && convertToQty >= 1 && convertFromRow.name !== convertForm.toName;
+
+  function submitConvertRequest() {
+    if (!convertFormValid) return;
+    const toItem = inventoryData.find(i => i.name === convertForm.toName);
+    const id = Math.max(0, ...productionRequests.map(r => r.id)) + 1;
+    const req = {
+      id, type: 'convert', status: 'Pending', stage: eventStatus,
+      fromRowId: convertFromRow.id, fromName: convertFromRow.name, fromWarehouse: convertFromRow.warehouseName, fromQty: convertFromQty,
+      toName: convertForm.toName, toSku: toItem?.sku || '', toQty: convertToQty,
+      requestedBy: currentUser?.name || 'Admin', requestedAt: new Date().toLocaleDateString('en-CA'),
+    };
+    setProductionRequests(rs => [req, ...rs]);
+    addActivityLog({
+      userName: req.requestedBy, action: 'Create', module: 'Event Detail',
+      description: `Requested convert of ${req.fromQty} × "${req.fromName}" into ${req.toQty} × "${req.toName}" for ${eventName}`,
+    });
+    setProductionOpen(false);
+    setStageFilter('production');
+  }
+
+  // Runs when the event moves forward: deducts each pending conversion's old item
+  // from the warehouse (logged in Warehouse Inventory → Stock History) and adds the
+  // new item to the event.
+  function applyConversions(targetStage) {
+    if (pendingConversions.length === 0) return;
+    const by = currentUser?.name || 'Admin';
+    const newItems = [];
+    pendingConversions.forEach((req, i) => {
+      applyStockMovement(req.fromRowId, -req.fromQty, {
+        reason: 'Convert', by, eventName, stage: targetStage,
+        note: `${req.fromQty} × ${req.fromName} → ${req.toQty} × ${req.toName}`,
+      });
+      newItems.push({
+        id: nextId + i, name: req.toName, area: 'UNASSIGNED', subArea: '', stage: targetStage,
+        qty: req.toQty, pic: '', checking: false, scanned: false, groupId: null, warehouseItem: true,
+        scanIn: null, scanOut: null, note: `Converted from ${req.fromQty} × ${req.fromName}`, checked: false,
+        ownership: 'IHC', fromConvert: true,
+      });
+    });
+    setItems(is => [...is, ...newItems]);
+    setNextId(n => n + newItems.length);
+    const doneIds = new Set(pendingConversions.map(r => r.id));
+    setProductionRequests(rs => rs.map(r => doneIds.has(r.id) ? { ...r, status: 'Converted', convertedAt: new Date().toLocaleDateString('en-CA') } : r));
+    addActivityLog({
+      userName: by, action: 'Update', module: 'Event Detail',
+      description: `Applied ${pendingConversions.length} convert request(s) on ${eventName} at "${targetStage}" — stock deducted`,
+    });
   }
 
   // --- Inventory picker → Cart ---
@@ -1161,29 +1240,62 @@ export default function EventDetailPage() {
         {effectiveStageFilter === 'production' ? (
           <>
             <p className="summary-text">
-              <strong>{productionRequests.length}</strong> production request{productionRequests.length === 1 ? '' : 's'}
+              <strong>{productionRequests.length}</strong> request{productionRequests.length === 1 ? '' : 's'}
               {productionEnabled ? '' : ' · new requests can only be made at a stage with Production Item enabled'}
             </p>
             {productionRequests.length === 0
-              ? <div className="no-data">No production requests yet. Use &ldquo;Request Production&rdquo; above to ask for a new item.</div>
+              ? <div className="no-data">No requests yet. Use &ldquo;Request Production&rdquo; above for a new production or to convert an existing item.</div>
               : (
                 <div className="production-list">
                   {productionRequests.map(req => {
                     const nextStatus = PRODUCTION_STATUSES[PRODUCTION_STATUSES.indexOf(req.status) + 1];
+                    if (req.type === 'convert') {
+                      return (
+                        <div key={req.id} className="production-card">
+                          <div className="production-card-main">
+                            <div className="production-card-title">
+                              <span className="badge badge-blue" style={{ fontSize: 10.5 }}>Convert</span>
+                              {req.fromQty} × {req.fromName} <span className="production-arrow">&rarr;</span> {req.toQty} × {req.toName}
+                              <span className={`badge ${req.status === 'Converted' ? 'badge-green' : 'badge-orange'}`} style={{ fontSize: 10.5 }}>{req.status}</span>
+                            </div>
+                            <div className="production-card-meta">
+                              <span>From {req.fromWarehouse}</span>
+                              {req.toSku && <span>New item SKU {req.toSku}</span>}
+                              <span>Requested by {req.requestedBy} on {req.requestedAt}</span>
+                            </div>
+                            <div className={`production-card-note ${req.status === 'Pending' ? 'warn' : ''}`}>
+                              {req.status === 'Pending'
+                                ? 'Stock will be reduced when this event moves to the next stage.'
+                                : `Stock was reduced on ${req.convertedAt}. See Warehouse Inventory → Stock History.`}
+                            </div>
+                          </div>
+                          <div className="production-card-actions">
+                            {req.status === 'Pending'
+                              ? <button type="button" className="btn btn-ghost" onClick={() => cancelProductionRequest(req)}>Cancel</button>
+                              : <span className="production-done-note">Added to event items</span>}
+                          </div>
+                        </div>
+                      );
+                    }
                     return (
                       <div key={req.id} className="production-card">
                         <div className="production-card-main">
                           <div className="production-card-title">
+                            <span className="badge badge-purple" style={{ fontSize: 10.5 }}>New Production</span>
                             {req.name}
                             <span className={`badge ${PRODUCTION_BADGE[req.status]}`} style={{ fontSize: 10.5 }}>{req.status}</span>
                           </div>
                           <div className="production-card-meta">
                             <span>Qty {req.qty}</span>
                             <span>{req.area}{req.subArea ? ` · ${req.subArea}` : ''}</span>
-                            {req.neededBy && <span>Needed by {req.neededBy}</span>}
                             <span>Requested by {req.requestedBy} on {req.requestedAt}</span>
                           </div>
                           {req.note && <div className="production-card-note">{req.note}</div>}
+                          <div className="production-card-note info">
+                            {req.status === 'Done'
+                              ? 'Item has been made — complete its information in the Inventory menu.'
+                              : 'After the item is made, its information needs to be completed in the Inventory menu.'}
+                          </div>
                         </div>
                         <div className="production-card-actions">
                           {req.status === 'Requested' && (
@@ -1515,7 +1627,7 @@ export default function EventDetailPage() {
             ['Sub Area', detailItem.subArea || '—'],
             ['Ownership', detailItem.ownership || '—'],
             ['Added at stage', detailItem.stage],
-            ['Source', detailItem.fromProduction ? 'Production request' : detailItem.warehouseItem ? 'Warehouse inventory' : 'Non-warehouse item'],
+            ['Source', detailItem.fromConvert ? 'Convert request' : detailItem.fromProduction ? 'Production request' : detailItem.warehouseItem ? 'Warehouse inventory' : 'Non-warehouse item'],
             ['Group', group ? group.name : '—'],
             ['Checking', detailItem.checking ? 'Yes' : 'No'],
             ['Cross-checked', detailItem.checked ? 'Yes' : 'No'],
@@ -1608,7 +1720,7 @@ export default function EventDetailPage() {
         )}
       </Modal>
 
-      {/* Request Production — ask for a new item to be produced */}
+      {/* Request Production — two tabs: New Production | Convert */}
       <Modal
         open={productionOpen}
         title="Request Production"
@@ -1616,51 +1728,107 @@ export default function EventDetailPage() {
         footer={
           <>
             <button className="btn-cancel-modal" onClick={() => setProductionOpen(false)}><IconClose /> Cancel</button>
-            <button className="btn-save-modal" onClick={submitProductionRequest} disabled={!productionFormValid}><IconCheck /> Submit Request</button>
+            {productionTab === 'new' ? (
+              <button className="btn-save-modal" onClick={submitProductionRequest} disabled={!productionFormValid}><IconCheck /> Submit Request</button>
+            ) : (
+              <button className="btn-save-modal" onClick={submitConvertRequest} disabled={!convertFormValid}><IconCheck /> Submit Convert</button>
+            )}
           </>
         }
       >
-        <p className="confirm-msg" style={{ marginTop: 0, marginBottom: 16 }}>
-          Ask for a new item that isn&rsquo;t in inventory to be produced for this event. Once it&rsquo;s marked done, it&rsquo;s added to the event&rsquo;s items.
-        </p>
-        <div className="form-group">
-          <label>Item Name <span style={{ color: 'var(--red)' }}>*</span></label>
-          <input type="text" placeholder="e.g. Custom Welcome Sign 1×2m" value={productionForm.name} onChange={e => setProductionForm(f => ({ ...f, name: e.target.value }))} />
+        <div className="stage-tabs" style={{ marginBottom: 16 }} role="tablist">
+          <button type="button" role="tab" aria-selected={productionTab === 'new'} className={`stage-tab${productionTab === 'new' ? ' active' : ''}`} onClick={() => setProductionTab('new')}>New Production</button>
+          <button type="button" role="tab" aria-selected={productionTab === 'convert'} className={`stage-tab${productionTab === 'convert' ? ' active' : ''}`} onClick={() => setProductionTab('convert')}>Convert</button>
         </div>
-        <div className="form-row">
-          <div className="form-group">
-            <label>Quantity <span style={{ color: 'var(--red)' }}>*</span></label>
-            <input type="number" min="1" value={productionForm.qty} onChange={e => setProductionForm(f => ({ ...f, qty: e.target.value }))} />
-          </div>
-          <div className="form-group">
-            <label>Needed By</label>
-            <input type="date" value={productionForm.neededBy} onChange={e => setProductionForm(f => ({ ...f, neededBy: e.target.value }))} />
-          </div>
-        </div>
-        <div className="form-row">
-          <div className="form-group">
-            <label>Area <span style={{ color: 'var(--red)' }}>*</span></label>
-            <SearchableSelect
-              value={productionForm.area}
-              onChange={v => setProductionForm(f => ({ ...f, area: v, subArea: '' }))}
-              placeholder="Select Area"
-              options={AREAS.map(a => ({ value: a, label: a }))}
-            />
-          </div>
-          <div className="form-group">
-            <label>Sub Area</label>
-            <SearchableSelect
-              value={productionForm.subArea}
-              onChange={v => setProductionForm(f => ({ ...f, subArea: v }))}
-              placeholder={(SUB_AREAS[productionForm.area] || []).length ? 'Select Sub Area' : '(No Sub Area)'}
-              options={[{ value: '', label: '—' }, ...(SUB_AREAS[productionForm.area] || []).map(s => ({ value: s, label: s }))]}
-            />
-          </div>
-        </div>
-        <div className="form-group">
-          <label>Notes</label>
-          <textarea placeholder="Size, material, color, reference…" value={productionForm.note} onChange={e => setProductionForm(f => ({ ...f, note: e.target.value }))} />
-        </div>
+
+        {productionTab === 'new' ? (
+          <>
+            <p className="confirm-msg" style={{ marginTop: 0, marginBottom: 12 }}>
+              Ask for a new item that isn&rsquo;t in inventory to be produced for this event. Once it&rsquo;s marked done, it&rsquo;s added to the event&rsquo;s items.
+            </p>
+            <div className="prod-notice prod-notice-info">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+              <div>After the item is made, its information (SKU, category, unit, etc.) needs to be completed in the <strong>Inventory</strong> menu.</div>
+            </div>
+            <div className="form-group">
+              <label>Item Name <span style={{ color: 'var(--red)' }}>*</span></label>
+              <input type="text" placeholder="e.g. Custom Welcome Sign 1×2m" value={productionForm.name} onChange={e => setProductionForm(f => ({ ...f, name: e.target.value }))} />
+            </div>
+            <div className="form-group">
+              <label>Quantity <span style={{ color: 'var(--red)' }}>*</span></label>
+              <input type="number" min="1" value={productionForm.qty} onChange={e => setProductionForm(f => ({ ...f, qty: e.target.value }))} />
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Area <span style={{ color: 'var(--red)' }}>*</span></label>
+                <SearchableSelect
+                  value={productionForm.area}
+                  onChange={v => setProductionForm(f => ({ ...f, area: v, subArea: '' }))}
+                  placeholder="Select Area"
+                  options={AREAS.map(a => ({ value: a, label: a }))}
+                />
+              </div>
+              <div className="form-group">
+                <label>Sub Area</label>
+                <SearchableSelect
+                  value={productionForm.subArea}
+                  onChange={v => setProductionForm(f => ({ ...f, subArea: v }))}
+                  placeholder={(SUB_AREAS[productionForm.area] || []).length ? 'Select Sub Area' : '(No Sub Area)'}
+                  options={[{ value: '', label: '—' }, ...(SUB_AREAS[productionForm.area] || []).map(s => ({ value: s, label: s }))]}
+                />
+              </div>
+            </div>
+            <div className="form-group">
+              <label>Notes</label>
+              <textarea placeholder="Size, material, color, reference…" value={productionForm.note} onChange={e => setProductionForm(f => ({ ...f, note: e.target.value }))} />
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="confirm-msg" style={{ marginTop: 0, marginBottom: 12 }}>
+              Turn an item you already have into another item that&rsquo;s already in inventory.
+            </p>
+            <div className="prod-notice prod-notice-warn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              <div><strong>Stock will be reduced</strong> once the event is moved to the next stage. The change is recorded in Warehouse Inventory &rarr; Stock History.</div>
+            </div>
+            <div className="form-group">
+              <label>Old Item <span style={{ color: 'var(--red)' }}>*</span></label>
+              <SearchableSelect
+                value={convertForm.fromRowId}
+                onChange={v => setConvertForm(f => ({ ...f, fromRowId: v, fromQty: 1 }))}
+                placeholder="Search old item…"
+                searchPlaceholder="Search item or warehouse…"
+                emptyText="No item with stock found"
+                options={conversionRows.map(r => ({ value: String(r.id), label: `${r.name} — ${r.warehouseName}`, meta: `${r.itemStock} in stock` }))}
+              />
+            </div>
+            <div className="form-group">
+              <label>Old Item Quantity <span style={{ color: 'var(--red)' }}>*</span></label>
+              <input type="number" min="1" max={convertAvailable || undefined} disabled={!convertFromRow} value={convertForm.fromQty} onChange={e => setConvertForm(f => ({ ...f, fromQty: e.target.value }))} />
+              {convertFromRow && (
+                <p style={{ fontSize: 11.5, margin: '5px 0 0', color: convertFromQty > convertAvailable ? 'var(--red)' : 'var(--text-muted)' }}>
+                  {convertAvailable} available{reservedQty > 0 ? ` (${reservedQty} already reserved by other pending converts)` : ''}
+                </p>
+              )}
+            </div>
+            <div className="form-group">
+              <label>New Item <span style={{ color: 'var(--red)' }}>*</span></label>
+              <SearchableSelect
+                value={convertForm.toName}
+                onChange={v => setConvertForm(f => ({ ...f, toName: v }))}
+                placeholder="Search new item…"
+                searchPlaceholder="Search inventory item…"
+                emptyText="No item found"
+                options={inventoryData.filter(i => i.name !== convertFromRow?.name).map(i => ({ value: i.name, label: i.name, meta: i.sku }))}
+              />
+            </div>
+            <div className="form-group">
+              <label>New Item Quantity <span style={{ color: 'var(--red)' }}>*</span></label>
+              <input type="number" min="1" value={convertForm.toQty} onChange={e => setConvertForm(f => ({ ...f, toQty: e.target.value }))} />
+            </div>
+          </>
+        )}
       </Modal>
 
       {/* Stage change confirmation — Next or reopening an earlier stage */}
@@ -1696,6 +1864,19 @@ export default function EventDetailPage() {
               ) : (
                 <> All items on this event have already been deducted, so nothing more will be cut.</>
               )}
+            </div>
+          </div>
+        )}
+        {pendingStage && stages.indexOf(pendingStage) > stageIndex && pendingConversions.length > 0 && (
+          <div className="stage-confirm-cut">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+            <div>
+              <strong>{pendingConversions.length} convert request{pendingConversions.length === 1 ? '' : 's'} will be applied.</strong> Warehouse stock will be reduced:
+              <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+                {pendingConversions.map(r => (
+                  <li key={r.id}>{r.fromQty} × {r.fromName} ({r.fromWarehouse}) &rarr; {r.toQty} × {r.toName}</li>
+                ))}
+              </ul>
             </div>
           </div>
         )}

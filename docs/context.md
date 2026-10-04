@@ -899,6 +899,34 @@ clashes or seems off) — proceeding with the stated assumption unless corrected
 
 ## Raw instruction log
 
+### 2026-10-05 — Request Production gets New Production + Convert tabs
+> 1. tambahkan 2 tab utama yaitu new production, convert
+> 2. untuk convert perlu ada special label bahwa ketika sudah di proceed ke next event
+> maka stock barang berkurang, ini juga perlu ada history nya di warehouse inventory
+> 3. untuk convert kita bisa merubah barang menjadi barang lain yang sudah ada di inventory
+> 4. convert hanya butuh: search barang lama, search barang baru, jumlah lama, jumlah baru
+> 5. needed by tidak perlu ada
+> 6. production tab sudah betul (item name, qty)
+> 7. production: label bahwa setelah barang dibuat, informasi perlu dilengkapi di menu barang
+
+Decisions:
+- The Request Production popup now has two tabs, **New Production** and **Convert**. "Needed By" is
+  removed. New Production shows a blue notice, and its cards say the item's info must be
+  completed in the Inventory menu once it's made.
+- **Convert** has only: Old Item (search, from warehouse inventory rows with stock), Old Item
+  Quantity (max = available, minus stock already reserved by other pending converts), New Item
+  (search, from the Inventory catalog) and New Item Quantity. An orange label says stock
+  is reduced when the event moves to the next stage.
+- A convert request starts as **Pending**. Stock is **not** touched until the event moves
+  **forward** to its next stage (the Next confirmation popup lists the converts). Then
+  each old item is deducted from its warehouse, logged in **Warehouse Inventory → Stock
+  History** (new tab), and the new item is added to the event (area UNASSIGNED, a "Converted"
+  badge). The request becomes **Converted**. Pending ones can be cancelled.
+- ⚠️ Assumption: only the **old** item's stock is reduced. The new item's quantity is what the
+  event receives (it comes from the converted stock), so the new item's warehouse stock is
+  not changed. Flagged to the user.
+- The Production tab now lists both types, each with a type badge.
+
 ### 2026-10-05 — Remove Cutting Stock from Event Settings
 > tolong remove soal cutting stock di event setting
 
