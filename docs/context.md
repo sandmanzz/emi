@@ -899,6 +899,17 @@ clashes or seems off) — proceeding with the stated assumption unless corrected
 
 ## Raw instruction log
 
+### 2026-10-05 — Remove Cutting Stock from Event Settings
+> tolong remove soal cutting stock di event setting
+
+Asked which scope; the user chose **Event Settings only**. The Cutting Stock column, KPI card,
+form field and exclusivity rule are gone from the Event Status page, and the seed no longer sets
+`cuttingStock` on any status. The cutting logic in Event Detail (`stockCut`, the warning in the stage popup,
+`isCuttingStockStage`) was **left in place but is now dormant**, because nothing can enable the flag.
+Stock Return no longer has the "not with Cutting Stock" rule. Note: a status list already saved
+in a browser's localStorage with `cuttingStock: true` would still trigger it until that status is
+edited or the list is reset. Delete the Event Detail logic if the feature is dropped for good.
+
 ### 2026-10-04 — Exclusive Cutting Stock, Stock Return flag, list view, checking lock
 > 1. cuttingstock hanya bisa 1 saja, jadi kalau 1 sudah di enable maka yang lain tidak
 > bisa memakai. tambahkan juga stock return konsep nya sama dengan cutting stock

@@ -50,6 +50,17 @@ explains a few non-obvious conventions that the entries below assume you already
 
 ---
 
+## Round 24 — Cutting Stock removed from Event Settings
+
+**Files:** `src/pages/EventStatusPage.jsx`, `src/data/eventStatuses.js`
+
+Removed the Cutting Stock column, KPI card, form field, `cuttingOwner` exclusivity and help text from
+the Event Status page, and the "not with Cutting Stock" rule from the Stock Return field. The seed now has
+`cuttingStock:false` everywhere. Event Detail's cutting-stock code is untouched and dormant (see
+`docs/context.md`, 2026-10-05).
+
+---
+
 ## Round 23 — Exclusive Cutting Stock, Stock Return, list view, checking lock
 
 **Files:** `src/pages/EventDetailPage.jsx`, `src/pages/EventStatusPage.jsx`,
@@ -1166,7 +1177,7 @@ Several features landed in this stretch:
 
 Add new entries at the **top** (right below "Context every dev should know", above
 the current newest round), numbered one higher than the current top entry (the next
-one after this file's Round 23 is "Round 24"). Each entry should say **what**
+one after this file's Round 24 is "Round 25"). Each entry should say **what**
 changed, **why** (the product reason, not just "user asked"), which **files** were
 touched, and any **gotcha** a future dev would otherwise have to rediscover the hard
 way. As of Round 6, this is a standing rule for every change, not just the big ones —

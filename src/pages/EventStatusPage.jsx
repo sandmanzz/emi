@@ -39,7 +39,7 @@ export default function EventStatusPage() {
   const [deleteModal,  setDeleteModal]  = useState(false);
   const [editingId,    setEditingId]    = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [form, setForm] = useState({ status: '', code: '', scan: 'None', cuttingStock: false, stockReturn: false, productionItem: false, order: '' });
+  const [form, setForm] = useState({ status: '', code: '', scan: 'None', stockReturn: false, productionItem: false, order: '' });
 
   // Reordering is edit-mode + explicit Save, not instant-apply-per-click.
   const [reorderMode,    setReorderMode]    = useState(false);
@@ -81,14 +81,13 @@ export default function EventStatusPage() {
     setPage(1);
   }
 
-  // Cutting Stock / Stock Return are exclusive: the status that already holds the
-  // flag (other than the one being edited), if any.
-  const cuttingOwner = statuses.find(s => s.cuttingStock === true && s.id !== editingId);
+  // Stock Return is exclusive: the status that already holds the flag (other than
+  // the one being edited), if any.
   const returnOwner  = statuses.find(s => s.stockReturn === true && s.id !== editingId);
 
   function openNew() {
     setEditingId(null);
-    setForm({ status: '', code: '', scan: 'None', cuttingStock: false, stockReturn: false, productionItem: false, order: String(statuses.length + 1) });
+    setForm({ status: '', code: '', scan: 'None', stockReturn: false, productionItem: false, order: String(statuses.length + 1) });
     setStatusModal(true);
   }
 
@@ -96,24 +95,22 @@ export default function EventStatusPage() {
     const r = statuses.find(x => x.id === id);
     if (!r) return;
     setEditingId(id);
-    setForm({ status: r.status, code: r.code || '', scan: r.scan, cuttingStock: r.cuttingStock === true, stockReturn: r.stockReturn === true, productionItem: r.productionItem === true, order: String(r.order) });
+    setForm({ status: r.status, code: r.code || '', scan: r.scan, stockReturn: r.stockReturn === true, productionItem: r.productionItem === true, order: String(r.order) });
     setStatusModal(true);
   }
 
   function save() {
     if (!form.status.trim()) return;
     // Exclusivity guard (the form already disables these options).
-    if (form.cuttingStock && cuttingOwner) return;
     if (form.stockReturn && returnOwner) return;
-    if (form.cuttingStock && form.stockReturn) return;
     const now = new Date().toISOString().slice(0, 10);
     if (editingId) {
       setStatuses(ss => ss.map(s => s.id === editingId
-        ? { ...s, status: form.status, code: form.code, scan: form.scan, cuttingStock: form.cuttingStock, stockReturn: form.stockReturn, productionItem: form.productionItem, order: parseInt(form.order) || s.order, updatedAt: now }
+        ? { ...s, status: form.status, code: form.code, scan: form.scan, stockReturn: form.stockReturn, productionItem: form.productionItem, order: parseInt(form.order) || s.order, updatedAt: now }
         : s
       ));
     } else {
-      setStatuses(ss => [...ss, { id: nextId, order: parseInt(form.order) || ss.length + 1, status: form.status, code: form.code, scan: form.scan, cuttingStock: form.cuttingStock, stockReturn: form.stockReturn, productionItem: form.productionItem, eventRunning: 0, updatedAt: now }]);
+      setStatuses(ss => [...ss, { id: nextId, order: parseInt(form.order) || ss.length + 1, status: form.status, code: form.code, scan: form.scan, stockReturn: form.stockReturn, productionItem: form.productionItem, eventRunning: 0, updatedAt: now }]);
       setNextId(n => n + 1);
     }
     setStatusModal(false);
@@ -159,7 +156,6 @@ export default function EventStatusPage() {
   const deleteRecord   = statuses.find(x => x.id === deleteTarget);
   const runningTotal   = statuses.reduce((a, s) => a + s.eventRunning, 0);
   const scanEnabled    = statuses.filter(s => s.scan === 'Scan').length;
-  const cuttingEnabled = statuses.filter(s => s.cuttingStock === true).length;
   const productionEnabled = statuses.filter(s => s.productionItem === true).length;
   const returnEnabled  = statuses.filter(s => s.stockReturn === true).length;
 
@@ -174,20 +170,17 @@ export default function EventStatusPage() {
         This list drives the stage stepper on every event&rsquo;s detail page, in the
         order shown below — add, remove, reorder, or rename a status here and it
         applies everywhere. A status with Scan set to &ldquo;Scan&rdquo; requires
-        items to be scanned while an event is at that stage. A status with Cutting
-        Stock set to &ldquo;True&rdquo; deducts the event&rsquo;s items from warehouse
-        stock when the event moves into that stage; Stock Return puts it back, and after
-        that stage no more items can be added. Each of those two can be on for only one
-        status. A status with Production Item set
+        items to be scanned while an event is at that stage. A status with Stock
+        Return set to &ldquo;True&rdquo; stops any more items being added once the event
+        reaches that stage (only one status can have it). A status with Production Item set
         to &ldquo;True&rdquo; lets users request new items to be produced while an
         event is at that stage.
       </p>
 
-      <div className="stats-bar" style={{ gridTemplateColumns:'repeat(6,1fr)' }}>
+      <div className="stats-bar" style={{ gridTemplateColumns:'repeat(5,1fr)' }}>
         {[
           { label:'Total Statuses',  value:statuses.length, color:'var(--brand)',  bg:'var(--brand-bg)' },
           { label:'Scan Enabled',    value:scanEnabled,     color:'var(--green)',  bg:'var(--green-bg)' },
-          { label:'Cutting Stock',   value:cuttingEnabled,  color:'var(--orange)', bg:'var(--orange-bg)' },
           { label:'Stock Return',    value:returnEnabled,   color:'var(--green)',  bg:'var(--green-bg)' },
           { label:'Production Item', value:productionEnabled, color:'var(--purple)', bg:'var(--purple-bg)' },
           { label:'Events Running',  value:runningTotal,    color:'var(--orange)', bg:'var(--orange-bg)' },
@@ -246,7 +239,6 @@ export default function EventStatusPage() {
                 <SortTh label="Status"        colIndex={1} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} />
                 <th style={{ width:80, textAlign:'center' }}>Code</th>
                 <th style={{ width:100, textAlign:'center' }}>Scan</th>
-                <th style={{ width:120, textAlign:'center' }}>Cutting Stock</th>
                 <th style={{ width:120, textAlign:'center' }}>Stock Return</th>
                 <th style={{ width:130, textAlign:'center' }}>Production Item</th>
                 <SortTh label="Event Running" colIndex={4} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width:120, textAlign:'right' }} />
@@ -256,7 +248,7 @@ export default function EventStatusPage() {
             </thead>
             <tbody>
               {pageData.length === 0
-                ? <tr><td colSpan={11} style={{ textAlign:'center', padding:40, color:'var(--text-muted)' }}>No statuses found.</td></tr>
+                ? <tr><td colSpan={10} style={{ textAlign:'center', padding:40, color:'var(--text-muted)' }}>No statuses found.</td></tr>
                 : pageData.map((r, idx) => (
                   <tr key={r.id}>
                     <td style={{ textAlign:'center' }}>
@@ -293,7 +285,6 @@ export default function EventStatusPage() {
                       {r.code ? <span className="badge badge-gray" style={{ fontSize:11 }}>{r.code}</span> : <span style={{ color:'var(--text-muted)', fontSize:12 }}>—</span>}
                     </td>
                     <td style={{ textAlign:'center' }}><ScanBadge scan={r.scan} /></td>
-                    <td style={{ textAlign:'center' }}><BoolBadge value={r.cuttingStock === true} /></td>
                     <td style={{ textAlign:'center' }}><BoolBadge value={r.stockReturn === true} /></td>
                     <td style={{ textAlign:'center' }}><BoolBadge value={r.productionItem === true} /></td>
                     <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums', fontWeight:600 }}>
@@ -353,29 +344,13 @@ export default function EventStatusPage() {
           />
         </div>
         <div className="form-group">
-          <label>Cutting Stock</label>
-          <SearchableSelect
-            value={form.cuttingStock ? 'true' : 'false'}
-            onChange={v => setForm(f => ({ ...f, cuttingStock: v === 'true' }))}
-            options={[
-              { value: 'false', label: 'False' },
-              { value: 'true',  label: cuttingOwner ? `True (already used by "${cuttingOwner.status}")` : form.stockReturn ? 'True (not with Stock Return)' : 'True', disabled: !!cuttingOwner || form.stockReturn },
-            ]}
-            placeholder="False"
-          />
-          <p style={{ fontSize: 11.5, color: 'var(--text-muted)', margin: '5px 0 0' }}>
-            When True, moving an event into this status deducts its items from warehouse stock.
-            Only one status can have this.
-          </p>
-        </div>
-        <div className="form-group">
           <label>Stock Return</label>
           <SearchableSelect
             value={form.stockReturn ? 'true' : 'false'}
             onChange={v => setForm(f => ({ ...f, stockReturn: v === 'true' }))}
             options={[
               { value: 'false', label: 'False' },
-              { value: 'true',  label: returnOwner ? `True (already used by "${returnOwner.status}")` : form.cuttingStock ? 'True (not with Cutting Stock)' : 'True', disabled: !!returnOwner || form.cuttingStock },
+              { value: 'true',  label: returnOwner ? `True (already used by "${returnOwner.status}")` : 'True', disabled: !!returnOwner },
             ]}
             placeholder="False"
           />
