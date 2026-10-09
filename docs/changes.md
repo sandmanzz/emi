@@ -50,6 +50,43 @@ explains a few non-obvious conventions that the entries below assume you already
 
 ---
 
+## Round 27 — Responsive UI (phone / tablet)
+
+**Files:** `src/components/useMediaQuery.js` (new), `src/components/useSidebar.js` (new), `src/components/Layout.jsx`,
+`src/components/Sidebar.jsx`, `src/components/SuperAdminSidebar.jsx`, `src/components/UpgradeCTA.jsx`,
+`src/pages/superadmin/SuperAdminLayout.jsx`, `src/pages/EventPage.jsx`, `src/pages/DashboardPage.jsx` and the
+`*DetailPage.jsx` / `InventoryReportPage.jsx` pages (class swaps only), `src/style.css` (new **RESPONSIVE** block at the end).
+
+**How it works**
+- `useSidebar()` returns `{ isMobile, visible, toggle, close }`. On narrow screens `visible` is true only while
+  `openKey === location.key`, so navigating closes the menu with no effect/setState (the repo's lint rule forbids
+  setState inside effects). Both layouts use it. `Sidebar` / `SuperAdminSidebar` take a `mobile` prop that adds
+  `.sidebar-mobile` (fixed, slides in); the layouts render `.sidebar-backdrop` while it is open.
+- `MOBILE_QUERY = '(max-width: 900px)'` in `useMediaQuery.js` **must match** the `@media (max-width: 900px)` block in
+  `style.css`. Change both together.
+- Breakpoints: 900px (tablet/phone shell), 560px (phone), 430px (header brand hidden).
+
+**CSS conventions added**
+- `.grid-2col` / `.grid-2col-wide` replace inline `gridTemplateColumns:'1fr 1fr'` / `'1.3fr 1fr'` (codemod over the detail
+  pages, Dashboard and Inventory Report). They collapse to one column at 900px. Keep gap/margins inline.
+- `.detail-header` replaces the inline flex header on the Area/Category/Unit/Warehouse/Inventory detail pages. On phones it
+  becomes Back + Edit/Delete on row 1 and the title on row 2.
+- `.stats-bar` now forces 3 columns (<=900) / 2 columns (<=560) with `!important`, because many pages pass an inline
+  `gridTemplateColumns: repeat(N, 1fr)`. Event page stats now use `.stats-bar` with `minmax(0,1fr)` (the plain `1fr` let
+  the cards overflow the screen).
+- Modals: `max-width: calc(100vw - 24px) !important` beats the inline widths from `Modal`'s `size` prop. The Add-Item
+  picker stacks its two panels and its rows wrap.
+- Global search results use `position: fixed`-like full header width on phones (`.global-search` becomes static).
+
+**Gotchas**
+- Do not add new inline multi-column `display:grid` layouts in pages; use `.grid-2col`, `.stats-bar` or `.items-grid` so
+  they stay responsive.
+- Verified at 375px and 768px by checking for horizontal overflow on every tenant and Owner page, plus visual checks of
+  Event Detail, drawer, modals, search, auth pages. Desktop (>=901px) behaviour was re-checked and is unchanged.
+- `src/index.css` and `src/App.css` are leftover Vite template files that are **not imported**; ignore them.
+
+---
+
 ## Round 26 — Check Ownership, broken items, production vendor/warehouse, Vendor CMS
 
 **Files:** `src/pages/EventDetailPage.jsx`, `src/pages/EventStatusPage.jsx`, `src/pages/VendorPage.jsx` (new),
@@ -1251,7 +1288,7 @@ Several features landed in this stretch:
 
 Add new entries at the **top** (right below "Context every dev should know", above
 the current newest round), numbered one higher than the current top entry (the next
-one after this file's Round 26 is "Round 27"). Each entry should say **what**
+one after this file's Round 27 is "Round 28"). Each entry should say **what**
 changed, **why** (the product reason, not just "user asked"), which **files** were
 touched, and any **gotcha** a future dev would otherwise have to rediscover the hard
 way. As of Round 6, this is a standing rule for every change, not just the big ones —

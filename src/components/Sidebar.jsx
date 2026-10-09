@@ -82,7 +82,7 @@ const SECTIONS = [
   },
 ];
 
-export default function Sidebar({ visible }) {
+export default function Sidebar({ visible, mobile = false }) {
   const isAdmin = isTenantAdmin();
   const sections = SECTIONS.map(section => {
     if (section.label !== 'Events' || !isAdmin) return section;
@@ -90,7 +90,7 @@ export default function Sidebar({ visible }) {
   });
 
   return (
-    <nav className="sidebar" style={visible ? {} : { display: 'none' }}>
+    <nav className={`sidebar${mobile ? ' sidebar-mobile' : ''}`} style={visible ? {} : { display: 'none' }}>
       {sections.map(section => (
         <div key={section.label} className="sidebar-section">
           <div className="sidebar-section-label">{section.label}</div>

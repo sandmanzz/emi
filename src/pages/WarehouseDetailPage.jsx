@@ -50,7 +50,7 @@ export default function WarehouseDetailPage() {
 
   return (
     <>
-      <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:24 }}>
+      <div className="detail-header">
         <button
           onClick={() => navigate('/warehouse')}
           style={{ display:'flex', alignItems:'center', gap:6, background:'none', border:'1px solid var(--border)', borderRadius:8, padding:'6px 12px', cursor:'pointer', fontSize:13, color:'var(--text-muted)', fontWeight:500 }}
@@ -67,13 +67,13 @@ export default function WarehouseDetailPage() {
         </button>
       </div>
 
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, marginBottom:16 }}>
+      <div className="grid-2col" style={{ gap:16, marginBottom:16 }}>
         <div className="card" style={{ padding:24 }}>
           <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:20 }}>
             <span style={{ width:8, height:8, borderRadius:'50%', background:'var(--brand)' }} />
             <span style={{ fontSize:11, fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'.07em' }}>Warehouse Info</span>
           </div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:18 }}>
+          <div className="grid-2col" style={{ gap:18 }}>
             <Field label="Name" value={warehouse.name} />
             <Field label="Location" value={warehouse.location} />
             <Field label="PIC" value={warehouse.pic} />

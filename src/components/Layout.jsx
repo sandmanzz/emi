@@ -1,5 +1,5 @@
-import { useState } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
+import useSidebar from './useSidebar';
 import Sidebar from './Sidebar';
 import GlobalSearch from './GlobalSearch';
 import LanguageSwitcher from './LanguageSwitcher';
@@ -8,7 +8,7 @@ import { IconMenu, IconLogout } from './icons';
 import { logoutTenant, getCurrentTenantUser } from '../lib/tenantAuth';
 
 export default function Layout() {
-  const [sidebarVisible, setSidebarVisible] = useState(true);
+  const { isMobile, visible: sidebarVisible, toggle: toggleSidebar, close: closeSidebar } = useSidebar();
   const navigate = useNavigate();
   const currentUser = getCurrentTenantUser();
 
@@ -21,16 +21,16 @@ export default function Layout() {
     <>
       <header className="header">
         <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-          <button className="header-btn" onClick={() => setSidebarVisible(v => !v)} title="Toggle menu">
+          <button className="header-btn" onClick={toggleSidebar} title="Toggle menu" aria-label="Toggle menu" aria-expanded={sidebarVisible}>
             <IconMenu />
           </button>
           <span className="header-title">EMI Inventory</span>
         </div>
         <GlobalSearch />
-        <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+        <div className="header-right">
           <UpgradeCTA />
           {currentUser && (
-            <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-2)', whiteSpace: 'nowrap' }}>
+            <span className="header-user" style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-2)', whiteSpace: 'nowrap' }}>
               {currentUser.name} <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>· {currentUser.role}</span>
             </span>
           )}
@@ -41,7 +41,8 @@ export default function Layout() {
         </div>
       </header>
       <div className="layout">
-        <Sidebar visible={sidebarVisible} />
+        <Sidebar visible={sidebarVisible} mobile={isMobile} />
+        {isMobile && sidebarVisible && <div className="sidebar-backdrop" onClick={closeSidebar} />}
         <main className="main">
           <Outlet />
         </main>

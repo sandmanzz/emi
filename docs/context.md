@@ -899,6 +899,18 @@ clashes or seems off) — proceeding with the stated assumption unless corrected
 
 ## Raw instruction log
 
+### 2026-10-09 — Make the whole UI responsive
+> saya mau secara UI semuanya pastikan responsive
+
+Scope: every tenant page, the SaaS Owner panel and the auth pages, on phone (375px) and tablet (768px). Decisions:
+- **Breakpoint 900px**: below it the sidebar becomes a slide-over menu (closed by default, closes after navigating or
+  tapping the backdrop). Above it the desktop layout is unchanged (sidebar open, header button hides/shows it).
+- **Phone (<=560px)**: KPI cards go to 2 columns, forms to 1 column, modals and the item drawer take the full
+  width, the header drops the user name / language code / "Upgrade" label, and below 430px the brand text gives way to the search box.
+- Wide tables keep scrolling horizontally inside their own container (`.table-wrap`) instead of being reshaped into
+  cards. The Event Detail list view does the same.
+- No new product behaviour. Anything not listed here looks and works as before.
+
 ### 2026-10-09 — Check Ownership flag, broken-item reports, production vendor/warehouse, Vendor CMS
 > ingat segala perubahan harus dicatat secara detail agar engineer lain bisa paham
 > 1. di event setting tambahkan boolean lagi checker untuk check ownership

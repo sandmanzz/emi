@@ -66,7 +66,7 @@ export default function InventoryDetailPage() {
   return (
     <>
       {/* Header */}
-      <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:24 }}>
+      <div className="detail-header">
         <button
           onClick={() => navigate('/inventory')}
           style={{ display:'flex', alignItems:'center', gap:6, background:'none', border:'1px solid var(--border)', borderRadius:8, padding:'6px 12px', cursor:'pointer', fontSize:13, color:'var(--text-muted)', fontWeight:500 }}
@@ -85,14 +85,14 @@ export default function InventoryDetailPage() {
         </button>
       </div>
 
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
+      <div className="grid-2col" style={{ gap:16 }}>
         {/* Main info */}
         <div className="card" style={{ padding:24 }}>
           <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:20 }}>
             <span style={{ width:8, height:8, borderRadius:'50%', background:'var(--brand)' }} />
             <span style={{ fontSize:11, fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'.07em' }}>Item Info</span>
           </div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:18 }}>
+          <div className="grid-2col" style={{ gap:18 }}>
             <Field label="SKU" value={item.sku} />
             <Field label="Category" value={item.category} />
             <Field label="Unit" value={item.unit} />

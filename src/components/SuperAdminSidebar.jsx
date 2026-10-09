@@ -20,9 +20,9 @@ const SECTIONS = [
   },
 ];
 
-export default function SuperAdminSidebar({ visible }) {
+export default function SuperAdminSidebar({ visible, mobile = false }) {
   return (
-    <nav className="sidebar" style={visible ? {} : { display: 'none' }}>
+    <nav className={`sidebar${mobile ? ' sidebar-mobile' : ''}`} style={visible ? {} : { display: 'none' }}>
       {SECTIONS.map(section => (
         <div key={section.label} className="sidebar-section">
           <div className="sidebar-section-label">{section.label}</div>

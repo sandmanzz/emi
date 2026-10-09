@@ -457,7 +457,7 @@ export default function EventPage() {
       </div>
 
       {/* Stats row */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom:22 }}>
+      <div className="stats-bar" style={{ gridTemplateColumns:'repeat(4,minmax(0,1fr))' }}>
         {[
           { label:'Total Events',       value:events.length,      color:'var(--brand)',      bg:'var(--brand-bg)' },
           { label:'Active',             value:totalActive,        color:'var(--green)',      bg:'var(--green-bg)' },
