@@ -50,6 +50,62 @@ explains a few non-obvious conventions that the entries below assume you already
 
 ---
 
+## Round 26 — Check Ownership, broken items, production vendor/warehouse, Vendor CMS
+
+**Files:** `src/pages/EventDetailPage.jsx`, `src/pages/EventStatusPage.jsx`, `src/pages/VendorPage.jsx` (new),
+`src/pages/InventoryPage.jsx`, `src/pages/InventoryDetailPage.jsx`, `src/pages/WarehouseInventoryPage.jsx`,
+`src/lib/producedItems.js` (new), `src/lib/vendorStore.js`, `src/lib/stockOpnameStore.js`, `src/lib/eventStatuses.js`,
+`src/data/eventStatuses.js`, `src/App.jsx`, `src/components/Sidebar.jsx`, `src/style.css`.
+Product decisions and assumptions are in `docs/context.md` (2026-10-09). Read that first.
+
+**Event Settings (`EventStatusPage`, `data/eventStatuses.js`, `lib/eventStatuses.js`)**
+- Added `checkOwnership` (column, KPI, form field) and `isCheckOwnershipStage()`.
+- Removed Stock Return from the page (column, KPI, field, `returnOwner` rule). The seed has `stockReturn:false` and
+  `cuttingStock:false`. Both flags are legacy: the Event Detail code is dormant and the helpers remain.
+
+**Stage-change flow (`EventDetailPage`)**
+- `requestStageChange(step)` now sets `flowStep = firstFlowStep(step)`. Forward moves can show, in order:
+  `'ownership'` (when `isCheckOwnershipStage(eventStatus)` and `ownershipAnsweredFor !== eventStatus`),
+  `'broken'` (when any item has `brokenQty > 0`), then `'confirm'` (the old popup, now only open when
+  `flowStep === 'confirm'`). Backward moves go straight to `'confirm'`.
+- `answerOwnership(true)` stores `resumeStage`, closes the flow and calls `openBulkOwnership()`. `applyBulkOwnership()`
+  re-calls `requestStageChange(resumeStage)`. `closeBulkOwnership()` clears `resumeStage` so a stale resume can't fire later.
+- `confirmStageChange()` calls `writeOffBrokenItems(step)` and `applyConversions(step)` on forward moves. Write-off reduces
+  `qty` by `brokenQty`, adds to `brokenWrittenOff`, resets `brokenQty` and writes an activity log.
+
+**Broken items**
+- New item fields: `brokenQty`, `brokenNote`, `brokenReportedBy`, `brokenReportedAt`, `brokenWrittenOff`.
+- `BrokenChip` renders on `ItemCard`, `ItemTable` and in the drawer. `openReport/saveReport/clearReport` and the
+  "Create Report" modal. Drawer buttons: Create/Edit Report and Create Production
+  (`createProductionFromBroken` pre-fills `productionForm` incl. `replacesItemId`). All hidden when `itemsLocked`.
+- Drawer info rows: Category, SKU (`getCatalog()` by name), Warehouse (`getInventoryRows()` by name). Checkout now
+  stores `warehouse` on added items, which is shown when the item is not in the warehouse rows.
+
+**Production request fields**
+- `productionForm` gained `warehouse`, `vendorOrigin`, `vendorId`, `replacesItemId` (`EMPTY_PRODUCTION_FORM`). Required to
+  submit: name, qty, area, warehouse, vendor. Vendors are re-read from `vendorStore` each time the modal opens.
+- `advanceProductionRequest` → Done now also calls `addProducedItem()` (catalog + row) and `addInventoryRow()`.
+
+**`lib/producedItems.js` (new)**
+- Persists `{catalog, row}` records in `localStorage['emi_produced_items']`. `getCatalog()` = static `inventoryData` + produced.
+  `isNeedsSetup(name)`, `markItemSetUp(name)`, `addProducedItem(...)`. It deliberately does not import
+  `stockOpnameStore` (circular); `stockOpnameStore` imports `getProducedRows()` to seed its live rows and exports
+  `addInventoryRow(row)`. Callers must do both: `addProducedItem` then `addInventoryRow`.
+- `InventoryPage` uses `getCatalog()`. `InventoryDetailPage` falls back to `getProducedCatalog()` since it keeps its own static
+  list. Highlights share CSS (`.row-needs-setup`, `.needs-setup-chip`, `.setup-banner`).
+
+**Vendor CMS**
+- `lib/vendorStore.js`: added `origin`, `normalize()` (backfills old records), `updateVendor`, `deleteVendor`,
+  `VENDOR_ORIGINS`. `VendorPage` (route `/vendor`, sidebar Master Data → Vendor) logs create/update/delete in the activity log.
+
+**Gotchas**
+- Items are matched to the catalog **by name**, not id (event items carry no catalog id). Renaming a catalog item breaks the match.
+- Warehouse rows and Stock History live in memory and reset on reload. Produced items, vendors, production requests and
+  vendor choices persist in localStorage. After a reload a produced item's row comes back with its original qty.
+- Test flows that touch stock via full `navigate()` lose the in-memory state; use client-side navigation.
+
+---
+
 ## Round 25 — Request Production: New Production + Convert tabs, Stock History
 
 **Files:** `src/pages/EventDetailPage.jsx`, `src/pages/WarehouseInventoryPage.jsx`,
@@ -1195,7 +1251,7 @@ Several features landed in this stretch:
 
 Add new entries at the **top** (right below "Context every dev should know", above
 the current newest round), numbered one higher than the current top entry (the next
-one after this file's Round 25 is "Round 26"). Each entry should say **what**
+one after this file's Round 26 is "Round 27"). Each entry should say **what**
 changed, **why** (the product reason, not just "user asked"), which **files** were
 touched, and any **gotcha** a future dev would otherwise have to rediscover the hard
 way. As of Round 6, this is a standing rule for every change, not just the big ones —

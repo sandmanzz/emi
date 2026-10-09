@@ -126,6 +126,45 @@ whose status is still `on-going`.
 
 ---
 
+## Stage moves, broken items, production, convert (2026-10-05 → 2026-10-09)
+
+Everything below is currently frontend-only (localStorage / component state). The rules are what the UI enforces and
+what the real API must enforce. Product reasoning is in `context.md`; UI wiring is in `changes.md` Rounds 21–26.
+
+**Event Status flags** (per status row; all booleans): `scan`, `productionItem`, `checkOwnership`. (`cuttingStock` and
+`stockReturn` are legacy, no longer editable.)
+
+**Moving an event forward (`POST /events/:id/advance`, suggested)** must be one atomic operation that, in order:
+1. Rejects if the current stage has `scan` and items are unscanned.
+2. If `checkOwnership` on the stage being left: the client has asked "does any item need an ownership change?". The
+   answer is UI-only. Ownership changes use the existing bulk-assign endpoint.
+3. For every item with `brokenQty > 0`: `qty -= brokenQty`, `brokenWrittenOff += brokenQty`, `brokenQty = 0`.
+   (Event quantity only; warehouse stock is not touched.)
+4. For every **Pending convert request**: deduct `fromQty` from warehouse row `fromRowId`, write a stock-ledger entry
+   (reason `Convert`), add `toQty` of the new item to the event, set the request to `Converted`.
+5. Sets the event stage. Going back never applies steps 3–4 and never undoes them.
+
+**Item report (broken)**: `POST /events/:id/items/:itemId/report` `{ brokenQty (1..qty), note }`; `DELETE` removes it. Stores
+reporter and time. Not allowed once the event is in Checking Inventory or later.
+
+**Production request** (`type: 'production'`): `{ name, qty, area, subArea, warehouse (required, a real warehouse),
+vendorOrigin ('Internal'|'External'), vendorId (must match origin), note, replacesItemId? }`. Status
+`Requested → In Production → Done`; `Requested` can be cancelled. On `Done` the server must (a) add the item to the
+event with ownership IHP, (b) create a **draft inventory item** flagged `needsSetup = true` (temporary SKU, empty
+category/unit) unless the name already exists, and (c) create a warehouse stock row of `qty` in `warehouse`.
+`needsSetup` clears when the item's info is completed (Warehouse Inventory edit, or an explicit "mark as set up").
+
+**Convert request** (`type: 'convert'`): `{ fromRowId, fromQty, toName, toQty }`. Status `Pending → Converted`.
+`fromQty` must be ≤ row stock minus other Pending converts from the same row (check again on apply). Only the
+**old** item's stock is reduced (assumption, see context.md 2026-10-05).
+
+**Stock ledger** (`GET /stock-movements`): `{ at, itemName, warehouse, change, before, after, reason, eventName, stage, note, by }`.
+Powers Warehouse Inventory → Stock History. Every stock change from outside Warehouse Inventory must write one.
+
+**Vendors** (`/vendors` CRUD): `{ id, name, contact, type (free-text category), origin ('Internal'|'External') }`.
+Used by Item Loan and by production requests (filtered by `origin`). Deleting a vendor must not break old records:
+loans and requests store `vendorName` as well as `vendorId`.
+
 ## Other mocked stores that need real endpoints
 
 Same pattern as above: all of these are currently in-memory or localStorage

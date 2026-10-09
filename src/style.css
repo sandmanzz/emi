@@ -2219,3 +2219,34 @@ td.id-cell   { color: var(--text-muted); font-size: 12px; }
 .production-arrow { color: var(--text-muted); font-weight: 400; }
 .production-card-note.warn { color: var(--orange); font-weight: 600; }
 .production-card-note.info { color: var(--brand); font-size: 12px; }
+
+/* Items created from production that still need their info completed
+   (Inventory + Warehouse Inventory, see lib/producedItems.js) */
+.row-needs-setup td { background: #fffaf0; }
+.row-needs-setup td:first-child { box-shadow: inset 3px 0 0 var(--orange); }
+.needs-setup-chip { margin-left: 8px; font-size: 10px; }
+.setup-missing { font-size: 12px; color: var(--orange); font-style: italic; }
+.setup-banner {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 18px; padding: 12px 16px;
+  background: var(--orange-bg); color: var(--orange); border-radius: var(--r-lg); font-size: 12.5px; line-height: 1.5;
+}
+.setup-banner > svg { width: 18px; height: 18px; flex-shrink: 0; }
+.setup-banner > div { flex: 1; }
+
+/* Broken items, ownership/broken steps, vendor choice (Event Detail) */
+.broken-table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 12.5px; }
+.broken-table th { text-align: left; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+.broken-table td { padding: 7px 8px; border-bottom: 1px solid var(--border-2); }
+.drawer-broken { background: var(--red-bg); color: var(--red); border-radius: var(--r-lg); padding: 10px 14px; font-size: 12.5px; line-height: 1.5; margin-bottom: 14px; }
+.drawer-broken-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.drawer-broken-meta { font-size: 11.5px; opacity: .8; margin-top: 4px; }
+.drawer-broken-done { background: var(--bg); color: var(--text-2); }
+.drawer-link-btn { background: none; border: none; padding: 0; color: inherit; font: inherit; font-size: 12px; text-decoration: underline; cursor: pointer; }
+.drawer-wh-list { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.drawer-wh-list em { font-style: normal; font-weight: 400; color: var(--text-muted); }
+.drawer-footer { flex-wrap: wrap; }
+.btn-create-production:not(:disabled) { color: var(--purple); border-color: var(--purple); }
+.btn-create-production:disabled { opacity: .5; cursor: not-allowed; }
+.seg-choice { display: inline-flex; padding: 3px; gap: 2px; border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--white); }
+.seg-choice button { padding: 6px 14px; border: none; background: none; border-radius: var(--r); font-size: 12.5px; font-weight: 600; color: var(--text-muted); cursor: pointer; font-family: inherit; }
+.seg-choice button.active { background: var(--brand-bg); color: var(--brand); }

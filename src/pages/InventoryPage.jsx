@@ -4,7 +4,8 @@ import Pagination from '../components/Pagination';
 import SortTh from '../components/SortTh';
 import SearchableSelect from '../components/SearchableSelect';
 import { IconSearch, IconPlus, IconEdit, IconDelete, IconClose } from '../components/icons';
-import { inventoryData, categories, stockStatuses } from '../data/inventory';
+import { categories, stockStatuses } from '../data/inventory';
+import { getCatalog, markItemSetUp } from '../lib/producedItems';
 
 function ImgCell({ src, name, onClick }) {
   return (
@@ -79,6 +80,17 @@ export default function InventoryPage() {
   const [sortCol,     setSortCol]     = useState(0);
   const [sortAsc,     setSortAsc]     = useState(true);
   const [imgPopup,    setImgPopup]    = useState({ open:false, name:'', src:null });
+  // Static seed items + items created by finished production requests (see lib/producedItems.js).
+  const [inventoryData, setInventoryData] = useState(() => getCatalog());
+  const [setupOnly,   setSetupOnly]   = useState(false);
+  const needsSetupCount = inventoryData.filter(r => r.needsSetup).length;
+
+  function markSetUp(name) {
+    markItemSetUp(name);
+    const next = getCatalog();
+    setInventoryData(next);
+    if (!next.some(r => r.needsSetup)) setSetupOnly(false); // nothing left to filter on
+  }
 
   const sortKeys = ['name','sku','category','unit','warehouse','totalStock','stockStatus','updatedAt'];
 
@@ -90,13 +102,14 @@ export default function InventoryPage() {
         const mQ = !q || r.name.toLowerCase().includes(q) || r.sku.toLowerCase().includes(q);
         const mC = !catFilter   || r.category    === catFilter;
         const mS = !stockFilter || r.stockStatus === stockFilter;
-        return mQ && mC && mS;
+        const mU = !setupOnly || r.needsSetup;
+        return mQ && mC && mS && mU;
       })
       .sort((a, b) => {
         const va = String(a[key] ?? ''), vb = String(b[key] ?? '');
         return sortAsc ? va.localeCompare(vb, undefined, { numeric:true }) : vb.localeCompare(va, undefined, { numeric:true });
       });
-  }, [query, catFilter, stockFilter, sortCol, sortAsc]);
+  }, [inventoryData, query, catFilter, stockFilter, setupOnly, sortCol, sortAsc]);
 
   function handleSort(col) {
     if (sortCol === col) setSortAsc(a => !a);
@@ -118,6 +131,14 @@ export default function InventoryPage() {
         <h1 className="page-title" style={{ margin:0 }}>Inventory</h1>
         <button className="btn-new"><IconPlus /> New Item</button>
       </div>
+
+      {needsSetupCount > 0 && (
+        <div className="setup-banner">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <div><strong>{needsSetupCount} item{needsSetupCount === 1 ? '' : 's'} created from production still need{needsSetupCount === 1 ? 's' : ''} setup.</strong> Their SKU is temporary and category and unit are empty. Complete the information, then tick &ldquo;Mark as set up&rdquo;.</div>
+          <button type="button" className="btn btn-ghost" onClick={() => { setSetupOnly(s => !s); setPage(1); }}>{setupOnly ? 'Show all' : 'Show only these'}</button>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="stats-bar" style={{ gridTemplateColumns:'repeat(4,1fr)' }}>
@@ -187,13 +208,18 @@ export default function InventoryPage() {
               {pageData.length === 0
                 ? <tr><td colSpan={10} style={{ textAlign:'center', color:'var(--text-muted)', padding:32 }}>No results found.</td></tr>
                 : pageData.map(r => (
-                  <tr key={r.id}>
-                    <td className="name-cell">{r.name}</td>
+                  <tr key={r.id} className={r.needsSetup ? 'row-needs-setup' : undefined}>
+                    <td className="name-cell">
+                      {r.name}
+                      {r.needsSetup && <span className="badge badge-orange needs-setup-chip" title="Created from a production request — complete its information">Needs setup</span>}
+                    </td>
                     <td className="id-cell">{r.sku}</td>
                     <td>
-                      <span className="badge badge-gray" style={{ fontSize:'10.5px' }}>{r.category}</span>
+                      {r.category
+                        ? <span className="badge badge-gray" style={{ fontSize:'10.5px' }}>{r.category}</span>
+                        : <span className="setup-missing">Not set</span>}
                     </td>
-                    <td style={{ color:'var(--text-muted)', fontSize:'12.5px' }}>{r.unit}</td>
+                    <td style={{ color:'var(--text-muted)', fontSize:'12.5px' }}>{r.unit || <span className="setup-missing">Not set</span>}</td>
                     <td>{r.warehouse}</td>
                     <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums', fontWeight:600 }}>{r.totalStock}</td>
                     <td>{stockBadge(r.stockStatus)}</td>
@@ -210,6 +236,11 @@ export default function InventoryPage() {
                         <button className="btn-icon" title="View Detail" style={{ color:'var(--brand)' }} onClick={() => navigate(`/inventory-detail?id=${r.id}`)}>
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width:14, height:14 }}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                         </button>
+                        {r.needsSetup && (
+                          <button className="btn-icon" title="Mark as set up (information completed)" style={{ color:'var(--green)' }} onClick={() => markSetUp(r.name)}>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ width:14, height:14 }}><polyline points="20 6 9 17 4 12"/></svg>
+                          </button>
+                        )}
                         <button className="btn-icon edit"   title="Edit"><IconEdit /></button>
                         <button className="btn-icon delete" title="Delete"><IconDelete /></button>
                       </div>

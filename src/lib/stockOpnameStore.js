@@ -1,5 +1,6 @@
 import { wiData } from '../data/warehouseInventory';
 import { initialOpnameHistory } from '../data/stockOpnameHistory';
+import { getProducedRows } from './producedItems';
 
 // Warehouse Inventory and Stock Opname are separate pages/routes. This app has no
 // Context/Redux, so the mutable inventory rows + opname history live here as a
@@ -7,12 +8,18 @@ import { initialOpnameHistory } from '../data/stockOpnameHistory';
 // and write the same live data. Resets on a full page reload — consistent with the
 // rest of the app's no-backend model.
 
-let inventoryRows = [...wiData];
+// Produced items (finished production requests) are persisted separately and merged in on load.
+let inventoryRows = [...getProducedRows(), ...wiData];
 let opnameHistory = [...initialOpnameHistory];
 let nextHistoryId = Math.max(0, ...opnameHistory.map(h => h.id)) + 1;
 
 export function getInventoryRows() {
   return inventoryRows;
+}
+
+// Adds one new warehouse row (used when a production request is finished).
+export function addInventoryRow(row) {
+  inventoryRows = [row, ...inventoryRows];
 }
 
 export function setInventoryRows(rows) {

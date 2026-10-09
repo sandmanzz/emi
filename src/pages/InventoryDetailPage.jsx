@@ -2,6 +2,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { IconEdit, IconDelete, IconClose } from '../components/icons';
 import { useState } from 'react';
 import Modal from '../components/Modal';
+import { getProducedCatalog } from '../lib/producedItems';
 
 const inventoryData = [
   { id:1,  name:'Artificial Flower Chrysant Giant White', sku:'AFG-001', category:'Floral',     unit:'pcs',   warehouse:'Warehouse Bali 66',   totalStock:342, stockStatus:'Available',    updatedAt:'12 Mar 2025', desc:'Premium artificial chrysanthemum flowers for event decoration. Large size, white color.' },
@@ -48,7 +49,8 @@ export default function InventoryDetailPage() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const id = parseInt(params.get('id'));
-  const item = inventoryData.find(r => r.id === id);
+  // Items created by finished production requests aren't in the static list above.
+  const item = inventoryData.find(r => r.id === id) || getProducedCatalog().find(r => r.id === id);
 
   const [deleteOpen, setDeleteOpen] = useState(false);
 

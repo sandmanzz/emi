@@ -9,6 +9,7 @@ import { wiData } from '../data/warehouseInventory';
 import { initialWarehouses } from '../data/warehouses';
 import { getInventoryRows, setInventoryRows as saveInventoryRows, getOpnameHistory, hasPendingOpname, resolveOpname, getStockMovements } from '../lib/stockOpnameStore';
 import { isTenantAdmin, getCurrentTenantUser } from '../lib/tenantAuth';
+import { isNeedsSetup, markItemSetUp } from '../lib/producedItems';
 
 const PAGE_SIZE = 10;
 const sortKeys = ['name','warehouseStock','warehouseName','itemStock','stokMin','stokUsed','valuation','totalValuation','minStatus','flag1','flag2','asile','rack','level','lantai','lorong','updatedAt'];
@@ -168,6 +169,10 @@ export default function WarehouseInventoryPage() {
   const [historyWarehouse, setHistoryWarehouse] = useState('');
   const [historyDetail,    setHistoryDetail]    = useState(null);
   const [stockMovements] = useState(() => getStockMovements());
+  // Rows for items created by a finished production request stay highlighted until
+  // their details are completed (saving the row's Edit form counts as completing).
+  const [setupOnly,  setSetupOnly]  = useState(false);
+  const [setupTick,  setSetupTick]  = useState(0); // forces re-read of isNeedsSetup after Edit/mark
   const pendingOpname = opnameHistory.some(h => h.status === 'Pending');
 
   const warehouseNames = useMemo(() => {
@@ -203,18 +208,21 @@ export default function WarehouseInventoryPage() {
   const filtered = useMemo(() => {
     const q = query.toLowerCase();
     const key = sortKeys[sortCol] || 'name';
+    // "Show only these" turns itself off once nothing needs setup any more.
+    const onlySetup = setupOnly && inventoryRows.some(r => isNeedsSetup(r.name));
     return inventoryRows
       .filter(r => {
         const mQ = !q || r.name.toLowerCase().includes(q) || r.warehouseName.toLowerCase().includes(q);
         const mW = !warehouseFilter || r.warehouseName === warehouseFilter;
         const mS = !statusFilter    || r.minStatus     === statusFilter;
-        return mQ && mW && mS;
+        const mU = !onlySetup || isNeedsSetup(r.name);
+        return mQ && mW && mS && mU;
       })
       .sort((a, b) => {
         const va = String(a[key] ?? ''), vb = String(b[key] ?? '');
         return sortAsc ? va.localeCompare(vb, undefined, { numeric:true }) : vb.localeCompare(va, undefined, { numeric:true });
       });
-  }, [inventoryRows, query, warehouseFilter, statusFilter, sortCol, sortAsc]);
+  }, [inventoryRows, query, warehouseFilter, statusFilter, setupOnly, setupTick, sortCol, sortAsc]); // eslint-disable-line react-hooks/exhaustive-deps -- setupTick re-runs the isNeedsSetup filter after Edit
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage   = Math.min(page, totalPages);
@@ -333,6 +341,11 @@ export default function WarehouseInventoryPage() {
     }
     setInventoryRows(newRows);
     saveInventoryRows(newRows);
+    if (editingRowId) {
+      // Saving the Edit form of a production-created item counts as completing its setup.
+      markItemSetUp(editingItemName);
+      setSetupTick(t => t + 1);
+    }
     setPage(1);
     closeModal();
   }
@@ -345,6 +358,7 @@ export default function WarehouseInventoryPage() {
     setDeleteTarget(null);
   }
 
+  const needsSetupRows = inventoryRows.filter(r => isNeedsSetup(r.name)).length;
   const safeCount     = inventoryRows.filter(r => r.minStatus === 'Safe').length;
   const warningCount  = inventoryRows.filter(r => r.minStatus === 'Warning').length;
   const criticalCount = inventoryRows.filter(r => r.minStatus === 'Critical').length;
@@ -521,6 +535,14 @@ export default function WarehouseInventoryPage() {
         ))}
       </div>
 
+      {tab === 'inventory' && needsSetupRows > 0 && (
+        <div className="setup-banner">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <div><strong>{needsSetupRows} item{needsSetupRows === 1 ? '' : 's'} created from production still need{needsSetupRows === 1 ? 's' : ''} setup.</strong> Stock was deployed here, but minimum stock, valuation and rack location are empty. Edit the row to fill them in.</div>
+          <button type="button" className="btn btn-ghost" onClick={() => { setSetupOnly(s => !s); setPage(1); }}>{setupOnly ? 'Show all' : 'Show only these'}</button>
+        </div>
+      )}
+
       {tab === 'inventory' && (
         <div className="card">
           <div className="toolbar">
@@ -588,8 +610,11 @@ export default function WarehouseInventoryPage() {
                 {pageData.length === 0
                   ? <tr><td colSpan={19} style={{ textAlign:'center', color:'var(--text-muted)', padding:32 }}>No results found.</td></tr>
                   : pageData.map(r => (
-                    <tr key={r.id}>
-                      <td className="name-cell">{r.name}</td>
+                    <tr key={r.id} className={isNeedsSetup(r.name) ? 'row-needs-setup' : undefined}>
+                      <td className="name-cell">
+                        {r.name}
+                        {isNeedsSetup(r.name) && <span className="badge badge-orange needs-setup-chip" title="Created from a production request — complete its information">Needs setup</span>}
+                      </td>
                       <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{r.warehouseStock}</td>
                       <td>{r.warehouseName}</td>
                       <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{r.itemStock}</td>

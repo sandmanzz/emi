@@ -17,6 +17,7 @@ import EventStatusPage from './pages/EventStatusPage';
 import CategoryPage from './pages/CategoryPage';
 import CategoryDetailPage from './pages/CategoryDetailPage';
 import UnitPage from './pages/UnitPage';
+import VendorPage from './pages/VendorPage';
 import UnitDetailPage from './pages/UnitDetailPage';
 import PlaceholderPage from './pages/PlaceholderPage';
 import AIAnalyzerPage from './pages/AIAnalyzerPage';
@@ -90,6 +91,7 @@ export default function App() {
           <Route path="category" element={<CategoryPage />} />
           <Route path="category-detail" element={<CategoryDetailPage />} />
           <Route path="unit" element={<UnitPage />} />
+          <Route path="vendor" element={<VendorPage />} />
           <Route path="unit-detail" element={<UnitDetailPage />} />
           <Route path="ai-analyzer" element={<AIAnalyzerPage />} />
           <Route path="qr-code" element={<PlaceholderPage title="QR Code" />} />

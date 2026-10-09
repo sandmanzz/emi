@@ -39,7 +39,7 @@ export default function EventStatusPage() {
   const [deleteModal,  setDeleteModal]  = useState(false);
   const [editingId,    setEditingId]    = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [form, setForm] = useState({ status: '', code: '', scan: 'None', stockReturn: false, productionItem: false, order: '' });
+  const [form, setForm] = useState({ status: '', code: '', scan: 'None', productionItem: false, checkOwnership: false, order: '' });
 
   // Reordering is edit-mode + explicit Save, not instant-apply-per-click.
   const [reorderMode,    setReorderMode]    = useState(false);
@@ -81,13 +81,9 @@ export default function EventStatusPage() {
     setPage(1);
   }
 
-  // Stock Return is exclusive: the status that already holds the flag (other than
-  // the one being edited), if any.
-  const returnOwner  = statuses.find(s => s.stockReturn === true && s.id !== editingId);
-
   function openNew() {
     setEditingId(null);
-    setForm({ status: '', code: '', scan: 'None', stockReturn: false, productionItem: false, order: String(statuses.length + 1) });
+    setForm({ status: '', code: '', scan: 'None', productionItem: false, checkOwnership: false, order: String(statuses.length + 1) });
     setStatusModal(true);
   }
 
@@ -95,22 +91,21 @@ export default function EventStatusPage() {
     const r = statuses.find(x => x.id === id);
     if (!r) return;
     setEditingId(id);
-    setForm({ status: r.status, code: r.code || '', scan: r.scan, stockReturn: r.stockReturn === true, productionItem: r.productionItem === true, order: String(r.order) });
+    setForm({ status: r.status, code: r.code || '', scan: r.scan, productionItem: r.productionItem === true, checkOwnership: r.checkOwnership === true, order: String(r.order) });
     setStatusModal(true);
   }
 
   function save() {
     if (!form.status.trim()) return;
     // Exclusivity guard (the form already disables these options).
-    if (form.stockReturn && returnOwner) return;
     const now = new Date().toISOString().slice(0, 10);
     if (editingId) {
       setStatuses(ss => ss.map(s => s.id === editingId
-        ? { ...s, status: form.status, code: form.code, scan: form.scan, stockReturn: form.stockReturn, productionItem: form.productionItem, order: parseInt(form.order) || s.order, updatedAt: now }
+        ? { ...s, status: form.status, code: form.code, scan: form.scan, productionItem: form.productionItem, checkOwnership: form.checkOwnership, order: parseInt(form.order) || s.order, updatedAt: now }
         : s
       ));
     } else {
-      setStatuses(ss => [...ss, { id: nextId, order: parseInt(form.order) || ss.length + 1, status: form.status, code: form.code, scan: form.scan, stockReturn: form.stockReturn, productionItem: form.productionItem, eventRunning: 0, updatedAt: now }]);
+      setStatuses(ss => [...ss, { id: nextId, order: parseInt(form.order) || ss.length + 1, status: form.status, code: form.code, scan: form.scan, productionItem: form.productionItem, checkOwnership: form.checkOwnership, eventRunning: 0, updatedAt: now }]);
       setNextId(n => n + 1);
     }
     setStatusModal(false);
@@ -157,7 +152,7 @@ export default function EventStatusPage() {
   const runningTotal   = statuses.reduce((a, s) => a + s.eventRunning, 0);
   const scanEnabled    = statuses.filter(s => s.scan === 'Scan').length;
   const productionEnabled = statuses.filter(s => s.productionItem === true).length;
-  const returnEnabled  = statuses.filter(s => s.stockReturn === true).length;
+  const ownershipEnabled = statuses.filter(s => s.checkOwnership === true).length;
 
   return (
     <>
@@ -170,9 +165,9 @@ export default function EventStatusPage() {
         This list drives the stage stepper on every event&rsquo;s detail page, in the
         order shown below — add, remove, reorder, or rename a status here and it
         applies everywhere. A status with Scan set to &ldquo;Scan&rdquo; requires
-        items to be scanned while an event is at that stage. A status with Stock
-        Return set to &ldquo;True&rdquo; stops any more items being added once the event
-        reaches that stage (only one status can have it). A status with Production Item set
+        items to be scanned while an event is at that stage. A status with Check
+        Ownership set to &ldquo;True&rdquo; asks whether any item needs an ownership change
+        before the event moves on from that stage. A status with Production Item set
         to &ldquo;True&rdquo; lets users request new items to be produced while an
         event is at that stage.
       </p>
@@ -181,7 +176,7 @@ export default function EventStatusPage() {
         {[
           { label:'Total Statuses',  value:statuses.length, color:'var(--brand)',  bg:'var(--brand-bg)' },
           { label:'Scan Enabled',    value:scanEnabled,     color:'var(--green)',  bg:'var(--green-bg)' },
-          { label:'Stock Return',    value:returnEnabled,   color:'var(--green)',  bg:'var(--green-bg)' },
+          { label:'Check Ownership', value:ownershipEnabled, color:'var(--green)',  bg:'var(--green-bg)' },
           { label:'Production Item', value:productionEnabled, color:'var(--purple)', bg:'var(--purple-bg)' },
           { label:'Events Running',  value:runningTotal,    color:'var(--orange)', bg:'var(--orange-bg)' },
         ].map(s => (
@@ -239,8 +234,8 @@ export default function EventStatusPage() {
                 <SortTh label="Status"        colIndex={1} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} />
                 <th style={{ width:80, textAlign:'center' }}>Code</th>
                 <th style={{ width:100, textAlign:'center' }}>Scan</th>
-                <th style={{ width:120, textAlign:'center' }}>Stock Return</th>
                 <th style={{ width:130, textAlign:'center' }}>Production Item</th>
+                <th style={{ width:130, textAlign:'center' }}>Check Ownership</th>
                 <SortTh label="Event Running" colIndex={4} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width:120, textAlign:'right' }} />
                 <SortTh label="Updated At"    colIndex={5} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width:120 }} />
                 <th style={{ width:100, textAlign:'center' }}>Action</th>
@@ -285,8 +280,8 @@ export default function EventStatusPage() {
                       {r.code ? <span className="badge badge-gray" style={{ fontSize:11 }}>{r.code}</span> : <span style={{ color:'var(--text-muted)', fontSize:12 }}>—</span>}
                     </td>
                     <td style={{ textAlign:'center' }}><ScanBadge scan={r.scan} /></td>
-                    <td style={{ textAlign:'center' }}><BoolBadge value={r.stockReturn === true} /></td>
                     <td style={{ textAlign:'center' }}><BoolBadge value={r.productionItem === true} /></td>
+                    <td style={{ textAlign:'center' }}><BoolBadge value={r.checkOwnership === true} /></td>
                     <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums', fontWeight:600 }}>
                       {r.eventRunning > 0
                         ? <span style={{ color:'var(--orange)' }}>{r.eventRunning}</span>
@@ -344,22 +339,6 @@ export default function EventStatusPage() {
           />
         </div>
         <div className="form-group">
-          <label>Stock Return</label>
-          <SearchableSelect
-            value={form.stockReturn ? 'true' : 'false'}
-            onChange={v => setForm(f => ({ ...f, stockReturn: v === 'true' }))}
-            options={[
-              { value: 'false', label: 'False' },
-              { value: 'true',  label: returnOwner ? `True (already used by "${returnOwner.status}")` : 'True', disabled: !!returnOwner },
-            ]}
-            placeholder="False"
-          />
-          <p style={{ fontSize: 11.5, color: 'var(--text-muted)', margin: '5px 0 0' }}>
-            When True, moving an event into this status returns deducted items to warehouse
-            stock, and no more items can be added afterwards. Only one status can have this.
-          </p>
-        </div>
-        <div className="form-group">
           <label>Production Item</label>
           <SearchableSelect
             value={form.productionItem ? 'true' : 'false'}
@@ -372,6 +351,21 @@ export default function EventStatusPage() {
           />
           <p style={{ fontSize: 11.5, color: 'var(--text-muted)', margin: '5px 0 0' }}>
             When True, users can request new items to be produced while an event is at this status.
+          </p>
+        </div>
+        <div className="form-group">
+          <label>Check Ownership</label>
+          <SearchableSelect
+            value={form.checkOwnership ? 'true' : 'false'}
+            onChange={v => setForm(f => ({ ...f, checkOwnership: v === 'true' }))}
+            options={[
+              { value: 'false', label: 'False' },
+              { value: 'true',  label: 'True' },
+            ]}
+            placeholder="False"
+          />
+          <p style={{ fontSize: 11.5, color: 'var(--text-muted)', margin: '5px 0 0' }}>
+            When True, moving an event on from this status first asks whether any item needs an ownership change.
           </p>
         </div>
       </Modal>

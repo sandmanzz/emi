@@ -899,6 +899,54 @@ clashes or seems off) — proceeding with the stated assumption unless corrected
 
 ## Raw instruction log
 
+### 2026-10-09 — Check Ownership flag, broken-item reports, production vendor/warehouse, Vendor CMS
+> ingat segala perubahan harus dicatat secara detail agar engineer lain bisa paham
+> 1. di event setting tambahkan boolean lagi checker untuk check ownership
+> 2. ketika di state tersebut ada check ownership == true, maka ada proses pertanyaan sebelum move ke next step apakah butuh pergantian ownership tidak
+> 3. remove stock return di event setting
+> 4. di barang detail ada opsi untuk create report, jadi ketika create report kita bisa info klo ada barang rusak. setelah create info barang rusak maka akan ada chip baru di list barang yang namanya broken item.
+> 5. ketika ada broken item maka ada informasi bahwa kamu masih ada broken item apakah yakin untuk lanjut, jika lanjut maka stok barang yang dipakai akan berkurang juga. misal menyiapkan 10 kursi tapi di report rusak 5 maka barang yang dipakai hanya 5
+> 6. di barang detail tambahkan kategori, informasi warehouse item juga
+> 7. di barang detail khusus yang rusak/broken ada opsi create production
+> 8. di pop up production tambahkan field produksi ini akan di deploy ke gudang mana
+> 9. di menu barang gudang ada highlight apabila ada production barang yang belum benar-benar di setting. begitu juga di menu barang, karena field nya banyak jadi tidak mungkin di setup semua
+> 10. di pop up production ada pilihan vendor luar atau vendor internal
+> 11. tambahkan CMS vendor di menu
+
+Decisions and assumptions (the user did not specify these — change them if wrong):
+- **#1 Check Ownership** is a new per-status boolean (`checkOwnership`), with a column, a KPI card and a True/False field in
+  Event Settings. It applies to the stage being **left**. Seed: only "Finish setup" is True.
+- **#2** The question is asked on forward moves only (Next), once per stage (`ownershipAnsweredFor`). "No" continues.
+  "Yes" opens the existing Bulk Assign Ownership modal, and saving it resumes the stage move
+  automatically (`resumeStage`). Cancelling Bulk Assign drops the move.
+- **#3** Stock Return was removed from Event Settings only (same choice the user made for Cutting Stock on 2026-10-05).
+  The Event Detail code for it (`addLocked`, the green section in the stage popup, `stockReturned`) is left in place but
+  dormant. The seed sets `stockReturn:false` everywhere. A status list already saved in a browser's localStorage with
+  `stockReturn: true` would still lock "Add Item" until reset.
+- **#4 Create Report** lives in the item drawer (hidden from Checking Inventory onward, because items are locked then).
+  It stores `brokenQty` (1..qty), note, who and when on the item, and shows a red **"Broken item · N"** chip on
+  cards, list rows and the drawer. "Edit Report" / "Remove report" are available while the item is unlocked.
+- **#5** The broken warning is step 2 of the stage flow. "Continue anyway" then goes to the normal confirmation. On confirm,
+  each reported item's `qty` is reduced by `brokenQty` (10 prepared, 5 broken → 5 used), `brokenWrittenOff` records the
+  amount and the chip disappears. ⚠️ Assumption: "stock used" = the **event's** quantity. Warehouse stock is not changed.
+- **#6** The drawer shows Category, SKU (from the Inventory catalog, matched by item **name**) and a Warehouse list
+  (live Warehouse Inventory rows with their stock). Items not in the catalog show "—".
+- **#7 Create Production** appears in the drawer on broken items. It opens Request Production (New Production tab)
+  pre-filled with the item's name, the broken qty, area and a note. It is disabled outside stages with Production Item = True.
+- **#8** New Production has a required **Deploy to Warehouse** field. The placeholder warehouse "Buy" (location None) is excluded.
+  Convert is unchanged (it does not create stock).
+- **#9** When a New Production request is marked Done, a draft item is created (SKU `NEW-###`, category and unit empty) and
+  a warehouse row is added with the request's qty in the chosen warehouse (`lib/producedItems.js`). Both pages highlight it
+  ("Needs setup" chip, orange row, banner with a "Show only these" filter). It stays highlighted until completed: in
+  Warehouse Inventory, saving the row's Edit form completes it. In Inventory (which has no working edit form yet — its Edit
+  button is a placeholder) a green tick button "Mark as set up" clears it. If an item with the same name already exists in
+  the catalog, no draft is created.
+- **#10** New Production has **Made by: Internal / External vendor** plus a required vendor picker filtered by that choice.
+  The request stores `vendorOrigin`, `vendorId` and `vendorName`, and the card shows them.
+- **#11 Vendor CMS** = Master Data → Vendor (`/vendor`): list, search, origin filter, add, edit and delete. Vendors gain an
+  `origin` field (Internal/External). Older records are backfilled: type "Internal Team" or contact "internal" → Internal,
+  everything else → External. Item Loan uses the same store.
+
 ### 2026-10-05 — Request Production gets New Production + Convert tabs
 > 1. tambahkan 2 tab utama yaitu new production, convert
 > 2. untuk convert perlu ada special label bahwa ketika sudah di proceed ke next event

@@ -9,8 +9,10 @@ import { initialAreas, SUB_AREAS } from '../data/areas';
 import { inventoryData, categories } from '../data/inventory';
 import { initialWarehouses } from '../data/warehouses';
 import { wiData } from '../data/warehouseInventory';
-import { getEventStageNames, isScanStage, isCuttingStockStage, isStockReturnStage, isProductionStage } from '../lib/eventStatuses';
-import { getInventoryRows, applyStockMovement } from '../lib/stockOpnameStore';
+import { getEventStageNames, isScanStage, isCuttingStockStage, isStockReturnStage, isProductionStage, isCheckOwnershipStage } from '../lib/eventStatuses';
+import { getInventoryRows, applyStockMovement, addInventoryRow } from '../lib/stockOpnameStore';
+import { getVendors, VENDOR_ORIGINS } from '../lib/vendorStore';
+import { getCatalog, addProducedItem } from '../lib/producedItems';
 import { getProductionRequests, saveProductionRequests, PRODUCTION_STATUSES, PRODUCTION_BADGE } from '../lib/productionRequests';
 import { resolveEventStage, saveEventProgress, getEventFurthestStage, saveEventFurthestStage } from '../lib/eventProgress';
 import { getEventClosing, setEventClosing, isOnGoingByItems } from '../lib/eventClosing';
@@ -29,6 +31,8 @@ function eventKeyFor(e) {
 
 const AREAS = initialAreas.map(a => a.name);
 const WAREHOUSES = [...new Set(initialWarehouses.map(w => w.name))];
+// "Buy" is a placeholder entry (location: None), not a real place — a produced item can't be deployed there.
+const DEPLOY_WAREHOUSES = WAREHOUSES.filter(w => w !== 'Buy');
 
 const AREA_BADGE_CLASS = {
   CEREMONY: 'ceremony', PHOTOBOOTH: 'photobooth', RECEPTION: 'reception',
@@ -165,6 +169,7 @@ function ItemCard({ item, group, showScanButton, onScanClick, onDelete, onCycleO
           {item.ownership && !onCycleOwnership && (
             <span className={`badge ${ownershipBadgeClass(item.ownership)}`} style={{ fontSize: 10 }}>{item.ownership}</span>
           )}
+          <BrokenChip item={item} />
           <StockBadge item={item} />
           {item.fromConvert && (
             <span className="badge badge-blue" style={{ fontSize: 10 }} title="Converted from another inventory item">Converted</span>
@@ -275,6 +280,7 @@ function ItemTable({ items, packages, showScanButton, onScanClick, onDelete, onC
                   <div className="item-table-flags">
                     {group && <span className="badge badge-gray" style={{ fontSize: 10 }}>{group.name}</span>}
                     {item.scanned && <span className="badge badge-green" style={{ fontSize: 10 }}>Scanned</span>}
+                    <BrokenChip item={item} />
                     <StockBadge item={item} />
                     {item.fromProduction && <span className="badge badge-purple" style={{ fontSize: 10 }}>Production</span>}
                     {item.resolution === 'returned' && <span className="badge badge-green" style={{ fontSize: 10 }}>Returned</span>}
@@ -326,6 +332,12 @@ function ItemTable({ items, packages, showScanButton, onScanClick, onDelete, onC
   );
 }
 
+// Red chip shown while an item has an open broken-item report (Create Report in the drawer).
+function BrokenChip({ item }) {
+  if (!(item.brokenQty > 0)) return null;
+  return <span className="badge badge-red" style={{ fontSize: 10 }} title={`${item.brokenQty} broken unit(s) reported`}>Broken item &middot; {item.brokenQty}</span>;
+}
+
 // "Stock cut" until the item has been returned to stock, then "Stock returned".
 function StockBadge({ item }) {
   if (item.stockReturned) return <span className="badge badge-green" style={{ fontSize: 10 }} title="Returned to warehouse stock">Stock returned</span>;
@@ -361,6 +373,12 @@ export default function EventDetailPage() {
   // status dropdown; later ones stay locked until Next is clicked.
   const [furthestIndex, setFurthestIndex] = useState(() => stages.indexOf(getEventFurthestStage(eventName)));
   const [pendingStage, setPendingStage] = useState(null); // stage awaiting confirmation
+  const [flowStep, setFlowStep] = useState('confirm'); // 'ownership' | 'broken' | 'confirm' (see "Stage-change flow")
+  const [ownershipAnsweredFor, setOwnershipAnsweredFor] = useState(null); // stage whose ownership question was answered
+  const [resumeStage, setResumeStage] = useState(null); // stage to continue to after Bulk Assign Ownership is saved
+  // Item report (broken units)
+  const [reportItemId, setReportItemId] = useState(null);
+  const [reportForm, setReportForm] = useState({ qty: 1, note: '' });
   const [closingStatus, setClosingStatus] = useState(() => getEventClosing(eventName));
   const [crossCheckOpen, setCrossCheckOpen] = useState(false);
   // Bulk Assign Ownership modal
@@ -420,7 +438,10 @@ export default function EventDetailPage() {
   const productionEnabled = isProductionStage(eventStatus);
   const [productionRequests, setProductionRequestsState] = useState(() => getProductionRequests(eventName));
   const [productionOpen, setProductionOpen] = useState(false);
-  const [productionForm, setProductionForm] = useState({ name: '', qty: 1, area: '', subArea: '', note: '' });
+  const EMPTY_PRODUCTION_FORM = { name: '', qty: 1, area: '', subArea: '', warehouse: '', vendorOrigin: 'Internal', vendorId: '', note: '', replacesItemId: null };
+  const [productionForm, setProductionForm] = useState(EMPTY_PRODUCTION_FORM);
+  const [vendors, setVendors] = useState(() => getVendors()); // re-read when the modal opens
+  const vendorOptions = vendors.filter(v => v.origin === productionForm.vendorOrigin);
   const [productionTab, setProductionTab] = useState('new'); // 'new' | 'convert'
   const [convertForm, setConvertForm] = useState({ fromRowId: '', fromQty: 1, toName: '', toQty: 1 });
 
@@ -502,12 +523,60 @@ export default function EventDetailPage() {
       return;
     }
     setStepperError('');
+    setFlowStep(firstFlowStep(step));
     setPendingStage(step);
   }
 
   function handleNextClick() {
     if (!hasNextStage) return;
     requestStageChange(stages[stageIndex + 1]);
+  }
+
+  // --- Stage-change flow -------------------------------------------------------
+  // Moving FORWARD can pass through up to three popups, in this order:
+  //   1. 'ownership' — only if the stage being left has Check Ownership = true (Event
+  //      Settings) and the question hasn't been answered yet for that stage.
+  //   2. 'broken'    — only if some item still has an open broken-item report.
+  //   3. 'confirm'   — always (the original confirmation; carries cut/return/convert notes).
+  // Going back skips 1 and 2. `flowStep` says which popup is showing for `pendingStage`.
+  const brokenItems = useMemo(() => items.filter(it => (it.brokenQty || 0) > 0), [items]);
+  const askOwnership = isCheckOwnershipStage(eventStatus) && ownershipAnsweredFor !== eventStatus;
+
+  function firstFlowStep(step) {
+    if (stages.indexOf(step) <= stageIndex) return 'confirm';
+    if (askOwnership) return 'ownership';
+    if (brokenItems.length > 0) return 'broken';
+    return 'confirm';
+  }
+
+  function answerOwnership(needsChange) {
+    setOwnershipAnsweredFor(eventStatus);
+    if (needsChange) {
+      // Open the existing Bulk Assign Ownership modal; saving it resumes the move.
+      setResumeStage(pendingStage);
+      setPendingStage(null);
+      openBulkOwnership();
+      return;
+    }
+    setFlowStep(brokenItems.length > 0 ? 'broken' : 'confirm');
+  }
+
+  // Quantity "used" in the event = prepared qty minus the broken units that were
+  // reported. Applied when the user continues past the broken-item warning.
+  function writeOffBrokenItems(step) {
+    if (brokenItems.length === 0) return;
+    const ids = new Set(brokenItems.map(it => it.id));
+    const totalBroken = brokenItems.reduce((sum, it) => sum + it.brokenQty, 0);
+    setItems(is => is.map(it => !ids.has(it.id) ? it : {
+      ...it,
+      qty: Math.max(0, it.qty - it.brokenQty),
+      brokenWrittenOff: (it.brokenWrittenOff || 0) + it.brokenQty,
+      brokenQty: 0,
+    }));
+    addActivityLog({
+      userName: currentUser?.name || 'Admin', action: 'Update', module: 'Event Detail',
+      description: `Moved on from "${eventStatus}" to "${step}" with ${totalBroken} broken unit(s) across ${ids.size} item(s) on ${eventName} — quantity used reduced`,
+    });
   }
 
   // Cutting-stock stages crossed when moving forward from the current stage to
@@ -557,7 +626,10 @@ export default function EventDetailPage() {
         description: `Returned stock for ${returnIds.size} item(s) (${totalQty} pcs) on ${eventName} at "${step}"`,
       });
     }
-    if (targetIndex > stageIndex) applyConversions(step);
+    if (targetIndex > stageIndex) {
+      writeOffBrokenItems(step);
+      applyConversions(step);
+    }
     setEventStatus(step);
     saveEventProgress(eventName, step);
     if (targetIndex > furthestIndex) {
@@ -746,6 +818,17 @@ export default function EventDetailPage() {
       });
     }
     setBulkOwnOpen(false);
+    if (resumeStage) {
+      // Opened from the ownership question in the stage flow: carry on with that move.
+      const step = resumeStage;
+      setResumeStage(null);
+      requestStageChange(step);
+    }
+  }
+
+  function closeBulkOwnership() {
+    setBulkOwnOpen(false);
+    setResumeStage(null);
   }
 
   // --- Closing the event: On Going -> (Ready to Close) -> Checking Inventory
@@ -849,6 +932,54 @@ export default function EventDetailPage() {
     setDetailItemId(null);
   }
 
+  // --- Item report (broken units) ---
+  const reportItem = reportItemId != null ? items.find(it => it.id === reportItemId) : null;
+  const reportQty = Math.floor(Number(reportForm.qty));
+  const reportValid = !!reportItem && reportQty >= 1 && reportQty <= reportItem.qty;
+
+  function openReport(item) {
+    setReportForm({ qty: item.brokenQty || 1, note: item.brokenNote || '' });
+    setReportItemId(item.id);
+  }
+
+  function saveReport() {
+    if (!reportValid) return;
+    const by = currentUser?.name || 'Admin';
+    setItems(is => is.map(it => it.id !== reportItem.id ? it : {
+      ...it, brokenQty: reportQty, brokenNote: reportForm.note.trim(),
+      brokenReportedBy: by, brokenReportedAt: new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+    }));
+    addActivityLog({
+      userName: by, action: 'Create', module: 'Event Detail',
+      description: `Reported ${reportQty} of ${reportItem.qty} "${reportItem.name}" as broken on ${eventName}`,
+    });
+    setReportItemId(null);
+  }
+
+  // Withdraws a report (e.g. filed by mistake).
+  function clearReport(item) {
+    if (!window.confirm(`Remove the broken-item report for "${item.name}"?`)) return;
+    setItems(is => is.map(it => it.id !== item.id ? it : { ...it, brokenQty: 0, brokenNote: '', brokenReportedBy: '', brokenReportedAt: '' }));
+  }
+
+  // "Create Production" on a broken item: opens Request Production (New Production tab)
+  // pre-filled as a replacement for the broken units.
+  const canRequestProduction = productionEnabled && closingStatus === 'on-going' && !addLocked;
+  function createProductionFromBroken(item) {
+    if (!canRequestProduction) return;
+    setProductionForm({
+      name: item.name, qty: item.brokenQty || 1, area: item.area, subArea: item.subArea || '',
+      warehouse: '', vendorOrigin: 'Internal', vendorId: '',
+      note: `Replacement for ${item.brokenQty} broken unit(s) of "${item.name}"${item.brokenNote ? ` — ${item.brokenNote}` : ''}`,
+      replacesItemId: item.id,
+    });
+    setConvertForm({ fromRowId: '', fromQty: 1, toName: '', toQty: 1 });
+    setProductionTab('new');
+    setVendors(getVendors());
+    setDetailItemId(null);
+    setProductionOpen(true);
+  }
+
   // --- Production requests ---
   function setProductionRequests(updater) {
     setProductionRequestsState(current => {
@@ -859,13 +990,15 @@ export default function EventDetailPage() {
   }
 
   function openProductionRequest() {
-    setProductionForm({ name: '', qty: 1, area: '', subArea: '', note: '' });
+    setProductionForm(EMPTY_PRODUCTION_FORM);
     setConvertForm({ fromRowId: '', fromQty: 1, toName: '', toQty: 1 });
     setProductionTab('new');
+    setVendors(getVendors());
     setProductionOpen(true);
   }
 
-  const productionFormValid = productionForm.name.trim() && Number(productionForm.qty) >= 1 && productionForm.area;
+  const productionFormValid = productionForm.name.trim() && Number(productionForm.qty) >= 1 && productionForm.area
+    && productionForm.warehouse && productionForm.vendorId;
 
   function submitProductionRequest() {
     if (!productionFormValid) return;
@@ -873,13 +1006,16 @@ export default function EventDetailPage() {
     const req = {
       id, name: productionForm.name.trim(), qty: Math.floor(Number(productionForm.qty)),
       area: productionForm.area, subArea: productionForm.subArea, type: 'production',
+      warehouse: productionForm.warehouse, vendorOrigin: productionForm.vendorOrigin,
+      vendorId: Number(productionForm.vendorId), vendorName: vendors.find(v => String(v.id) === String(productionForm.vendorId))?.name || '',
+      replacesItemId: productionForm.replacesItemId,
       note: productionForm.note.trim(), status: 'Requested', stage: eventStatus,
       requestedBy: currentUser?.name || 'Admin', requestedAt: new Date().toLocaleDateString('en-CA'), // local YYYY-MM-DD
     };
     setProductionRequests(rs => [req, ...rs]);
     addActivityLog({
       userName: req.requestedBy, action: 'Create', module: 'Event Detail',
-      description: `Requested production of "${req.name}" (${req.qty} pcs) for ${eventName}`,
+      description: `Requested production of "${req.name}" (${req.qty} pcs) for ${eventName} — by ${req.vendorName} (${req.vendorOrigin}), deploy to ${req.warehouse}`,
     });
     setProductionOpen(false);
     setStageFilter('production');
@@ -891,10 +1027,16 @@ export default function EventDetailPage() {
     if (!nextStatus) return;
     if (nextStatus === 'Done') {
       if (!window.confirm(`Mark "${req.name}" as done? It will be added to this event's items.`)) return;
+      // Create the draft Inventory item + Warehouse Inventory row (flagged "Needs setup")
+      // unless an item with this name already exists in the catalog.
+      if (!getCatalog().some(i => i.name === req.name)) {
+        const { row } = addProducedItem({ name: req.name, qty: req.qty, warehouseName: req.warehouse, vendorName: req.vendorName, producedFor: eventName });
+        addInventoryRow(row);
+      }
       setItems(is => [...is, {
         id: nextId, name: req.name, area: req.area, subArea: req.subArea, stage: eventStatus,
         qty: req.qty, pic: '', checking: false, scanned: false, groupId: null, warehouseItem: false,
-        scanIn: null, scanOut: null, note: req.note, checked: false, ownership: 'IHP', fromProduction: true,
+        scanIn: null, scanOut: null, note: req.note, checked: false, ownership: 'IHP', fromProduction: true, warehouse: req.warehouse,
       }]);
       setNextId(n => n + 1);
     }
@@ -1042,7 +1184,7 @@ export default function EventDetailPage() {
         id: nextId + i, name: c.name, area: c.area, subArea: c.subArea, stage: eventStatus,
         qty: c.qty, pic: '', checking: false, scanned: false, groupId: null,
         warehouseItem: true, scanIn: null, scanOut: null, note: '',
-        checked: false, ownership: 'IHC',
+        checked: false, ownership: 'IHC', warehouse: c.warehouse,
       })),
     ]);
     setNextId(n => n + cart.length);
@@ -1288,13 +1430,15 @@ export default function EventDetailPage() {
                           <div className="production-card-meta">
                             <span>Qty {req.qty}</span>
                             <span>{req.area}{req.subArea ? ` · ${req.subArea}` : ''}</span>
+                            {req.warehouse && <span>Deploy to {req.warehouse}</span>}
+                            {req.vendorName && <span>By {req.vendorName} ({req.vendorOrigin})</span>}
                             <span>Requested by {req.requestedBy} on {req.requestedAt}</span>
                           </div>
                           {req.note && <div className="production-card-note">{req.note}</div>}
                           <div className="production-card-note info">
                             {req.status === 'Done'
-                              ? 'Item has been made — complete its information in the Inventory menu.'
-                              : 'After the item is made, its information needs to be completed in the Inventory menu.'}
+                              ? 'Item has been made and added to Inventory / Warehouse Inventory as "Needs setup" — complete its information there.'
+                              : 'After the item is made, it is added to Inventory marked "Needs setup" — its information must be completed in the Inventory menu.'}
                           </div>
                         </div>
                         <div className="production-card-actions">
@@ -1613,6 +1757,21 @@ export default function EventDetailPage() {
               <button className="btn btn-ghost" onClick={() => openScanPopup(detailItem)}>{detailItem.scanned ? 'Re-scan' : 'Scan'}</button>
             )}
             {!itemsLocked && (
+              <button className="btn btn-ghost" onClick={() => openReport(detailItem)}>
+                {detailItem.brokenQty > 0 ? 'Edit Report' : 'Create Report'}
+              </button>
+            )}
+            {!itemsLocked && detailItem.brokenQty > 0 && (
+              <button
+                className="btn btn-ghost btn-create-production"
+                disabled={!canRequestProduction}
+                title={canRequestProduction ? 'Request production of replacements' : 'Production can only be requested at a stage with Production Item enabled'}
+                onClick={() => createProductionFromBroken(detailItem)}
+              >
+                Create Production
+              </button>
+            )}
+            {!itemsLocked && (
               <button className="btn-save-modal" onClick={() => openModifyItem(detailItem)}><IconEdit /> Modify</button>
             )}
           </>
@@ -1620,7 +1779,16 @@ export default function EventDetailPage() {
       >
         {detailItem && (() => {
           const group = detailItem.groupId ? packages.find(p => p.id === detailItem.groupId) : null;
+          // Category / unit / SKU come from the Inventory catalog (matched by name); the
+          // warehouse list from live Warehouse Inventory rows.
+          const catalogItem = getCatalog().find(i => i.name === detailItem.name);
+          const warehouseRows = getInventoryRows().filter(r => r.name === detailItem.name);
           const rows = [
+            ['Category', catalogItem?.category || '—'],
+            ['SKU', catalogItem?.sku || '—'],
+            ['Warehouse', warehouseRows.length > 0
+              ? <span className="drawer-wh-list">{warehouseRows.map(r => <span key={r.id}>{r.warehouseName} <em>({r.itemStock} in stock)</em></span>)}</span>
+              : (detailItem.warehouse || '—')],
             ['Quantity', detailItem.qty],
             ['PIC', detailItem.pic || '—'],
             ['Area', detailItem.area],
@@ -1641,9 +1809,25 @@ export default function EventDetailPage() {
                 <span className={`area-badge ${areaBadgeClass(detailItem.area)}`}>{detailItem.area}</span>
                 {detailItem.ownership && <span className={`badge ${ownershipBadgeClass(detailItem.ownership)}`} style={{ fontSize: 10 }}>{detailItem.ownership}</span>}
                 {detailItem.scanned && <span className="badge badge-green" style={{ fontSize: 10 }}>Scanned</span>}
+                <BrokenChip item={detailItem} />
                 <StockBadge item={detailItem} />
                 {detailItem.resolution === 'returned' && <span className="badge badge-green" style={{ fontSize: 10 }}>Returned</span>}
               </div>
+              {detailItem.brokenQty > 0 && (
+                <div className="drawer-broken">
+                  <div className="drawer-broken-head">
+                    <strong>{detailItem.brokenQty} of {detailItem.qty} reported broken</strong>
+                    {!itemsLocked && <button type="button" className="drawer-link-btn" onClick={() => clearReport(detailItem)}>Remove report</button>}
+                  </div>
+                  {detailItem.brokenNote && <div>{detailItem.brokenNote}</div>}
+                  <div className="drawer-broken-meta">Reported by {detailItem.brokenReportedBy || '—'} · {detailItem.brokenReportedAt || '—'}</div>
+                </div>
+              )}
+              {detailItem.brokenWrittenOff > 0 && (
+                <div className="drawer-broken drawer-broken-done">
+                  {detailItem.brokenWrittenOff} broken unit(s) were removed from the quantity used when the event moved on.
+                </div>
+              )}
               <dl className="drawer-dl">
                 {rows.map(([k, v]) => (
                   <div key={k} className="drawer-dl-row"><dt>{k}</dt><dd>{v}</dd></div>
@@ -1748,7 +1932,7 @@ export default function EventDetailPage() {
             </p>
             <div className="prod-notice prod-notice-info">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-              <div>After the item is made, its information (SKU, category, unit, etc.) needs to be completed in the <strong>Inventory</strong> menu.</div>
+              <div>After the item is made it is added to <strong>Inventory</strong> and <strong>Warehouse Inventory</strong> marked <em>Needs setup</em>. Its information (SKU, category, unit, rack, etc.) must then be completed in the Inventory menu.</div>
             </div>
             <div className="form-group">
               <label>Item Name <span style={{ color: 'var(--red)' }}>*</span></label>
@@ -1757,6 +1941,40 @@ export default function EventDetailPage() {
             <div className="form-group">
               <label>Quantity <span style={{ color: 'var(--red)' }}>*</span></label>
               <input type="number" min="1" value={productionForm.qty} onChange={e => setProductionForm(f => ({ ...f, qty: e.target.value }))} />
+            </div>
+            <div className="form-group">
+              <label>Deploy to Warehouse <span style={{ color: 'var(--red)' }}>*</span></label>
+              <SearchableSelect
+                value={productionForm.warehouse}
+                onChange={v => setProductionForm(f => ({ ...f, warehouse: v }))}
+                placeholder="Which warehouse will it go to?"
+                options={DEPLOY_WAREHOUSES.map(w => ({ value: w, label: w }))}
+              />
+              <p style={{ fontSize: 11.5, color: 'var(--text-muted)', margin: '5px 0 0' }}>Once finished, the item is added to this warehouse&rsquo;s stock.</p>
+            </div>
+            <div className="form-group">
+              <label>Made by <span style={{ color: 'var(--red)' }}>*</span></label>
+              <div className="seg-choice" role="radiogroup" aria-label="Vendor origin">
+                {VENDOR_ORIGINS.map(o => (
+                  <button key={o} type="button" role="radio" aria-checked={productionForm.vendorOrigin === o}
+                    className={productionForm.vendorOrigin === o ? 'active' : ''}
+                    onClick={() => setProductionForm(f => ({ ...f, vendorOrigin: o, vendorId: '' }))}>
+                    {o === 'Internal' ? 'Internal vendor' : 'External vendor'}
+                  </button>
+                ))}
+              </div>
+              <div style={{ marginTop: 8 }}>
+                <SearchableSelect
+                  value={productionForm.vendorId}
+                  onChange={v => setProductionForm(f => ({ ...f, vendorId: v }))}
+                  placeholder={`Select ${productionForm.vendorOrigin.toLowerCase()} vendor`}
+                  emptyText="No vendor found"
+                  options={vendorOptions.map(v => ({ value: String(v.id), label: v.name, meta: v.type || '' }))}
+                />
+              </div>
+              {vendorOptions.length === 0 && (
+                <p style={{ fontSize: 11.5, color: 'var(--orange)', margin: '5px 0 0' }}>No {productionForm.vendorOrigin.toLowerCase()} vendors yet. Add one in Master Data &rarr; Vendor.</p>
+              )}
             </div>
             <div className="form-row">
               <div className="form-group">
@@ -1832,8 +2050,108 @@ export default function EventDetailPage() {
       </Modal>
 
       {/* Stage change confirmation — Next or reopening an earlier stage */}
+      {/* Stage flow step 1 — ownership question (only when the stage being left has Check Ownership = true) */}
       <Modal
-        open={!!pendingStage}
+        open={!!pendingStage && flowStep === 'ownership'}
+        title="Check ownership"
+        onClose={() => setPendingStage(null)}
+        footer={
+          <>
+            <button className="btn-cancel-modal" onClick={() => setPendingStage(null)}><IconClose /> Cancel</button>
+            <button className="btn btn-ghost" onClick={() => answerOwnership(false)}>No, continue</button>
+            <button className="btn-save-modal" onClick={() => answerOwnership(true)}>Yes, change ownership</button>
+          </>
+        }
+      >
+        <div className="stage-confirm-route">
+          <span>{eventStatus}</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          <strong>{pendingStage}</strong>
+        </div>
+        <p className="confirm-msg">
+          Before moving on from <strong>&ldquo;{eventStatus}&rdquo;</strong>: does any item need a change of ownership (IHC / IHP / Outsource)?
+        </p>
+        <p className="confirm-msg" style={{ marginTop: 8, color: 'var(--text-muted)' }}>
+          Choose <strong>Yes</strong> to open Bulk Assign Ownership. Once you save it, the move continues automatically.
+        </p>
+      </Modal>
+
+      {/* Stage flow step 2 — broken-item warning */}
+      <Modal
+        open={!!pendingStage && flowStep === 'broken'}
+        title="Broken items reported"
+        onClose={() => setPendingStage(null)}
+        footer={
+          <>
+            <button className="btn-cancel-modal" onClick={() => setPendingStage(null)}><IconClose /> Cancel</button>
+            <button className="btn-del-ok" onClick={() => setFlowStep('confirm')}>Continue anyway</button>
+          </>
+        }
+      >
+        <div className="stage-confirm-cut">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <div>
+            <strong>{brokenItems.length} item{brokenItems.length === 1 ? ' still has' : 's still have'} broken units.</strong> If you continue,
+            the broken units are taken out of the quantity used in this event.
+          </div>
+        </div>
+        <table className="broken-table">
+          <thead><tr><th>Item</th><th style={{ textAlign: 'right' }}>Prepared</th><th style={{ textAlign: 'right' }}>Broken</th><th style={{ textAlign: 'right' }}>Used after</th></tr></thead>
+          <tbody>
+            {brokenItems.map(it => (
+              <tr key={it.id}>
+                <td>{it.name}</td>
+                <td style={{ textAlign: 'right' }}>{it.qty}</td>
+                <td style={{ textAlign: 'right', color: 'var(--red)', fontWeight: 700 }}>{it.brokenQty}</td>
+                <td style={{ textAlign: 'right', fontWeight: 700 }}>{Math.max(0, it.qty - it.brokenQty)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p className="confirm-msg" style={{ marginTop: 12, color: 'var(--text-muted)' }}>
+          Example: 10 chairs prepared, 5 reported broken &rarr; only 5 are used. To replace them instead, cancel and use <strong>Create Production</strong> on the item first.
+        </p>
+      </Modal>
+
+      {/* Item report — mark units as broken */}
+      <Modal
+        open={!!reportItem}
+        title="Create Report"
+        onClose={() => setReportItemId(null)}
+        footer={
+          <>
+            <button className="btn-cancel-modal" onClick={() => setReportItemId(null)}><IconClose /> Cancel</button>
+            <button className="btn-save-modal" onClick={saveReport} disabled={!reportValid}><IconCheck /> Submit Report</button>
+          </>
+        }
+      >
+        {reportItem && (
+          <>
+            <div className="form-group">
+              <label>Item</label>
+              <input type="text" value={reportItem.name} disabled />
+            </div>
+            <div className="form-group">
+              <label>Broken Quantity <span style={{ color: 'var(--red)' }}>*</span></label>
+              <input type="number" min="1" max={reportItem.qty} value={reportForm.qty} onChange={e => setReportForm(f => ({ ...f, qty: e.target.value }))} />
+              <p style={{ fontSize: 11.5, margin: '5px 0 0', color: reportQty > reportItem.qty ? 'var(--red)' : 'var(--text-muted)' }}>
+                Out of {reportItem.qty} prepared for this event.
+              </p>
+            </div>
+            <div className="form-group">
+              <label>What happened?</label>
+              <textarea placeholder="e.g. 5 chair legs cracked during loading" value={reportForm.note} onChange={e => setReportForm(f => ({ ...f, note: e.target.value }))} />
+            </div>
+            <div className="prod-notice prod-notice-info" style={{ marginBottom: 0 }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+              <div>The item gets a <strong>Broken item</strong> chip. You&rsquo;ll be warned before the event moves on, and the broken units are then removed from the quantity used.</div>
+            </div>
+          </>
+        )}
+      </Modal>
+
+      <Modal
+        open={!!pendingStage && flowStep === 'confirm'}
         title={pendingStage && stages.indexOf(pendingStage) > stageIndex ? 'Move to next stage?' : 'Go back to an earlier stage?'}
         onClose={() => setPendingStage(null)}
         footer={
@@ -1993,11 +2311,11 @@ export default function EventDetailPage() {
       <Modal
         open={bulkOwnOpen}
         title="Bulk Assign Ownership"
-        onClose={() => setBulkOwnOpen(false)}
+        onClose={closeBulkOwnership}
         size="lg"
         footer={
           <>
-            <button className="btn-cancel-modal" onClick={() => setBulkOwnOpen(false)}><IconClose /> Cancel</button>
+            <button className="btn-cancel-modal" onClick={closeBulkOwnership}><IconClose /> Cancel</button>
             <button className="btn-save-modal" onClick={applyBulkOwnership} disabled={bulkOwnSelected.length === 0}>
               <IconCheck /> Assign {bulkOwnTarget} to {bulkOwnSelected.length} item{bulkOwnSelected.length === 1 ? '' : 's'}
             </button>

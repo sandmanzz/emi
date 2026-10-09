@@ -47,6 +47,13 @@ export function isProductionStage(statusName) {
   return record?.productionItem === true;
 }
 
+// While the event is at this stage, clicking Next first asks whether items need an
+// ownership change. Missing field counts as false.
+export function isCheckOwnershipStage(statusName) {
+  const record = getEventStatuses().find(s => s.status === statusName);
+  return record?.checkOwnership === true;
+}
+
 // Moving into this stage returns cut items to warehouse stock; after it, the event
 // can't take new items.
 export function isStockReturnStage(statusName) {
