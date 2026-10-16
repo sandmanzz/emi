@@ -3,6 +3,7 @@ import { useState } from 'react';
 import Modal from '../components/Modal';
 import { IconEdit, IconDelete } from '../components/icons';
 import { initialWarehouses } from '../data/warehouses';
+import { fmtNum } from '../lib/format';
 
 const warehouseItems = {
   'Warehouse Bali 66':   [{ name:'Artificial Flower Chrysant Giant White', sku:'AFG-001', qty:342, status:'Available' },{ name:'Artificial Rose Pink', sku:'ARP-003', qty:182, status:'Available' },{ name:'Cylinder-Shaped Crystal', sku:'CBT-007', qty:100, status:'Available' }],
@@ -119,7 +120,7 @@ export default function WarehouseDetailPage() {
                     <tr key={i}>
                       <td className="name-cell">{item.name}</td>
                       <td className="id-cell">{item.sku}</td>
-                      <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums', fontWeight:600 }}>{item.qty}</td>
+                      <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums', fontWeight:600 }}>{fmtNum(item.qty)}</td>
                       <td>{statusBadge(item.status)}</td>
                     </tr>
                   ))}

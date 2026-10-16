@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { TODAY } from '../data/events';
 import { computeClashes, isoDay } from '../lib/eventClashes';
 import { IconChevronLeft, IconChevronRight } from '../components/icons';
+import { fmtNum } from '../lib/format';
 
 // Event Calendar (/event-calendar): every event on a month grid, by its booking window
 // (load-in date → finish), and the ITEM CLASHES between events booked on the same days
@@ -164,7 +165,7 @@ export default function EventCalendarPage() {
                         <div className="cal-clash-bar" title={`Needed ${c.demand}, in stock ${c.stock}`}>
                           <div style={{ width: `${Math.min(100, c.stock ? (c.demand / c.stock) * 100 : 100)}%` }} />
                         </div>
-                        <div className="rep-muted">Needed {c.demand} · in stock {c.stock}</div>
+                        <div className="rep-muted">Needed {fmtNum(c.demand)} · in stock {fmtNum(c.stock)}</div>
                       </div>
                     ))}
                   </div>
@@ -201,12 +202,12 @@ export default function EventCalendarPage() {
                       {c.entries.map((x, i) => (
                         <span key={x.key}>
                           {i > 0 && ' · '}
-                          <button type="button" className="link-btn" style={{ fontSize: 12.5 }} onClick={() => openEvent(x.key)}>{x.name}</button> ({x.qty})
+                          <button type="button" className="link-btn" style={{ fontSize: 12.5 }} onClick={() => openEvent(x.key)}>{x.name}</button> ({fmtNum(x.qty)})
                         </span>
                       ))}
                     </td>
-                    <td style={{ textAlign: 'right', fontWeight: 700 }}>{c.demand}</td>
-                    <td style={{ textAlign: 'right' }}>{c.stock}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 700 }}>{fmtNum(c.demand)}</td>
+                    <td style={{ textAlign: 'right' }}>{fmtNum(c.stock)}</td>
                     <td>
                       <span className={`badge ${c.shortage ? 'badge-red' : 'badge-orange'}`} style={{ fontSize: 11 }}>
                         {c.shortage ? `Short ${c.demand - c.stock}` : 'Shared, enough stock'}

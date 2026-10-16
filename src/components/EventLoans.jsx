@@ -5,6 +5,7 @@ import { IconClose, IconCheck } from './icons';
 import { LOAN_STATUSES, LOAN_BADGE, loanDisplayStatus, loanTotalCost } from '../lib/eventLoans';
 import { formatIDR } from '../lib/superAdminUtils';
 import { TODAY } from '../data/events';
+import { fmtNum } from '../lib/format';
 
 const UNITS = ['pcs', 'unit', 'set', 'roll', 'meter'];
 
@@ -40,7 +41,7 @@ export function EventLoansPanel({ loans, loanEnabled, locked, onAdvance, onCance
                       <span className={`badge ${LOAN_BADGE[status]}`} style={{ fontSize: 10.5 }}>{status}</span>
                     </div>
                     <div className="production-card-meta">
-                      <span>Qty {l.qty} {l.unit}</span>
+                      <span>Qty {fmtNum(l.qty)} {l.unit}</span>
                       <span>{l.area}{l.subArea ? ` · ${l.subArea}` : ''}</span>
                       <span>From <button type="button" className="link-btn" style={{ fontSize: 12 }} onClick={() => onOpenVendor(l.vendorId)}>{l.vendorName}</button></span>
                       <span>{fmt(l.startDate)} → {fmt(l.dueDate)}</span>

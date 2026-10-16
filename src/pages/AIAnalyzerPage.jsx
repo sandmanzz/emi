@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { IconClose, IconPlus, IconSearch } from '../components/icons';
 import SearchableSelect from '../components/SearchableSelect';
+import { fmtNum } from '../lib/format';
 
 const PROJECT_OPTIONS = [
   { id: 'wsg-2026', name: 'Wedding Spring Garden', location: 'Bogor', date: '10-11 May 2026' },
@@ -405,7 +406,7 @@ export default function AIAnalyzerPage() {
                       {shownMaterials.map(item => (
                         <tr key={item.name}>
                           <td className="name-cell">{item.name}</td>
-                          <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{item.qty}</td>
+                          <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{fmtNum(item.qty)}</td>
                           <td>{item.unit}</td>
                           <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{currency(item.averagePrice)}</td>
                           <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums', fontWeight: 700 }}>{currency(item.totalPrice)}</td>
@@ -467,7 +468,7 @@ export default function AIAnalyzerPage() {
                           style={{ cursor:'pointer' }}
                         >
                           <td className="name-cell">{item.name}</td>
-                          <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{item.qty}</td>
+                          <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{fmtNum(item.qty)}</td>
                           <td>{item.ref}</td>
                           {WAREHOUSE_COLUMNS.map(warehouse => (
                             <td key={warehouse} style={{ textAlign:'right', fontVariantNumeric:'tabular-nums' }}>
@@ -505,7 +506,7 @@ export default function AIAnalyzerPage() {
                   <div className="ai-detail-body">
                     <div className="ai-detail-row"><span>Material</span><strong>{selectedRelatedItem.name}</strong></div>
                     <div className="ai-detail-row"><span>Ref</span><strong>{selectedRelatedItem.ref}</strong></div>
-                    <div className="ai-detail-row"><span>Need</span><strong>{selectedRelatedItem.qty} {selectedRelatedItem.unit}</strong></div>
+                    <div className="ai-detail-row"><span>Need</span><strong>{fmtNum(selectedRelatedItem.qty)} {selectedRelatedItem.unit}</strong></div>
                     <div className="ai-detail-row"><span>Total Stock</span><strong>{selectedRelatedItem.related ? `${selectedRelatedItem.totalStock} ${selectedRelatedItem.stockUnit}` : 'Not Available'}</strong></div>
                     <div className="ai-detail-row"><span>Status</span><span className={`badge ${statusToBadge(selectedRelatedItem.status)}`}>{selectedRelatedItem.status}</span></div>
                     <div className="ai-detail-warehouse-list">

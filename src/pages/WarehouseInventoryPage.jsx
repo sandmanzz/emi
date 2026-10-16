@@ -10,6 +10,7 @@ import { getInventoryRows, setInventoryRows as saveInventoryRows, getOpnameHisto
 import { isTenantAdmin, getCurrentTenantUser } from '../lib/tenantAuth';
 import { isNeedsSetup, markItemSetUp, getCatalog } from '../lib/producedItems';
 import ProductionLogTab from '../components/ProductionLogTab';
+import { fmtNum } from '../lib/format';
 
 const PAGE_SIZE = 10;
 const sortKeys = ['name','warehouseStock','warehouseName','itemStock','stokMin','stokUsed','valuation','totalValuation','minStatus','flag1','flag2','asile','rack','level','lantai','lorong','updatedAt'];
@@ -605,13 +606,13 @@ export default function WarehouseInventoryPage() {
                         {r.name}
                         {isNeedsSetup(r.name) && <span className="badge badge-orange needs-setup-chip" title="Created from a production request — complete its information">Needs setup</span>}
                       </td>
-                      <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{r.warehouseStock}</td>
+                      <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{fmtNum(r.warehouseStock)}</td>
                       <td>{r.warehouseName}</td>
-                      <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{r.itemStock}</td>
-                      <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{r.stokMin}</td>
-                      <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{r.stokUsed}</td>
-                      <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{r.valuation}</td>
-                      <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{r.totalValuation}</td>
+                      <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{fmtNum(r.itemStock)}</td>
+                      <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{fmtNum(r.stokMin)}</td>
+                      <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{fmtNum(r.stokUsed)}</td>
+                      <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{fmtNum(r.valuation)}</td>
+                      <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{fmtNum(r.totalValuation)}</td>
                       <td>{statusBadge(r.minStatus)}</td>
                       <td style={{ textAlign:'center', color:'var(--text-muted)', fontSize:'12px' }}>{r.flag1}</td>
                       <td style={{ textAlign:'center', color:'var(--text-muted)', fontSize:'12px' }}>{r.flag2}</td>
@@ -723,7 +724,7 @@ export default function WarehouseInventoryPage() {
                     <ItemThumb name={item.name} />
                     <span className="inventory-item-meta">
                       <span className="inventory-item-name">{item.name}</span>
-                      <span className="inventory-item-stock">Stock: {item.stock}</span>
+                      <span className="inventory-item-stock">Stock: {fmtNum(item.stock)}</span>
                     </span>
                   </button>
                 ))
@@ -797,12 +798,12 @@ export default function WarehouseInventoryPage() {
           <div className="item-detail-grid">
             <div className="item-detail-row"><span>Name</span><strong>{detailRow.name}</strong></div>
             <div className="item-detail-row"><span>Warehouse</span><strong>{detailRow.warehouseName}</strong></div>
-            <div className="item-detail-row"><span>Warehouse Stock</span><strong>{detailRow.warehouseStock}</strong></div>
-            <div className="item-detail-row"><span>Item Stock</span><strong>{detailRow.itemStock}</strong></div>
-            <div className="item-detail-row"><span>Minimum Stock</span><strong>{detailRow.stokMin}</strong></div>
-            <div className="item-detail-row"><span>Used</span><strong>{detailRow.stokUsed}</strong></div>
-            <div className="item-detail-row"><span>Valuation</span><strong>{detailRow.valuation}</strong></div>
-            <div className="item-detail-row"><span>Total Valuation</span><strong>{detailRow.totalValuation}</strong></div>
+            <div className="item-detail-row"><span>Warehouse Stock</span><strong>{fmtNum(detailRow.warehouseStock)}</strong></div>
+            <div className="item-detail-row"><span>Item Stock</span><strong>{fmtNum(detailRow.itemStock)}</strong></div>
+            <div className="item-detail-row"><span>Minimum Stock</span><strong>{fmtNum(detailRow.stokMin)}</strong></div>
+            <div className="item-detail-row"><span>Used</span><strong>{fmtNum(detailRow.stokUsed)}</strong></div>
+            <div className="item-detail-row"><span>Valuation</span><strong>{fmtNum(detailRow.valuation)}</strong></div>
+            <div className="item-detail-row"><span>Total Valuation</span><strong>{fmtNum(detailRow.totalValuation)}</strong></div>
             <div className="item-detail-row"><span>Status</span><span>{statusBadge(detailRow.minStatus)}</span></div>
             <div className="item-detail-row"><span>Flag 1 / Flag 2</span><strong>{detailRow.flag1 || '—'} / {detailRow.flag2 || '—'}</strong></div>
             <div className="item-detail-row"><span>Aisle / Rack / Level</span><strong>{detailRow.asile || '—'} / {detailRow.rack || '—'} / {detailRow.level || '—'}</strong></div>
@@ -862,7 +863,7 @@ export default function WarehouseInventoryPage() {
                       <td className="name-cell">{mo.itemName}</td>
                       <td>{mo.fromWarehouse}</td>
                       <td>{mo.toWarehouse}</td>
-                      <td style={{ textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{mo.qty}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{fmtNum(mo.qty)}</td>
                       <td>{mo.movedBy}</td>
                     </tr>
                   ))
@@ -922,7 +923,7 @@ export default function WarehouseInventoryPage() {
                       <label className="mo-item-check">
                         <input type="checkbox" checked={checked} onChange={() => toggleMoItem(r)} />
                         <span className="mo-item-name">{r.name}</span>
-                        <span className="mo-item-stock">stock: {r.itemStock}</span>
+                        <span className="mo-item-stock">stock: {fmtNum(r.itemStock)}</span>
                       </label>
                       {checked && (
                         <input
@@ -1000,7 +1001,7 @@ export default function WarehouseInventoryPage() {
                       <td className="name-cell">{m.itemName}</td>
                       <td>{m.warehouse}</td>
                       <td style={{ textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: m.change < 0 ? 'var(--red)' : 'var(--green)' }}>{m.change > 0 ? '+' : ''}{m.change}</td>
-                      <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: 'var(--text-muted)' }}>{m.before} → {m.after}</td>
+                      <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: 'var(--text-muted)' }}>{fmtNum(m.before)} → {fmtNum(m.after)}</td>
                       <td>
                         <span className="badge badge-orange" style={{ fontSize: 11 }}>{m.reason}</span>
                         {m.note && <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 3 }}>{m.note}</div>}
@@ -1157,7 +1158,7 @@ export default function WarehouseInventoryPage() {
                     {it.note && <div style={{ fontSize:11, color:'var(--text-muted)', marginTop:2 }}>{it.note}</div>}
                   </span>
                   <span style={{ fontWeight:700, color: it.diff > 0 ? 'var(--brand)' : it.diff < 0 ? 'var(--red)' : 'var(--text-muted)', whiteSpace:'nowrap' }}>
-                    {it.before} → {it.after} ({it.diff > 0 ? '+' : ''}{it.diff})
+                    {fmtNum(it.before)} → {fmtNum(it.after)} ({it.diff > 0 ? '+' : ''}{it.diff})
                   </span>
                 </div>
               ))}

@@ -86,7 +86,7 @@ export default function OverviewReportPage() {
         <div className="kpi-card green-accent">
           <div className="kpi-label">Inventory SKU</div>
           <div className="kpi-value">{inventoryData.length}</div>
-          <div className="kpi-sub">{totalItemCount.toLocaleString('en-US')} items across upcoming events</div>
+          <div className="kpi-sub">{totalItemCount.toLocaleString('id-ID')} items across upcoming events</div>
         </div>
       </div>
 

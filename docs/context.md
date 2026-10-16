@@ -899,6 +899,16 @@ clashes or seems off) — proceeding with the stated assumption unless corrected
 
 ## Raw instruction log
 
+### 2026-10-16 (6) — Dot thousands separator everywhere; "menu not updated" (Claude Web)
+> 1. untuk semua angka gunakan . ya pemisahnya
+> 2. kemudian saya lihat menu belum terupdate, kan sebelumnya saya minta ada untuk tambahan cms kok tidak ada disini
+
+- **Standing rule:** every number shown uses `.` as the thousands separator (`fmtNum()` in `src/lib/format.js`,
+  locale `id-ID`). Applied to all tables / KPIs that showed raw numbers (valuation 650000 → 650.000, etc.).
+- The menu on `main` already has Event Calendar, Loan, Event Report and Stock Opname Report, and no Item Loan.
+  The owner's screenshot showed the old sidebar (with Item Loan), so the copy being viewed was older than `main`.
+  They were told to pull `main` and restart the dev server.
+
 ### 2026-10-16 (5) — Event Calendar with item clashes, better Event Report, Stock Opname Report (Claude Web)
 > 1. Kalender event yang menampilkan bentrok pemakaian barang: barang yang sama dipesan dua event di tanggal yang sama.
 > 2. Report event tolong dibuat lebih baik lagi

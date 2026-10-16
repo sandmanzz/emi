@@ -10,6 +10,7 @@ import { addActivityLog } from '../lib/activityLogStore';
 import { getCurrentTenantUser } from '../lib/tenantAuth';
 import { getAllProductions, PRODUCTION_BADGE } from '../lib/productionRequests';
 import { formatIDR } from '../lib/superAdminUtils';
+import { fmtNum } from '../lib/format';
 
 
 function statusBadge(s) {
@@ -119,14 +120,14 @@ export default function InventoryDetailPage() {
             <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', paddingBottom:8, borderBottom:'1px solid var(--bg)' }}>
                 <span style={{ fontSize:13, color:'var(--text-muted)', fontWeight:500 }}>Total Stock</span>
-                <span style={{ fontSize:20, fontWeight:700, color:'var(--text)', fontVariantNumeric:'tabular-nums' }}>{item.totalStock} <span style={{ fontSize:12, color:'var(--text-muted)', fontWeight:500 }}>{item.unit}</span></span>
+                <span style={{ fontSize:20, fontWeight:700, color:'var(--text)', fontVariantNumeric:'tabular-nums' }}>{fmtNum(item.totalStock)} <span style={{ fontSize:12, color:'var(--text-muted)', fontWeight:500 }}>{item.unit}</span></span>
               </div>
               {item.warehouses.length === 0
                 ? <p style={{ fontSize:12.5, color:'var(--text-muted)', margin:0 }}>No stock in any warehouse.</p>
                 : item.warehouses.map(w => (
                   <div key={w.name} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', paddingBottom:8, borderBottom:'1px solid var(--bg)' }}>
                     <span style={{ fontSize:13, color:'var(--text-muted)', fontWeight:500 }}>{w.name}</span>
-                    <span style={{ fontSize:15, fontWeight:700, color:'var(--brand)', fontVariantNumeric:'tabular-nums' }}>{w.stock}</span>
+                    <span style={{ fontSize:15, fontWeight:700, color:'var(--brand)', fontVariantNumeric:'tabular-nums' }}>{fmtNum(w.stock)}</span>
                   </div>
                 ))}
               <p style={{ fontSize:11.5, color:'var(--text-muted)', margin:0 }}>From Warehouse Inventory, the single source of stock.</p>
@@ -168,7 +169,7 @@ export default function InventoryDetailPage() {
                       <td style={{ whiteSpace:'nowrap', color:'var(--text-muted)', fontSize:12.5 }}>{m.at}</td>
                       <td>{m.warehouse}</td>
                       <td style={{ textAlign:'right', fontWeight:700, color: m.change < 0 ? 'var(--red)' : 'var(--green)' }}>{m.change > 0 ? '+' : ''}{m.change}</td>
-                      <td style={{ textAlign:'right', color:'var(--text-muted)' }}>{m.before} → {m.after}</td>
+                      <td style={{ textAlign:'right', color:'var(--text-muted)' }}>{fmtNum(m.before)} → {fmtNum(m.after)}</td>
                       <td><span className="badge badge-orange" style={{ fontSize:11 }}>{m.reason}</span>{m.note && <div style={{ fontSize:11.5, color:'var(--text-muted)' }}>{m.note}</div>}</td>
                       <td style={{ fontSize:12.5 }}>{m.by || '—'}</td>
                     </tr>
@@ -197,7 +198,7 @@ export default function InventoryDetailPage() {
                   {productions.map(p => (
                     <tr key={p.uid}>
                       <td style={{ whiteSpace:'nowrap', color:'var(--text-muted)', fontSize:12.5 }}>{p.requestedAt}</td>
-                      <td style={{ textAlign:'right', fontWeight:600 }}>{p.qty}</td>
+                      <td style={{ textAlign:'right', fontWeight:600 }}>{fmtNum(p.qty)}</td>
                       <td>{p.vendorId ? <button type="button" className="link-btn" onClick={() => navigate(`/vendor-detail?id=${p.vendorId}`)}>{p.vendorName}</button> : (p.vendorName || '—')}</td>
                       <td>{p.eventKey ? <button type="button" className="link-btn" onClick={() => navigate(`/event-detail?name=${encodeURIComponent(p.eventKey)}`)}>{p.eventName}</button> : <span style={{ color:'var(--text-muted)' }}>Restock (no event)</span>}</td>
                       <td>{p.warehouse || '—'}</td>
@@ -226,7 +227,7 @@ export default function InventoryDetailPage() {
         </>}
       >
         {item.totalStock > 0
-          ? <p className="confirm-msg"><strong>&ldquo;{item.name}&rdquo;</strong> still has <strong>{item.totalStock}</strong> in stock. Move or write off the stock in Warehouse Inventory first.</p>
+          ? <p className="confirm-msg"><strong>&ldquo;{item.name}&rdquo;</strong> still has <strong>{fmtNum(item.totalStock)}</strong> in stock. Move or write off the stock in Warehouse Inventory first.</p>
           : <p className="confirm-msg">Delete <strong>&ldquo;{item.name}&rdquo;</strong>? It has no stock. This can&rsquo;t be undone.</p>}
       </Modal>
     </>

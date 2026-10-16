@@ -26,6 +26,7 @@ import { getIncomingItems, queueMovedItem, clearIncomingItems } from '../lib/mov
 import { addActivityLog } from '../lib/activityLogStore';
 import { getCurrentTenantUser } from '../lib/tenantAuth';
 import { initialEvents, TODAY } from '../data/events';
+import { fmtNum } from '../lib/format';
 
 // Matches the "<date> | <NAME>" key this page reads its own ?name= from, so a
 // candidate move-target event can be looked up in the same closing-status store.
@@ -170,7 +171,7 @@ function ItemCard({ item, group, showScanButton, onScanClick, onDelete, onCycleO
               <span className="item-scanned-badge"><CheckIcon /> Scanned</span>
             )}
           </span>
-          <span className="item-qty">Qty: {item.qty}</span>
+          <span className="item-qty">Qty: {fmtNum(item.qty)}</span>
         </div>
         {item.subArea && <div className="item-subarea">{item.subArea}</div>}
         <div className="item-pic">
@@ -267,7 +268,7 @@ function ItemTable({ items, packages, showScanButton, onScanClick, onDelete, onC
                   <span className={`area-badge ${areaBadgeClass(item.area)}`}>{item.area}</span>
                   {item.subArea && <div className="item-table-sub">{item.subArea}</div>}
                 </td>
-                <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{item.qty}</td>
+                <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{fmtNum(item.qty)}</td>
                 <td>{item.pic || '—'}</td>
                 <td>
                   {onCycleOwnership ? (
@@ -311,7 +312,7 @@ function ItemTable({ items, packages, showScanButton, onScanClick, onDelete, onC
 // Red chip shown while an item has an open broken-item report (Create Report in the drawer).
 function BrokenChip({ item }) {
   if (!(item.brokenQty > 0)) return null;
-  return <span className="badge badge-red" style={{ fontSize: 10 }} title={`${item.brokenQty} broken unit(s) reported`}>Broken item &middot; {item.brokenQty}</span>;
+  return <span className="badge badge-red" style={{ fontSize: 10 }} title={`${item.brokenQty} broken unit(s) reported`}>Broken item &middot; {fmtNum(item.brokenQty)}</span>;
 }
 
 // "Stock cut" until the item has been returned to stock, then "Stock returned".
@@ -1460,7 +1461,7 @@ export default function EventDetailPage() {
                           <div className="production-card-main">
                             <div className="production-card-title">
                               <span className="badge badge-blue" style={{ fontSize: 10.5 }}>Convert</span>
-                              {req.fromQty} × {req.fromName} <span className="production-arrow">&rarr;</span> {req.toQty} × {req.toName}
+                              {fmtNum(req.fromQty)} × {req.fromName} <span className="production-arrow">&rarr;</span> {fmtNum(req.toQty)} × {req.toName}
                               <span className={`badge ${req.status === 'Converted' ? 'badge-green' : 'badge-orange'}`} style={{ fontSize: 10.5 }}>{req.status}</span>
                             </div>
                             <div className="production-card-meta">
@@ -1491,7 +1492,7 @@ export default function EventDetailPage() {
                             <span className={`badge ${PRODUCTION_BADGE[req.status]}`} style={{ fontSize: 10.5 }}>{req.status}</span>
                           </div>
                           <div className="production-card-meta">
-                            <span>Qty {req.qty}</span>
+                            <span>Qty {fmtNum(req.qty)}</span>
                             <span>{req.area}{req.subArea ? ` · ${req.subArea}` : ''}</span>
                             {req.warehouse && <span>Deploy to {req.warehouse}</span>}
                             {req.vendorName && <span>By {req.vendorName} ({req.vendorOrigin})</span>}
@@ -1818,7 +1819,7 @@ export default function EventDetailPage() {
         </div>
 
         <p className="summary-text" style={{ marginBottom: 0 }}>
-          Total quantity across all items: <strong>{summaryStats.totalQty}</strong> · Scanned out:{' '}
+          Total quantity across all items: <strong>{fmtNum(summaryStats.totalQty)}</strong> · Scanned out:{' '}
           <strong>{summaryStats.scanOut}</strong> of {summaryStats.total}
         </p>
 
@@ -1876,7 +1877,7 @@ export default function EventDetailPage() {
             ['Category', catalogItem?.category || '—'],
             ['SKU', catalogItem?.sku || '—'],
             ['Warehouse', warehouseRows.length > 0
-              ? <span className="drawer-wh-list">{warehouseRows.map(r => <span key={r.id}>{r.warehouseName} <em>({r.itemStock} in stock)</em></span>)}</span>
+              ? <span className="drawer-wh-list">{warehouseRows.map(r => <span key={r.id}>{r.warehouseName} <em>({fmtNum(r.itemStock)} in stock)</em></span>)}</span>
               : (detailItem.warehouse || '—')],
             ['Quantity', detailItem.qty],
             ['PIC', detailItem.pic || '—'],
@@ -1905,7 +1906,7 @@ export default function EventDetailPage() {
               {detailItem.brokenQty > 0 && (
                 <div className="drawer-broken">
                   <div className="drawer-broken-head">
-                    <strong>{detailItem.brokenQty} of {detailItem.qty} reported broken</strong>
+                    <strong>{fmtNum(detailItem.brokenQty)} of {fmtNum(detailItem.qty)} reported broken</strong>
                     {!itemsLocked && <button type="button" className="drawer-link-btn" onClick={() => clearReport(detailItem)}>Remove report</button>}
                   </div>
                   {detailItem.brokenNote && <div>{detailItem.brokenNote}</div>}
@@ -2190,8 +2191,8 @@ export default function EventDetailPage() {
             {brokenItems.map(it => (
               <tr key={it.id}>
                 <td>{it.name}</td>
-                <td style={{ textAlign: 'right' }}>{it.qty}</td>
-                <td style={{ textAlign: 'right', color: 'var(--red)', fontWeight: 700 }}>{it.brokenQty}</td>
+                <td style={{ textAlign: 'right' }}>{fmtNum(it.qty)}</td>
+                <td style={{ textAlign: 'right', color: 'var(--red)', fontWeight: 700 }}>{fmtNum(it.brokenQty)}</td>
                 <td style={{ textAlign: 'right', fontWeight: 700 }}>{Math.max(0, it.qty - it.brokenQty)}</td>
               </tr>
             ))}
@@ -2224,7 +2225,7 @@ export default function EventDetailPage() {
               <label>Broken Quantity <span style={{ color: 'var(--red)' }}>*</span></label>
               <input type="number" min="1" max={reportItem.qty} value={reportForm.qty} onChange={e => setReportForm(f => ({ ...f, qty: e.target.value }))} />
               <p style={{ fontSize: 11.5, margin: '5px 0 0', color: reportQty > reportItem.qty ? 'var(--red)' : 'var(--text-muted)' }}>
-                Out of {reportItem.qty} prepared for this event.
+                Out of {fmtNum(reportItem.qty)} prepared for this event.
               </p>
             </div>
             <div className="form-group">
@@ -2281,7 +2282,7 @@ export default function EventDetailPage() {
               <strong>{pendingConversions.length} convert request{pendingConversions.length === 1 ? '' : 's'} will be applied.</strong> Warehouse stock will be reduced:
               <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
                 {pendingConversions.map(r => (
-                  <li key={r.id}>{r.fromQty} × {r.fromName} ({r.fromWarehouse}) &rarr; {r.toQty} × {r.toName}</li>
+                  <li key={r.id}>{fmtNum(r.fromQty)} × {r.fromName} ({r.fromWarehouse}) &rarr; {fmtNum(r.toQty)} × {r.toName}</li>
                 ))}
               </ul>
             </div>
@@ -2389,7 +2390,7 @@ export default function EventDetailPage() {
                 <input type="checkbox" checked={packagingSelection.includes(it.id)} onChange={() => togglePackagingSelection(it.id)} onClick={e => e.stopPropagation()} />
                 <div>
                   <div className="package-pick-row-name">{it.name}</div>
-                  <div className="package-pick-row-meta">{it.area} · Qty: {it.qty}</div>
+                  <div className="package-pick-row-meta">{it.area} · Qty: {fmtNum(it.qty)}</div>
                 </div>
               </div>
             ))
@@ -2473,7 +2474,7 @@ export default function EventDetailPage() {
                       </span>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text)' }}>{it.name}</div>
-                        <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{it.area} · {it.stage} · Qty: {it.qty}</div>
+                        <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{it.area} · {it.stage} · Qty: {fmtNum(it.qty)}</div>
                       </div>
                       <span className={`badge ${ownershipBadgeClass(it.ownership)}`}>{it.ownership}</span>
                       {sel && it.ownership !== bulkOwnTarget && (
@@ -2519,7 +2520,7 @@ export default function EventDetailPage() {
                   </span>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text)' }}>{it.name}</div>
-                    <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{it.area} · Qty: {it.qty}</div>
+                    <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{it.area} · Qty: {fmtNum(it.qty)}</div>
                   </div>
                 </div>
               ))}
@@ -2562,7 +2563,7 @@ export default function EventDetailPage() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
                     <div>
                       <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text)' }}>{it.name}</div>
-                      <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{it.area} · Qty: {it.qty}</div>
+                      <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{it.area} · Qty: {fmtNum(it.qty)}</div>
                     </div>
                     {it.resolution === 'returned' ? (
                       <span className="badge badge-green" style={{ fontSize: 10, flexShrink: 0 }}>Returned</span>

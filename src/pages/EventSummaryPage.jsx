@@ -15,6 +15,7 @@ import { getEventLoans, loanDisplayStatus, loanTotalCost, LOAN_BADGE } from '../
 import { getProductionRequests, PRODUCTION_BADGE } from '../lib/productionRequests';
 import { clashesForEvent } from '../lib/eventClashes';
 import { TODAY } from '../data/events';
+import { fmtNum } from '../lib/format';
 
 // Event Report (/event-summary?name=<event key>): everything about one event's items on one
 // page, built for the real case of HUNDREDS of item lines per event.
@@ -392,7 +393,7 @@ export default function EventSummaryPage() {
                   <tr key={a.area} className={`row-clickable${areas.includes(a.area) ? ' rep-row-active' : ''}`} onClick={() => toggleArea(a.area)}>
                     <td className="name-cell">{a.area}</td>
                     <td className="num">{a.lines}</td>
-                    <td className="num">{a.qty}</td>
+                    <td className="num">{fmtNum(a.qty)}</td>
                     <td className="num rep-nowrap">{formatIDR(a.value)}</td>
                     <td><Bar value={a.checked} total={a.lines} color="var(--purple)" /></td>
                     <td><Bar value={a.scanIn} total={a.lines} color="var(--brand)" /></td>
@@ -463,7 +464,7 @@ export default function EventSummaryPage() {
                     <tr key={`g-${it.area}-${i}`} className="rep-group-row">
                       <td colSpan={colCount}>
                         <strong>{it.area}</strong>
-                        <span>{g.lines} lines · {g.qty} pcs · {formatIDR(g.value)}</span>
+                        <span>{g.lines} lines · {fmtNum(g.qty)} pcs · {formatIDR(g.value)}</span>
                       </td>
                     </tr>
                   ),
@@ -474,7 +475,7 @@ export default function EventSummaryPage() {
                       <span>{[it.sku, it.category].filter(Boolean).join(' · ')}</span>
                     </td>
                     <td className="rep-area">{it.area}{it.subArea && <span>{it.subArea}</span>}</td>
-                    <td className="num rep-nowrap"><strong>{it.qty}</strong> <span className="rep-muted">{it.unit}</span></td>
+                    <td className="num rep-nowrap"><strong>{fmtNum(it.qty)}</strong> <span className="rep-muted">{it.unit}</span></td>
                     <td className="num rep-nowrap">{it.value ? formatIDR(it.value) : '—'}</td>
                     <td>{it.ownership}</td>
                     <td className="rep-muted rep-small">{it.stage}</td>
@@ -525,7 +526,7 @@ export default function EventSummaryPage() {
                     {loans.map(l => (
                       <tr key={l.id}>
                         <td className="name-cell">{l.itemName}</td>
-                        <td className="num">{l.qty} <span className="rep-muted">{l.unit}</span></td>
+                        <td className="num">{fmtNum(l.qty)} <span className="rep-muted">{l.unit}</span></td>
                         <td><button type="button" className="link-btn" onClick={() => navigate(`/loan-vendor-detail?id=${l.vendorId}`)}>{l.vendorName}</button></td>
                         <td className="rep-small">{l.area}{l.subArea ? ` · ${l.subArea}` : ''}</td>
                         <td className="rep-small rep-nowrap">{fmtDate(l.startDate)} → {fmtDate(l.dueDate)}</td>
@@ -549,7 +550,7 @@ export default function EventSummaryPage() {
                       <tr key={`p${p.id}`}>
                         <td><span className="badge badge-purple" style={{ fontSize: 10.5 }}>Production</span></td>
                         <td className="name-cell">{p.name}{p.reason === 'broken' && <span className="badge badge-red" style={{ fontSize: 10, marginLeft: 6 }}>Replaces broken</span>}</td>
-                        <td className="num">{p.qty}</td>
+                        <td className="num">{fmtNum(p.qty)}</td>
                         <td>{p.vendorId ? <button type="button" className="link-btn" onClick={() => navigate(`/vendor-detail?id=${p.vendorId}`)}>{p.vendorName}</button> : (p.vendorName || '—')}</td>
                         <td className="rep-small">{p.warehouse || '—'}</td>
                         <td className="rep-small rep-nowrap">{p.requestedAt}</td>
@@ -559,8 +560,8 @@ export default function EventSummaryPage() {
                     {converts.map(c => (
                       <tr key={`c${c.id}`}>
                         <td><span className="badge badge-blue" style={{ fontSize: 10.5 }}>Convert</span></td>
-                        <td className="name-cell">{c.fromQty} × {c.fromName} → {c.toQty} × {c.toName}</td>
-                        <td className="num">{c.toQty}</td>
+                        <td className="name-cell">{fmtNum(c.fromQty)} × {c.fromName} → {fmtNum(c.toQty)} × {c.toName}</td>
+                        <td className="num">{fmtNum(c.toQty)}</td>
                         <td className="rep-small">{c.fromWarehouse}</td>
                         <td className="rep-small">—</td>
                         <td className="rep-small rep-nowrap">{c.requestedAt}</td>
@@ -588,8 +589,8 @@ export default function EventSummaryPage() {
                     <td className="name-cell">{c.item}</td>
                     <td className="rep-small rep-nowrap">{fmtDate(c.from)}{c.to !== c.from ? ` – ${fmtDate(c.to)}` : ''}</td>
                     <td className="rep-small">{c.entries.map(x => `${x.name} (${x.qty})`).join(' · ')}</td>
-                    <td className="num" style={{ color: 'var(--red)', fontWeight: 700 }}>{c.demand}</td>
-                    <td className="num">{c.stock}</td>
+                    <td className="num" style={{ color: 'var(--red)', fontWeight: 700 }}>{fmtNum(c.demand)}</td>
+                    <td className="num">{fmtNum(c.stock)}</td>
                   </tr>
                 ))}</tbody>
               </table></div>
@@ -598,25 +599,25 @@ export default function EventSummaryPage() {
           {issues.overdue.length > 0 && (
             <div className="card rep-issue">
               <div className="rep-section-title">Overdue rentals <span className="rep-muted">return to the vendor</span></div>
-              <ul className="rep-issue-list">{issues.overdue.map(l => <li key={l.id}><strong>{l.itemName}</strong> · {l.qty} {l.unit} from {l.vendorName} · due {fmtDate(l.dueDate)}</li>)}</ul>
+              <ul className="rep-issue-list">{issues.overdue.map(l => <li key={l.id}><strong>{l.itemName}</strong> · {fmtNum(l.qty)} {l.unit} from {l.vendorName} · due {fmtDate(l.dueDate)}</li>)}</ul>
             </div>
           )}
           {issues.broken.length > 0 && (
             <div className="card rep-issue">
               <div className="rep-section-title">Broken items <span className="rep-muted">{issues.broken.reduce((s, it) => s + it.brokenQty, 0)} pcs reported</span></div>
-              <ul className="rep-issue-list">{issues.broken.map(it => <li key={it.id}><strong>{it.name}</strong> · {it.area} · {it.brokenQty} of {it.qty} broken{it.brokenNote ? ` — ${it.brokenNote}` : ''}</li>)}</ul>
+              <ul className="rep-issue-list">{issues.broken.map(it => <li key={it.id}><strong>{it.name}</strong> · {it.area} · {fmtNum(it.brokenQty)} of {fmtNum(it.qty)} broken{it.brokenNote ? ` — ${it.brokenNote}` : ''}</li>)}</ul>
             </div>
           )}
           {issues.notScanned.length > 0 && (
             <div className="card rep-issue">
               <div className="rep-section-title">Not scanned in <span className="rep-muted">{issues.notScanned.length} lines, although the event is past the scan-in stage</span></div>
-              <ul className="rep-issue-list rep-issue-cols">{issues.notScanned.map(it => <li key={it.id}><strong>{it.name}</strong> · {it.area} · {it.qty}</li>)}</ul>
+              <ul className="rep-issue-list rep-issue-cols">{issues.notScanned.map(it => <li key={it.id}><strong>{it.name}</strong> · {it.area} · {fmtNum(it.qty)}</li>)}</ul>
             </div>
           )}
           {issues.notChecked.length > 0 && (
             <div className="card rep-issue">
               <div className="rep-section-title">Not cross-checked <span className="rep-muted">{issues.notChecked.length} lines still to check during closing</span></div>
-              <ul className="rep-issue-list rep-issue-cols">{issues.notChecked.map(it => <li key={it.id}><strong>{it.name}</strong> · {it.area} · {it.qty}</li>)}</ul>
+              <ul className="rep-issue-list rep-issue-cols">{issues.notChecked.map(it => <li key={it.id}><strong>{it.name}</strong> · {it.area} · {fmtNum(it.qty)}</li>)}</ul>
             </div>
           )}
         </div>

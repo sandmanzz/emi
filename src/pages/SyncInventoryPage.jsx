@@ -3,6 +3,7 @@ import Pagination from '../components/Pagination';
 import SortTh from '../components/SortTh';
 import SearchableSelect from '../components/SearchableSelect';
 import { IconSearch } from '../components/icons';
+import { fmtNum } from '../lib/format';
 
 const PAGE_SIZE = 10;
 
@@ -173,8 +174,8 @@ export default function SyncInventoryPage() {
                       <tr key={r.id}>
                         <td className="name-cell">{r.name}</td>
                         <td className="id-cell">{r.sku}</td>
-                        <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums', fontWeight:600 }}>{r.stock}</td>
-                        <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{r.warehouseStock}</td>
+                        <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums', fontWeight:600 }}>{fmtNum(r.stock)}</td>
+                        <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{fmtNum(r.warehouseStock)}</td>
                         <td style={{ fontSize:'12.5px' }}>{r.warehouse}</td>
                         <td><DiffBadge diff={diff} /></td>
                         <td style={{ textAlign:'center' }}>

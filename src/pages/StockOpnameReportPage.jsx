@@ -7,6 +7,7 @@ import { getOpnameHistory } from '../lib/stockOpnameStore';
 import { getCatalog } from '../lib/producedItems';
 import { formatIDR } from '../lib/superAdminUtils';
 import { TODAY } from '../data/events';
+import { fmtNum } from '../lib/format';
 
 // Stock Opname Report (/stock-opname-report): how accurate our stock records are, per warehouse,
 // per month and per item, from the stock opname history (lib/stockOpnameStore.js).
@@ -212,7 +213,7 @@ export default function StockOpnameReportPage() {
                   <tr key={w.warehouse}>
                     <td className="name-cell">{w.warehouse}</td>
                     <td className="num">{w.opnames}</td>
-                    <td className="num">{w.counted}</td>
+                    <td className="num">{fmtNum(w.counted)}</td>
                     <td><Acc value={w.accuracy} /></td>
                     <td className="num" style={{ color: w.net < 0 ? 'var(--red)' : 'var(--green)', fontWeight: 700 }}>{w.net > 0 ? '+' : ''}{w.net}</td>
                     <td className="num rep-nowrap">{formatIDR(w.shrink)}</td>
@@ -280,7 +281,7 @@ export default function StockOpnameReportPage() {
                     <td>{h.warehouse}</td>
                     <td>{h.appliedBy}{h.resolvedBy && <div className="rep-muted">{h.status === 'Pending' ? 'waiting' : `${h.status.toLowerCase()} by ${h.resolvedBy}`}</div>}</td>
                     <td><span className={`badge ${STATUS_BADGE[h.status] || 'badge-gray'}`} style={{ fontSize: 11 }}>{h.status}</span></td>
-                    <td className="num">{h.counted}</td>
+                    <td className="num">{fmtNum(h.counted)}</td>
                     <td className="num">{h.varianceLines}</td>
                     <td><Acc value={h.accuracy} /></td>
                     <td className="num" style={{ color: h.net < 0 ? 'var(--red)' : 'var(--green)', fontWeight: 700 }}>{h.net > 0 ? '+' : ''}{h.net}</td>
@@ -296,8 +297,8 @@ export default function StockOpnameReportPage() {
                             {h.lines.map(l => (
                               <tr key={`${h.id}-${l.rowId}`}>
                                 <td>{l.name}</td>
-                                <td className="num">{l.before}</td>
-                                <td className="num">{l.after}</td>
+                                <td className="num">{fmtNum(l.before)}</td>
+                                <td className="num">{fmtNum(l.after)}</td>
                                 <td className="num" style={{ color: l.diff < 0 ? 'var(--red)' : 'var(--green)', fontWeight: 700 }}>{l.diff > 0 ? '+' : ''}{l.diff}</td>
                                 <td><span className={`badge ${l.condition === 'Poor' ? 'badge-orange' : 'badge-gray'}`} style={{ fontSize: 10.5 }}>{l.condition}</span></td>
                                 <td className="num rep-nowrap">{l.value ? formatIDR(Math.abs(l.value)) : '—'}</td>

@@ -3,6 +3,7 @@ import Modal from './Modal';
 import SearchableSelect from './SearchableSelect';
 import { IconClose, IconPrint } from './icons';
 import { getCatalog } from '../lib/producedItems';
+import { fmtNum } from '../lib/format';
 
 // Styles for the printed sheet. Every rule is scoped to .pp-*, so the same string is
 // used for the in-app preview (inside a <style> tag) and for the print iframe.
@@ -167,7 +168,7 @@ export default function PrintPlanModal({ eventName, eventSeed, currentStage, sta
                 <div key={g.area} className={`pp-loc${pageBreak && gi > 0 ? ' pp-break' : ''}`}>
                   <div className="pp-loc-head">
                     <span className="pp-loc-name">{g.area}</span>
-                    <span className="pp-loc-count">{g.count} item{g.count === 1 ? '' : 's'} · {g.qty} pcs</span>
+                    <span className="pp-loc-count">{g.count} item{g.count === 1 ? '' : 's'} · {fmtNum(g.qty)} pcs</span>
                   </div>
                   <table className="pp-table">
                     <thead>
@@ -194,7 +195,7 @@ export default function PrintPlanModal({ eventName, eventSeed, currentStage, sta
                               <td className="pp-muted">{n}</td>
                               <td><strong>{it.name}</strong>{cat?.sku && <div className="pp-muted">{cat.sku}</div>}</td>
                               <td>{cat?.category || '—'}</td>
-                              <td className="pp-num"><strong>{it.qty}</strong> {cat?.unit || ''}</td>
+                              <td className="pp-num"><strong>{fmtNum(it.qty)}</strong> {cat?.unit || ''}</td>
                               {cols.warehouse && <td>{it.warehouse || cat?.warehouse || '—'}</td>}
                               {cols.ownership && <td>{it.ownership || '—'}</td>}
                               {cols.pic && <td>{it.pic || '—'}</td>}

@@ -2,6 +2,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import Modal from '../components/Modal';
 import { IconEdit, IconDelete } from '../components/icons';
+import { fmtNum } from '../lib/format';
 
 const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 function fmtDate(d) {
@@ -106,7 +107,7 @@ export default function CategoryDetailPage() {
         </div>
         <div className="stat-card" style={{ margin:0 }}>
           <div className="stat-icon" style={{ background:clr.bg }}>
-            <span className="stat-value" style={{ color:clr.color }}>{cat.itemCount}</span>
+            <span className="stat-value" style={{ color:clr.color }}>{fmtNum(cat.itemCount)}</span>
           </div>
           <span className="stat-label">Total Items</span>
         </div>

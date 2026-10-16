@@ -6,6 +6,7 @@ import { getCatalog } from '../lib/producedItems';
 import { getInventoryRows } from '../lib/stockOpnameStore';
 import { getAllRentals, loanDisplayStatus } from '../lib/eventLoans';
 import { getActivityLogs } from '../lib/activityLogStore';
+import { fmtNum } from '../lib/format';
 
 const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const MONTHS_LONG = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -135,7 +136,7 @@ export default function DashboardPage() {
         <div className="kpi-card green-accent">
           <div className="kpi-label">Inventory SKU</div>
           <div className="kpi-value">{inventoryData.length}</div>
-          <div className="kpi-sub">{totalStockUnits.toLocaleString('en-US')} total units</div>
+          <div className="kpi-sub">{totalStockUnits.toLocaleString('id-ID')} total units</div>
           <KpiDelta direction="up" good>+2 new SKUs</KpiDelta>
         </div>
         <div className="kpi-card orange-accent">
@@ -219,10 +220,10 @@ export default function DashboardPage() {
             {warehouseBreakdown.map(([warehouse, stock]) => (
               <div key={warehouse} className="viz-bar-row">
                 <div className="viz-bar-label">{warehouse}</div>
-                <div className="viz-bar-track" title={`${warehouse}: ${stock.toLocaleString('en-US')} units`}>
+                <div className="viz-bar-track" title={`${warehouse}: ${stock.toLocaleString('id-ID')} units`}>
                   <div className="viz-bar-fill" style={{ width: `${pct(stock, maxWarehouseStock)}%` }} />
                 </div>
-                <div className="viz-bar-value">{stock.toLocaleString('en-US')}</div>
+                <div className="viz-bar-value">{stock.toLocaleString('id-ID')}</div>
               </div>
             ))}
           </div>
@@ -250,10 +251,10 @@ export default function DashboardPage() {
           {categoryBreakdown.map(([category, stock]) => (
             <div key={category} className="viz-bar-row">
               <div className="viz-bar-label">{category}</div>
-              <div className="viz-bar-track" title={`${category}: ${stock.toLocaleString('en-US')} units`}>
+              <div className="viz-bar-track" title={`${category}: ${stock.toLocaleString('id-ID')} units`}>
                 <div className="viz-bar-fill" style={{ width: `${pct(stock, maxCategoryStock)}%` }} />
               </div>
-              <div className="viz-bar-value">{stock.toLocaleString('en-US')}</div>
+              <div className="viz-bar-value">{stock.toLocaleString('id-ID')}</div>
             </div>
           ))}
         </div>
@@ -280,7 +281,7 @@ export default function DashboardPage() {
                     <td className="name-cell">{i.name}</td>
                     <td>{i.category}</td>
                     <td style={{ color: 'var(--text-muted)' }}>{i.warehouse}</td>
-                    <td style={{ textAlign: 'right', fontWeight: 600 }}>{i.totalStock} {i.unit}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 600 }}>{fmtNum(i.totalStock)} {i.unit}</td>
                     <td><span className={`badge ${stockBadgeClass(i.stockStatus)}`}>{i.stockStatus}</span></td>
                   </tr>
                 ))

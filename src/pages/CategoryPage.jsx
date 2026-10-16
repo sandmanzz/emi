@@ -5,6 +5,7 @@ import Pagination from '../components/Pagination';
 import SortTh from '../components/SortTh';
 import { IconSearch, IconPlus, IconEdit, IconDelete, IconClose, IconCheck } from '../components/icons';
 import { initialCategories } from '../data/categories';
+import { fmtNum } from '../lib/format';
 
 const PAGE_SIZE = 10;
 
@@ -160,7 +161,7 @@ export default function CategoryPage() {
                           <span style={{ display:'inline-flex', alignItems:'center', gap:6, padding:'4px 10px', background:clr.bg, color:clr.color, borderRadius:6, fontWeight:600, fontSize:12.5 }}>{r.name}</span>
                         </td>
                         <td style={{ color:'var(--text-2)', fontSize:'12.5px' }}>{r.desc || <span style={{ color:'var(--text-muted)' }}>—</span>}</td>
-                        <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums', fontWeight:600, color: r.itemCount > 0 ? 'var(--text)' : 'var(--text-muted)' }}>{r.itemCount}</td>
+                        <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums', fontWeight:600, color: r.itemCount > 0 ? 'var(--text)' : 'var(--text-muted)' }}>{fmtNum(r.itemCount)}</td>
                         <td style={{ color:'var(--text-muted)', fontSize:'12.5px' }}>{fmtDate(r.createdAt)}</td>
                         <td style={{ color:'var(--text-muted)', fontSize:'12.5px' }}>{fmtDate(r.updatedAt)}</td>
                         <td>

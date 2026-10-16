@@ -12,6 +12,7 @@ import Modal from '../components/Modal';
 import { addActivityLog } from '../lib/activityLogStore';
 import { getCurrentTenantUser } from '../lib/tenantAuth';
 import { formatIDR } from '../lib/superAdminUtils';
+import { fmtNum } from '../lib/format';
 
 function ImgCell({ src, name, onClick }) {
   return (
@@ -276,7 +277,7 @@ export default function InventoryPage() {
                       {r.warehouse || <span className="setup-missing">No stock</span>}
                       {r.warehouses.length > 1 && <span className="rep-muted" title={r.warehouses.map(w => `${w.name}: ${w.stock}`).join('\n')}> +{r.warehouses.length - 1}</span>}
                     </td>
-                    <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums', fontWeight:600 }}>{r.totalStock}</td>
+                    <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums', fontWeight:600 }}>{fmtNum(r.totalStock)}</td>
                     <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums', whiteSpace:'nowrap' }}>
                       {r.itemValue ? formatIDR(r.itemValue) : <span className="setup-missing">Not set</span>}
                     </td>

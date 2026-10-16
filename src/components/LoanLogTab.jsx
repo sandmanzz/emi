@@ -12,6 +12,7 @@ import { getCurrentTenantUser } from '../lib/tenantAuth';
 import { BorrowItemModal } from './EventLoans';
 import { formatIDR } from '../lib/superAdminUtils';
 import { TODAY } from '../data/events';
+import { fmtNum } from '../lib/format';
 
 const PAGE_SIZE = 15;
 const STATUSES = ['Requested', 'Borrowed', 'Overdue', 'Returned'];
@@ -148,7 +149,7 @@ export default function LoanLogTab({ vendorId = null, allowCreate = false }) {
                       {l.itemName}
                       {l.note && <div style={{ fontSize: 11.5, color: 'var(--text-muted)', fontWeight: 400, marginTop: 2 }}>{l.note}</div>}
                     </td>
-                    <td style={{ textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap' }}>{l.qty} <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: 12 }}>{l.unit}</span></td>
+                    <td style={{ textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap' }}>{fmtNum(l.qty)} <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: 12 }}>{l.unit}</span></td>
                     {vendorId == null && (
                       <td><button type="button" className="link-btn" onClick={() => navigate(`/loan-vendor-detail?id=${l.vendorId}`)}>{l.vendorName}</button></td>
                     )}

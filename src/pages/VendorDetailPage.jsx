@@ -9,6 +9,7 @@ import { getCatalog } from '../lib/producedItems';
 import { formatIDR } from '../lib/superAdminUtils';
 import { addActivityLog } from '../lib/activityLogStore';
 import { getCurrentTenantUser } from '../lib/tenantAuth';
+import { fmtNum } from '../lib/format';
 
 function InfoRow({ label, children }) {
   return (
@@ -125,7 +126,7 @@ export default function VendorDetailPage() {
                         {[...r.events].join(', ')}{r.events.size && r.restock ? ' · ' : ''}{r.restock ? `${r.restock}× restock` : ''}
                       </div>
                     </div>
-                    <span className="vendor-item-qty">{r.done}{r.done !== r.qty && <em> / {r.qty}</em>}</span>
+                    <span className="vendor-item-qty">{r.done}{r.done !== r.qty && <em> / {fmtNum(r.qty)}</em>}</span>
                   </li>
                 ))}
               </ul>
@@ -170,7 +171,7 @@ export default function VendorDetailPage() {
                       {p.reason === 'broken' && <span className="badge badge-red" style={{ fontSize: 10.5, marginLeft: 6 }}>Replaces broken</span>}
                       {p.note && <div style={{ fontSize: 11.5, color: 'var(--text-muted)', fontWeight: 400, marginTop: 2 }}>{p.note}</div>}
                     </td>
-                    <td style={{ textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{p.qty}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{fmtNum(p.qty)}</td>
                     <td>
                       {p.eventKey
                         ? <button type="button" className="link-btn" onClick={() => navigate(`/event-detail?name=${encodeURIComponent(p.eventKey)}`)}>{p.eventName}</button>

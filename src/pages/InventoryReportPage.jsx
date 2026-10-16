@@ -3,6 +3,7 @@ import Pagination from '../components/Pagination';
 import SearchableSelect from '../components/SearchableSelect';
 import { IconSearch, IconPrint } from '../components/icons';
 import { inventoryData, categories, stockStatuses } from '../data/inventory';
+import { fmtNum } from '../lib/format';
 
 const PAGE_SIZE = 10;
 
@@ -72,7 +73,7 @@ export default function InventoryReportPage() {
         </div>
         <div className="kpi-card green-accent">
           <div className="kpi-label">Total Stock</div>
-          <div className="kpi-value">{totalStockUnits.toLocaleString('en-US')}</div>
+          <div className="kpi-value">{totalStockUnits.toLocaleString('id-ID')}</div>
           <div className="kpi-sub">units across all warehouses</div>
         </div>
         <div className="kpi-card orange-accent">
@@ -95,7 +96,7 @@ export default function InventoryReportPage() {
               <div key={category}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
                   <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-2)' }}>{category} <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>({v.count} SKU)</span></span>
-                  <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text)' }}>{v.stock.toLocaleString('en-US')}</span>
+                  <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text)' }}>{v.stock.toLocaleString('id-ID')}</span>
                 </div>
                 <div className="progress-bar-track">
                   <div className="progress-bar-fill" style={{ width: `${(v.stock / maxCategoryStock) * 100}%`, background: 'var(--brand)' }} />
@@ -112,7 +113,7 @@ export default function InventoryReportPage() {
               <div key={warehouse}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
                   <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-2)' }}>{warehouse} <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>({v.count} SKU)</span></span>
-                  <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text)' }}>{v.stock.toLocaleString('en-US')}</span>
+                  <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text)' }}>{v.stock.toLocaleString('id-ID')}</span>
                 </div>
                 <div className="progress-bar-track">
                   <div className="progress-bar-fill" style={{ width: `${(v.stock / maxWarehouseStock) * 100}%`, background: 'var(--green)' }} />
@@ -173,7 +174,7 @@ export default function InventoryReportPage() {
                     <td>{i.category}</td>
                     <td>{i.unit}</td>
                     <td style={{ color: 'var(--text-muted)' }}>{i.warehouse}</td>
-                    <td style={{ textAlign: 'right', fontWeight: 600 }}>{i.totalStock}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 600 }}>{fmtNum(i.totalStock)}</td>
                     <td><span className={`badge ${stockBadgeClass(i.stockStatus)}`}>{i.stockStatus}</span></td>
                   </tr>
                 ))

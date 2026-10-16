@@ -50,6 +50,15 @@ explains a few non-obvious conventions that the entries below assume you already
 
 ---
 
+## Round 33 — Dot as thousands separator for every displayed number
+
+**Files:** new `src/lib/format.js` (`fmtNum`, `formatIDR`). A codemod wrapped raw numeric JSX (`{r.valuation}`, `{it.qty}`,
+`{x.totalStock}`, … on stock / qty / value fields) in `fmtNum()` across 24 components, and `toLocaleString('en-US')` → `'id-ID'`.
+The codemod skipped `attr={…}` (inputs keep plain numbers) and template strings.
+**Rule for new code:** display numbers with `fmtNum()` / `formatIDR()`, never raw and never `en-US`.
+
+---
+
 ## Round 32 — Event Calendar (item clashes), Event Report v2, Stock Opname Report
 
 Spec: [prd/PRD-2026-10-16.md](prd/PRD-2026-10-16.md) §12.

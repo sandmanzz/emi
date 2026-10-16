@@ -8,6 +8,7 @@ import { getAllEventLoans, loanTotalCost } from '../lib/eventLoans';
 import { formatIDR } from '../lib/superAdminUtils';
 import { addActivityLog } from '../lib/activityLogStore';
 import { getCurrentTenantUser } from '../lib/tenantAuth';
+import { fmtNum } from '../lib/format';
 
 function InfoRow({ label, children }) {
   return (
@@ -103,7 +104,7 @@ export default function LoanVendorDetailPage() {
                       <div className="vendor-item-sub">{[...r.events].join(', ')}</div>
                     </div>
                     <span className="vendor-item-qty">
-                      {r.qty} {r.unit}
+                      {fmtNum(r.qty)} {r.unit}
                       {r.out > 0 && <em> · {r.out} out now</em>}
                     </span>
                   </li>

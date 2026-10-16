@@ -6,6 +6,7 @@ import { IconSearch, IconCheck } from '../components/icons';
 import { initialWarehouses } from '../data/warehouses';
 import { getInventoryRows, addOpnameHistory, hasPendingOpname } from '../lib/stockOpnameStore';
 import { getCurrentTenantUser } from '../lib/tenantAuth';
+import { fmtNum } from '../lib/format';
 
 function formatToday() {
   const date = new Date();
@@ -217,7 +218,7 @@ export default function StockOpnamePage() {
                   return (
                     <tr key={r.id}>
                       <td className="name-cell">{r.name}</td>
-                      <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{r.itemStock}</td>
+                      <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmtNum(r.itemStock)}</td>
                       <td style={{ textAlign: 'right' }}>
                         <input
                           type="number" min="0" className="inv-pick-qty" style={{ width: 76 }}
@@ -289,7 +290,7 @@ export default function StockOpnamePage() {
                   {cond === 'Poor' && <span className="badge badge-red" style={{ marginLeft: 6, fontSize: 10 }}>Poor</span>}
                 </span>
                 <span style={{ fontWeight: 700, color: diff > 0 ? 'var(--brand)' : diff < 0 ? 'var(--red)' : 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-                  {r.itemStock} → {getActual(r)} ({diff > 0 ? '+' : ''}{diff})
+                  {fmtNum(r.itemStock)} → {getActual(r)} ({diff > 0 ? '+' : ''}{diff})
                 </span>
               </div>
             );

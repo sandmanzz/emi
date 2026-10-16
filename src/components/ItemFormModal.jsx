@@ -7,6 +7,7 @@ import { initialUnits } from '../data/units';
 import { initialWarehouses } from '../data/warehouses';
 import { addCatalogItem, updateCatalogItem, isNameTaken, isSkuTaken } from '../lib/catalogStore';
 import { formatIDR } from '../lib/superAdminUtils';
+import { fmtNum } from '../lib/format';
 
 // New / Edit Inventory item (catalog master data). Render it only while open; it fills itself once.
 // - Stock is NOT edited here: it lives in Warehouse Inventory rows (the single stock source).
@@ -144,8 +145,8 @@ export default function ItemFormModal({ item = null, by = 'Admin', onClose, onSa
             ? <p className="field-hint" style={{ marginTop: 0 }}>No stock in any warehouse.</p>
             : (
               <ul className="item-form-wh">
-                {item.warehouses.map(w => <li key={w.name}><span>{w.name}</span><strong>{w.stock} {item.unit}</strong></li>)}
-                <li className="total"><span>Total</span><strong>{item.totalStock} {item.unit}</strong></li>
+                {item.warehouses.map(w => <li key={w.name}><span>{w.name}</span><strong>{fmtNum(w.stock)} {item.unit}</strong></li>)}
+                <li className="total"><span>Total</span><strong>{fmtNum(item.totalStock)} {item.unit}</strong></li>
               </ul>
             )}
         </div>

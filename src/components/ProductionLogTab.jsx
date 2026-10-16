@@ -12,6 +12,7 @@ import { getVendorsOfKind, VENDOR_ORIGINS } from '../lib/vendorStore';
 import { getCatalog, stockInProduced } from '../lib/producedItems';
 import { addActivityLog } from '../lib/activityLogStore';
 import { getCurrentTenantUser } from '../lib/tenantAuth';
+import { fmtNum } from '../lib/format';
 
 const PAGE_SIZE = 10;
 const EMPTY_FORM = { itemMode: 'existing', name: '', newName: '', qty: 1, warehouse: '', vendorOrigin: 'Internal', vendorId: '', note: '' };
@@ -191,7 +192,7 @@ export default function ProductionLogTab({ warehouseNames, onStockChanged }) {
                         {p.reason === 'broken' && <span className="badge badge-red" style={{ fontSize: 10.5, marginLeft: 6 }}>Replaces broken</span>}
                         {p.note && <div style={{ fontSize: 11.5, color: 'var(--text-muted)', fontWeight: 400, marginTop: 2 }}>{p.note}</div>}
                       </td>
-                      <td style={{ textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{p.qty}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{fmtNum(p.qty)}</td>
                       <td>
                         {p.vendorId
                           ? <button type="button" className="link-btn" onClick={() => navigate(`/vendor-detail?id=${p.vendorId}`)}>{p.vendorName}</button>
