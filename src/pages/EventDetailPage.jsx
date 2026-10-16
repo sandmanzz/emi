@@ -10,9 +10,9 @@ import { inventoryData, categories } from '../data/inventory';
 import { initialWarehouses } from '../data/warehouses';
 import { wiData } from '../data/warehouseInventory';
 import { getEventStageNames, isScanStage, isCuttingStockStage, isStockReturnStage, isProductionStage, isCheckOwnershipStage, isDeleteAllowedStage, isLoanStage } from '../lib/eventStatuses';
-import { getInventoryRows, applyStockMovement, addInventoryRow } from '../lib/stockOpnameStore';
+import { getInventoryRows, applyStockMovement } from '../lib/stockOpnameStore';
 import { getVendorsOfKind, VENDOR_ORIGINS } from '../lib/vendorStore';
-import { getCatalog, addProducedItem } from '../lib/producedItems';
+import { getCatalog, stockInProduced } from '../lib/producedItems';
 import PrintPlanModal from '../components/PrintPlanModal';
 import { getEventSeedItems } from '../lib/eventItems';
 import { EventLoansPanel, BorrowItemModal } from '../components/EventLoans';
@@ -1014,13 +1014,10 @@ export default function EventDetailPage() {
     const nextStatus = PRODUCTION_STATUSES[PRODUCTION_STATUSES.indexOf(req.status) + 1];
     if (!nextStatus) return;
     if (nextStatus === 'Done') {
-      if (!window.confirm(`Mark "${req.name}" as done? It will be added to this event's items.`)) return;
-      // Create the draft Inventory item + Warehouse Inventory row (flagged "Needs setup")
-      // unless an item with this name already exists in the catalog.
-      if (!getCatalog().some(i => i.name === req.name)) {
-        const { row } = addProducedItem({ name: req.name, qty: req.qty, warehouseName: req.warehouse, vendorName: req.vendorName, producedFor: eventName });
-        addInventoryRow(row);
-      }
+      if (!window.confirm(`Mark "${req.name}" as done? It will be added to this event's items and ${req.qty} to ${req.warehouse}'s stock.`)) return;
+      // Stock goes into the deploy-to warehouse (logged as 'Production'); an item that isn't in the
+      // catalog yet becomes a "Needs setup" draft. (Since 2026-10-16 event productions add stock too.)
+      stockInProduced({ name: req.name, qty: req.qty, warehouseName: req.warehouse, vendorName: req.vendorName, producedFor: eventName, by: currentUser?.name || 'Admin' });
       setItems(is => [...is, {
         id: nextId, name: req.name, area: req.area, subArea: req.subArea, stage: eventStatus,
         qty: req.qty, pic: '', checking: false, scanned: false, groupId: null, warehouseItem: false,

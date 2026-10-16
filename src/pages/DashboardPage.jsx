@@ -1,9 +1,10 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { initialEvents, TODAY } from '../data/events';
-import { inventoryData } from '../data/inventory';
 import { initialWarehouses } from '../data/warehouses';
-import { initialItemLoans } from '../data/itemLoans';
+import { getCatalog } from '../lib/producedItems';
+import { getInventoryRows } from '../lib/stockOpnameStore';
+import { getAllRentals, loanDisplayStatus } from '../lib/eventLoans';
 import { getActivityLogs } from '../lib/activityLogStore';
 
 const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -53,7 +54,7 @@ function KpiDelta({ direction, good, children }) {
 }
 
 const MODULE_DOT = {
-  Event: 'var(--brand)', Inventory: 'var(--green)', 'Item Loan': 'var(--purple)',
+  Event: 'var(--brand)', Inventory: 'var(--green)', 'Item Loan': 'var(--purple)', Loan: 'var(--purple)', Vendor: 'var(--orange)',
   'Warehouse Inventory': 'var(--orange)', Warehouse: 'var(--red)', System: 'var(--text-muted)',
   Category: 'var(--blue, var(--brand))', Unit: 'var(--blue, var(--brand))', Area: 'var(--blue, var(--brand))',
 };
@@ -61,12 +62,14 @@ const MODULE_DOT = {
 const QUICK_ACTIONS = [
   { to: '/event', label: 'New Event', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="12" y1="14" x2="12" y2="18"/><line x1="10" y1="16" x2="14" y2="16"/></svg> },
   { to: '/inventory', label: 'Add Inventory', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg> },
-  { to: '/item-loan', label: 'Loan Item', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> },
+  { to: '/loan?tab=items', label: 'Rent Item', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> },
   { to: '/warehouse-inventory', label: 'Stock Opname', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="17"/><line x1="9.5" y1="14.5" x2="14.5" y2="14.5"/></svg> },
 ];
 
 export default function DashboardPage() {
   const navigate = useNavigate();
+  // Live catalog: stock derived from Warehouse Inventory rows (single stock source).
+  const inventoryData = useMemo(() => getCatalog(), []);
 
   const upcomingEvents = useMemo(
     () => initialEvents.filter(e => e.type === 'upcoming').sort((a, b) => new Date(a.start) - new Date(b.start)),
@@ -83,20 +86,22 @@ export default function DashboardPage() {
   const totalStockUnits = inventoryData.reduce((s, i) => s + i.totalStock, 0);
   const warehouseCount = useMemo(() => new Set(initialWarehouses.map(w => w.name)).size, []);
 
-  const allLoanItems = useMemo(() => initialItemLoans.flatMap(l => l.items.map(it => ({ ...it, dueDate: l.dueDate }))), []);
-  const activeLoans = allLoanItems.filter(it => !it.returnDate);
-  const overdueLoans = activeLoans.filter(it => new Date(it.dueDate) < TODAY);
+  // Rentals = items WE borrow from loan vendors (events + warehouse rentals).
+  const allLoanItems = useMemo(() => getAllRentals(), []);
+  const activeLoans = allLoanItems.filter(l => l.status === 'Borrowed');
+  const overdueLoans = activeLoans.filter(l => loanDisplayStatus(l, TODAY) === 'Overdue');
 
   const categoryBreakdown = useMemo(() => {
     const map = {};
-    inventoryData.forEach(i => { map[i.category] = (map[i.category] || 0) + i.totalStock; });
+    inventoryData.forEach(i => { map[i.category || 'Uncategorised'] = (map[i.category || 'Uncategorised'] || 0) + i.totalStock; });
     return Object.entries(map).sort((a, b) => b[1] - a[1]);
-  }, []);
+  }, [inventoryData]);
   const maxCategoryStock = Math.max(...categoryBreakdown.map(([, v]) => v), 1);
 
   const warehouseBreakdown = useMemo(() => {
     const map = {};
-    inventoryData.forEach(i => { map[i.warehouse] = (map[i.warehouse] || 0) + i.totalStock; });
+    // Real stock per warehouse, straight from the warehouse rows.
+    getInventoryRows().forEach(r => { map[r.warehouseName] = (map[r.warehouseName] || 0) + (Number(r.itemStock) || 0); });
     return Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 5);
   }, []);
   const maxWarehouseStock = Math.max(...warehouseBreakdown.map(([, v]) => v), 1);
@@ -140,15 +145,15 @@ export default function DashboardPage() {
           <KpiDelta direction="up" good={false}>+2 this week</KpiDelta>
         </div>
         <div className="kpi-card brand-accent">
-          <div className="kpi-label">Currently On Loan</div>
+          <div className="kpi-label">Rented Now</div>
           <div className="kpi-value">{activeLoans.length}</div>
-          <div className="kpi-sub">out of {allLoanItems.length} total items loaned</div>
+          <div className="kpi-sub">of {allLoanItems.length} rentals from loan vendors</div>
           <KpiDelta direction="flat">stable</KpiDelta>
         </div>
         <div className="kpi-card red-accent">
-          <div className="kpi-label">Overdue Loans</div>
+          <div className="kpi-label">Overdue Rentals</div>
           <div className="kpi-value">{overdueLoans.length}</div>
-          <div className="kpi-sub">needs follow-up</div>
+          <div className="kpi-sub">return to the vendor</div>
           <KpiDelta direction="up" good={false}>needs attention</KpiDelta>
         </div>
         <div className="kpi-card red-accent">

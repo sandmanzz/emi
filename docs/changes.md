@@ -50,6 +50,40 @@ explains a few non-obvious conventions that the entries below assume you already
 
 ---
 
+## Round 31 — Item form, single persistent stock source + full ledger, Item Loan replaced by warehouse rentals
+
+Spec: [prd/PRD-2026-10-16.md](prd/PRD-2026-10-16.md) §11.
+
+**Files:** new `src/lib/catalogStore.js`, `src/components/ItemFormModal.jsx`. Rewritten: `src/lib/stockOpnameStore.js`,
+`src/lib/producedItems.js`. Removed: `src/pages/ItemLoanPage.jsx`, `src/pages/ItemLoanDetailPage.jsx`, `src/lib/itemLoanStore.js`,
+`src/data/itemLoans.js`. Changed: `InventoryPage`, `InventoryDetailPage`, `WarehouseInventoryPage`, `EventDetailPage`,
+`DashboardPage`, `VendorPage`, `VendorDetailPage`, `LoanVendorDetailPage`, `PRDPage`, `GlobalSearch`, `Sidebar`, `App`,
+`LoanLogTab`, `EventLoans`, `ProductionLogTab`, `lib/eventLoans.js`, `lib/vendorStore.js`, `data/vendors.js`,
+`data/eventLoanSeed.js`, `data/activityLogs.js`, `style.css`.
+
+**How it works**
+- `stockOpnameStore`: rows / ledger / opname are persisted (`emi_wh_rows`, `emi_stock_movements`, `emi_opname_history`).
+  - `setInventoryRows(rows, info)` diffs by row id and logs each change (`reason`, `newRowReason`, `deleteReason`).
+  - New helpers: `stockInto(name, warehouse, qty, info, template)` (opens the row if needed), `nextRowId()`, `renameItemRows()`, `setItemValuation()`.
+  - `minStatusFor()` is exported.
+- `catalogStore`: the persisted catalog (`emi_catalog`). `getCatalog()` joins the rows by name to derive
+  `totalStock` / `warehouses` / `warehouse` / `stockStatus`. CRUD with name and SKU uniqueness. Delete is refused while stock > 0.
+- `producedItems` is now glue: it re-exports `getCatalog` / `isNeedsSetup` / `markItemSetUp`, and `stockInProduced()` creates
+  the draft if needed and stocks in with reason 'Production'. It is used by Event Detail (event production Done) and ProductionLogTab.
+- `eventLoans`: `getGeneralRentals` / `saveGeneralRentals` (`emi_rentals`, seed `SEED_GENERAL_RENTALS`). `getAllRentals()` merges them
+  with event rentals (`source`). `BorrowItemModal` takes `target="warehouse"` (warehouse + purpose instead of area).
+  `LoanLogTab allowCreate` adds New Rental and the warehouse-rental actions.
+- `vendorStore.getVendors()` drops the legacy borrowers (ids 1–4, matched by seed name) from stored data.
+- WarehouseInventoryPage: `itemCatalog` (New row picker) now comes from the catalog. `nextId` comes from `nextRowId()`, because
+  `rows.length + 1` collided once rows persisted. Stock History reads the store directly.
+
+**Gotchas**
+- Items are still joined to rows **by name**. Renaming via the item form is safe for rows, but not for event items.
+- The asset value on fresh storage is now Rp1.366.865.000 (derived from rows; the old static totalStock differed slightly).
+- Anything that changes stock must go through the store APIs above. Calling `setInventoryRows` without `info` logs 'Manual edit'.
+
+---
+
 ## Round 30 — Borrow Item, Loan CMS, two-tab vendor menus, Event Report rewrite, event list filters
 
 Spec: [prd/PRD-2026-10-16.md](prd/PRD-2026-10-16.md) §4.2, §5, §6, §7, §8. Narrative: [context-claude-web.md](context-claude-web.md) session (3).

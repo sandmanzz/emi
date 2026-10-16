@@ -28,11 +28,40 @@ Newest session first.
   `src/data/*.js` and mutated in module stores (`src/lib/*Store.js`) or `localStorage`.
 - **Mock today:** `TODAY = 2026-04-09` (`src/data/events.js`). Seed dates are written around it.
 - **Run:** `npm ci && npm run dev` (port 5173). Login `dewi@emi.id` / `Admin@123` (Admin).
-- **Lint baseline:** `npx eslint src` reports **13 problems (6 errors, 7 warnings)**, all pre-existing
-  (it was 18 before the Event Report rewrite). A change should not add to that number.
+- **Lint baseline:** `npx eslint src` reports **11 problems (4 errors, 7 warnings)**, all pre-existing
+  (it was 18 before the Event Report rewrite and the Item Loan removal). A change should not add to that number.
 - **localStorage gotcha:** stores that are seeded only when nothing is saved (vendors, production
   requests) keep the old data in a browser that used the app before. Clear `emi_vendors`,
   `emi_production_requests` and `emi_production_log` (or all site data) to see the new seed.
+
+---
+
+## Session 2026-10-16 (4) — Item form, single persistent stock source, one loan concept (we rent)
+
+Spec: [prd/PRD-2026-10-16.md](prd/PRD-2026-10-16.md) **§11**, which overrides earlier sections.
+
+### Request (verbatim)
+> lakukan perbaikan untuk ini
+> 1. Form New/Edit Item di Inventory (termasuk Item Value), supaya nilai aset bisa dikelola.
+> 2. Satu sumber stok yang tersimpan saat reload: Total Stock di Inventory dihitung dari baris gudang, dan semua perubahan stok masuk ke Stock History.
+> 3. Dua konsep "loan" bikin bingung. Item Loan (kita meminjamkan) dan Loan (kita menyewa) letaknya berdekatan di menu. Peminjam lama juga muncul di daftar vendor sewa dengan 0 pinjaman. (ini yang ada kita menyewa ya jadi kamu jangan salah konsep)
+>
+> Lanjutkan untuk fitur ya, fitur apalagi yang harus ditambah. atau UI modification.
+
+### Decisions
+- **#1** `ItemFormModal` handles new, edit and delete. Delete is refused while the item has stock. New items can get opening stock.
+  A rename carries over to the warehouse rows, and a new Item Value is copied to the rows' valuation.
+- **#2** Warehouse rows are the only stock. Rows, ledger and opname history are persisted, and Inventory stock / status / asset
+  value are derived from them. Every change is logged with a reason, including bulk edits (per-row diff). ⚠️ Event productions
+  now also add stock to the deploy-to warehouse, so production behaves the same everywhere.
+- **#3** **Concept corrected: a loan always means WE rent.** Looking back, the 2026-08-28 Item Loan request ("borrow
+  an item and later return it", "brand-new item we don't stock") described renting, so the outbound module was a misread.
+  - Item Loan was removed (routes redirect), and so were its 4 borrower "vendors".
+  - Its use case lives on as **warehouse rentals** (Loan → Borrowed Items → New Rental).
+  - Rented items never count as our stock or assets.
+
+### Verified
+See PRD §11.4. Lint is at 11 problems (pre-existing), build OK, and no new console errors.
 
 ---
 

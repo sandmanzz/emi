@@ -899,6 +899,17 @@ clashes or seems off) — proceeding with the stated assumption unless corrected
 
 ## Raw instruction log
 
+### 2026-10-16 (4) — Item form, single stock source, loan = we rent (Claude Web)
+> 1. Form New/Edit Item di Inventory (termasuk Item Value), supaya nilai aset bisa dikelola.
+> 2. Satu sumber stok yang tersimpan saat reload: Total Stock di Inventory dihitung dari baris gudang, dan semua perubahan stok masuk ke Stock History.
+> 3. Dua konsep "loan" bikin bingung … (ini yang ada kita menyewa ya jadi kamu jangan salah konsep)
+> Lanjutkan untuk fitur ya, fitur apalagi yang harus ditambah. atau UI modification.
+
+**Standing decision: in EMI a loan ALWAYS means we borrow / rent from a vendor.** The outbound Item Loan module (built from
+the 2026-08-28 request) was the wrong direction and has been removed. Its use case continues as warehouse rentals.
+Warehouse Inventory rows are the single, persisted stock source, and every stock change is in Stock History.
+Details: [prd/PRD-2026-10-16.md](prd/PRD-2026-10-16.md) §11.
+
 ### 2026-10-16 (3) — Borrow Item, Loan CMS, vendor tabs, Event Report rewrite, event filters, PRD (Claude Web)
 > 1. di event setting sama juga tmbahkan option untuk meminjam barang
 > 2. kemudian tambahkan menu loan di menu untuk CMS nya,bisa add loan vendor, edit dan delete, ketika 1 vendor di klik bisa lihat detail nya termasuk barang apa yang dibuat

@@ -9,8 +9,7 @@ import {
   PRODUCTION_STATUSES, PRODUCTION_BADGE,
 } from '../lib/productionRequests';
 import { getVendorsOfKind, VENDOR_ORIGINS } from '../lib/vendorStore';
-import { getCatalog, addProducedItem } from '../lib/producedItems';
-import { getInventoryRows, addInventoryRow, applyStockMovement } from '../lib/stockOpnameStore';
+import { getCatalog, stockInProduced } from '../lib/producedItems';
 import { addActivityLog } from '../lib/activityLogStore';
 import { getCurrentTenantUser } from '../lib/tenantAuth';
 
@@ -95,32 +94,9 @@ export default function ProductionLogTab({ warehouseNames, onStockChanged }) {
     setPage(1);
   }
 
-  // Adds a finished manual production to warehouse stock.
+  // Adds a finished manual production to warehouse stock (logged as 'Production').
   function stockIn(rec) {
-    const by = currentUser?.name || 'Admin';
-    const info = { reason: 'Production', eventName: '—', note: `Made by ${rec.vendorName || 'unknown vendor'}`, by };
-    const existingRow = getInventoryRows().find(r => r.name === rec.name && r.warehouseName === rec.warehouse);
-    if (existingRow) {
-      applyStockMovement(existingRow.id, rec.qty, info);
-      return;
-    }
-    const catalogItem = getCatalog().find(i => i.name === rec.name);
-    let row;
-    if (catalogItem) {
-      // Known item, but no stock row in this warehouse yet: open one at 0, then stock in.
-      const value = catalogItem.itemValue || 0;
-      row = {
-        id: Math.max(0, ...getInventoryRows().map(r => r.id)) + 1, name: rec.name, warehouseStock: 0, warehouseName: rec.warehouse,
-        itemStock: 0, stokMin: 0, stokUsed: 0, valuation: value, totalValuation: 0, minStatus: 'Not Set',
-        flag1: '', flag2: '', asile: '', rack: '', level: '', lantai: '', lorong: '', updatedAt: '-',
-      };
-    } else {
-      // Brand-new item: becomes a "Needs setup" draft in Inventory + Warehouse Inventory.
-      const draft = addProducedItem({ name: rec.name, qty: rec.qty, warehouseName: rec.warehouse, vendorName: rec.vendorName, producedFor: '' }).row;
-      row = { ...draft, id: Math.max(0, ...getInventoryRows().map(r => r.id)) + 1, itemStock: 0, warehouseStock: 0 };
-    }
-    addInventoryRow(row);
-    applyStockMovement(row.id, rec.qty, info);
+    stockInProduced({ name: rec.name, qty: rec.qty, warehouseName: rec.warehouse, vendorName: rec.vendorName, producedFor: '', by: currentUser?.name || 'Admin' });
   }
 
   function advance(rec) {

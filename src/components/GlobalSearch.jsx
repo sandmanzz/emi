@@ -2,13 +2,13 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { IconSearch, IconClose } from './icons';
 import { initialEvents } from '../data/events';
-import { inventoryData } from '../data/inventory';
+import { getCatalog } from '../lib/producedItems';
 import { initialWarehouses } from '../data/warehouses';
-import { wiData } from '../data/warehouseInventory';
+import { getInventoryRows } from '../lib/stockOpnameStore';
 import { initialAreas } from '../data/areas';
 import { initialCategories } from '../data/categories';
 import { initialUnits } from '../data/units';
-import { initialItemLoans } from '../data/itemLoans';
+import { getAllRentals } from '../lib/eventLoans';
 
 const MAX_PER_GROUP = 5;
 
@@ -23,10 +23,10 @@ function search(query) {
     .map(e => ({ label: e.name, sub: `${e.code} · ${e.location}`, to: `/event-detail?name=${encodeURIComponent(e.name)}` }));
   if (events.length) groups.push({ type: 'Event', items: events });
 
-  const inventory = inventoryData
+  const inventory = getCatalog()
     .filter(i => i.name.toLowerCase().includes(q) || i.sku.toLowerCase().includes(q) || i.category.toLowerCase().includes(q))
     .slice(0, MAX_PER_GROUP)
-    .map(i => ({ label: i.name, sub: `${i.sku} · ${i.category} · ${i.warehouse}`, to: '/inventory' }));
+    .map(i => ({ label: i.name, sub: `${i.sku} · ${i.category || 'No category'} · ${i.totalStock} in stock`, to: `/inventory-detail?id=${i.id}` }));
   if (inventory.length) groups.push({ type: 'Inventory', items: inventory });
 
   const warehouses = initialWarehouses
@@ -35,7 +35,7 @@ function search(query) {
     .map(w => ({ label: w.name, sub: w.location, to: '/warehouse' }));
   if (warehouses.length) groups.push({ type: 'Warehouse', items: warehouses });
 
-  const warehouseInventory = wiData
+  const warehouseInventory = getInventoryRows()
     .filter(r => r.name.toLowerCase().includes(q) || r.warehouseName.toLowerCase().includes(q))
     .slice(0, MAX_PER_GROUP)
     .map(r => ({ label: r.name, sub: `${r.warehouseName} · Stock ${r.itemStock}`, to: '/warehouse-inventory' }));
@@ -59,12 +59,11 @@ function search(query) {
     .map(u => ({ label: u.name, sub: u.abbr, to: '/unit' }));
   if (units.length) groups.push({ type: 'Unit', items: units });
 
-  const loans = initialItemLoans
-    .flatMap(l => l.items.map(item => ({ loan: l, item })))
-    .filter(({ loan, item }) => item.itemName.toLowerCase().includes(q) || loan.vendorName.toLowerCase().includes(q))
+  const loans = getAllRentals()
+    .filter(l => l.itemName.toLowerCase().includes(q) || l.vendorName.toLowerCase().includes(q))
     .slice(0, MAX_PER_GROUP)
-    .map(({ loan, item }) => ({ label: item.itemName, sub: `Borrowed by ${loan.vendorName}`, to: `/item-loan-detail?id=${loan.id}` }));
-  if (loans.length) groups.push({ type: 'Item Loan', items: loans });
+    .map(l => ({ label: l.itemName, sub: `Rented from ${l.vendorName} · ${l.eventName || l.warehouse} · ${l.status}`, to: '/loan?tab=items' }));
+  if (loans.length) groups.push({ type: 'Rental', items: loans });
 
   return groups;
 }

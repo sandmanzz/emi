@@ -13,7 +13,7 @@ const SECTIONS = [
   { id: 'event-inventory-link', label: 'Event Inventory Link' },
   { id: 'searchable-dropdown', label: 'Searchable Dropdown' },
   { id: 'activity-log', label: 'Activity Log' },
-  { id: 'item-loan', label: 'Item Loan & Vendors' },
+  { id: 'item-loan', label: 'Loan (Rental) & Vendors' },
   { id: 'data', label: 'Mock Data' },
   { id: 'assumptions', label: 'Open Assumptions' },
 ];
@@ -347,7 +347,7 @@ export default function PRDPage() {
           current time.
         </P>
         <P>
-          Not everything logs yet — only authentication and Item Loan actions do.
+          Not everything logs yet — authentication, inventory, vendor, production and rental actions do.
           Extending this to other modules (events, warehouse edits, stock opname,
           etc.) follows the same small pattern (<code>addActivityLog(...)</code>
           from <code>src/lib/activityLogStore.js</code>) but hasn&rsquo;t been done
@@ -355,31 +355,21 @@ export default function PRDPage() {
         </P>
       </Section>
 
-      <Section id="item-loan" title="Item Loan & Vendors">
+      <Section id="item-loan" title="Loan (Rental) & Vendors">
         <P>
-          Item Loan now has a proper <strong>Vendor</strong> list instead of
-          free-text borrower fields &mdash; pick an existing vendor or add a new
-          one on the fly from the same modal. Contact person/phone stay editable
-          per loan, since who you dealt with can differ from the vendor&rsquo;s
-          own listed contact.
+          In EMI a <strong>loan always means we borrow / rent</strong> items from a loan vendor &mdash;
+          never that we lend our own items out (the old outbound &ldquo;Item Loan&rdquo; module was removed on
+          2026-10-16 because its direction was wrong). Master Data &rarr; <strong>Loan</strong> has two tabs:
+          <strong> Vendors</strong> (the rental vendors, with a detail page each) and <strong>Borrowed Items</strong>
+          (every rental).
         </P>
         <P>
-          A loan is now an <strong>order that can cover multiple items at once</strong>,
-          each added either <strong>From Warehouse</strong> (real, live stock —
-          borrowing decreases it, returning restores it) or as a{' '}
-          <strong>New / External Item</strong> (something the business doesn&rsquo;t
-          stock itself — no inventory impact at all). The page is split like every
-          other list+detail pair in the app: <strong>/item-loan</strong> lists
-          loan orders (vendor, item count, overall status), and{' '}
-          <strong>/item-loan-detail</strong> shows one order&rsquo;s individual
-          items, each with its own <strong>Return Item</strong> action (date,
-          Good/Poor condition, notes if Poor) &mdash; so a 3-item loan can be{' '}
-          <strong>Partially Returned</strong> instead of all-or-nothing.
+          There are two kinds of rental with the same lifecycle (Requested &rarr; Received &rarr; Returned, Overdue when
+          past the return date): <strong>for an event</strong> (Event Detail &rarr; Borrow Item, at stages with
+          Borrow Item enabled; the item joins the event as Outsource when received) and <strong>kept in a warehouse</strong>
+          (Loan &rarr; Borrowed Items &rarr; New Rental). Rented items are not our assets, so they never change our stock or
+          asset value. Production vendors live in Master Data &rarr; Vendor.
         </P>
-        <Ul>
-          <li>The 6 seed loans&rsquo; warehouse-sourced items aren&rsquo;t tied to a real inventory row, so returning one of them doesn&rsquo;t restore any stock &mdash; only loans created through the app do.</li>
-          <li>Global Search&rsquo;s Item Loan results deep-link straight to a matching item&rsquo;s loan detail page.</li>
-        </Ul>
       </Section>
 
       <Section id="data" title="Mock Data">

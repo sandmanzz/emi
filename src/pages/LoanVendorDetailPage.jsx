@@ -5,7 +5,6 @@ import LoanLogTab from '../components/LoanLogTab';
 import { IconEdit } from '../components/icons';
 import { getVendor, updateVendor } from '../lib/vendorStore';
 import { getAllEventLoans, loanTotalCost } from '../lib/eventLoans';
-import { getLoans } from '../lib/itemLoanStore';
 import { formatIDR } from '../lib/superAdminUtils';
 import { addActivityLog } from '../lib/activityLogStore';
 import { getCurrentTenantUser } from '../lib/tenantAuth';
@@ -21,8 +20,7 @@ function InfoRow({ label, children }) {
 
 // Loan vendor detail (/loan-vendor-detail?id=): the vendor's profile plus everything we
 // borrowed from them — which item, how many, for which event, when, and what it cost.
-// Records come from every event's Borrow Item list (lib/eventLoans.js). If we also lent
-// our own items to this vendor (Item Loan), those are listed at the bottom.
+// Records = every rental from this vendor: event rentals (Borrow Item) and warehouse rentals.
 export default function LoanVendorDetailPage() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
@@ -32,7 +30,6 @@ export default function LoanVendorDetailPage() {
   const [editOpen, setEditOpen] = useState(false);
 
   const loans = useMemo(() => getAllEventLoans().filter(l => l.vendorId === id), [id]);
-  const lentToThem = useMemo(() => getLoans().filter(l => l.vendorId === id), [id]);
 
   if (!vendor) {
     return (
@@ -43,7 +40,7 @@ export default function LoanVendorDetailPage() {
     );
   }
 
-  const events = new Set(loans.map(l => l.eventKey));
+  const events = new Set(loans.filter(l => l.eventKey).map(l => l.eventKey));
   const totalCost = loans.reduce((s, l) => s + loanTotalCost(l), 0);
 
   // Per item: total borrowed, how much is out right now, and for which events.
@@ -51,7 +48,7 @@ export default function LoanVendorDetailPage() {
     const row = m.get(l.itemName) || { name: l.itemName, unit: l.unit, qty: 0, out: 0, events: new Set() };
     row.qty += Number(l.qty || 0);
     if (l.status === 'Borrowed') row.out += Number(l.qty || 0);
-    row.events.add(l.eventName);
+    row.events.add(l.eventName || `${l.warehouse} (warehouse)`);
     m.set(l.itemName, row);
     return m;
   }, new Map()).values()].sort((a, b) => b.qty - a.qty);
@@ -119,26 +116,6 @@ export default function LoanVendorDetailPage() {
       <div className="section-dot-label"><span style={{ background: 'var(--orange)' }} />Loan History</div>
       <LoanLogTab vendorId={id} />
 
-      {lentToThem.length > 0 && (
-        <div className="card" style={{ marginTop: 16 }}>
-          <div className="section-dot-label"><span style={{ background: 'var(--purple)' }} />Our items lent to this vendor (Item Loan · {lentToThem.length})</div>
-          <div className="table-wrap">
-            <table>
-              <thead><tr><th>Loan Date</th><th>Purpose</th><th>Items</th><th>Due</th></tr></thead>
-              <tbody>
-                {lentToThem.map(l => (
-                  <tr key={l.id} className="row-clickable" onClick={() => navigate(`/item-loan-detail?id=${l.id}`)}>
-                    <td style={{ whiteSpace: 'nowrap', color: 'var(--text-muted)', fontSize: '12.5px' }}>{l.loanDate}</td>
-                    <td>{l.purpose}</td>
-                    <td style={{ fontSize: '12.5px' }}>{l.items.map(it => `${it.qty} × ${it.itemName}`).join(', ')}</td>
-                    <td style={{ whiteSpace: 'nowrap', color: 'var(--text-muted)', fontSize: '12.5px' }}>{l.dueDate}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
 
       {editOpen && <VendorFormModal vendor={vendor} defaultKind="loan" onClose={() => setEditOpen(false)} onSave={save} />}
     </>

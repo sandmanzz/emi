@@ -5,27 +5,14 @@ import Pagination from '../components/Pagination';
 import SortTh from '../components/SortTh';
 import SearchableSelect from '../components/SearchableSelect';
 import { IconSearch, IconPlus, IconDelete, IconClose, IconCheck, IconEdit } from '../components/icons';
-import { wiData } from '../data/warehouseInventory';
 import { initialWarehouses } from '../data/warehouses';
-import { getInventoryRows, setInventoryRows as saveInventoryRows, getOpnameHistory, hasPendingOpname, resolveOpname, getStockMovements } from '../lib/stockOpnameStore';
+import { getInventoryRows, setInventoryRows as saveInventoryRows, getOpnameHistory, hasPendingOpname, resolveOpname, getStockMovements, nextRowId } from '../lib/stockOpnameStore';
 import { isTenantAdmin, getCurrentTenantUser } from '../lib/tenantAuth';
-import { isNeedsSetup, markItemSetUp } from '../lib/producedItems';
+import { isNeedsSetup, markItemSetUp, getCatalog } from '../lib/producedItems';
 import ProductionLogTab from '../components/ProductionLogTab';
 
 const PAGE_SIZE = 10;
 const sortKeys = ['name','warehouseStock','warehouseName','itemStock','stokMin','stokUsed','valuation','totalValuation','minStatus','flag1','flag2','asile','rack','level','lantai','lorong','updatedAt'];
-const itemCatalog = Array.from(
-  wiData.reduce((map, item) => {
-    if (!map.has(item.name)) {
-      map.set(item.name, {
-        id: item.id,
-        name: item.name,
-        stock: item.itemStock,
-      });
-    }
-    return map;
-  }, new Map()).values(),
-);
 
 function tokenizeKeyword(value) {
   return value
@@ -137,7 +124,9 @@ export default function WarehouseInventoryPage() {
   const currentUser = getCurrentTenantUser();
 
   const [inventoryRows,    setInventoryRows]    = useState(() => getInventoryRows());
-  const [nextId,           setNextId]           = useState(() => getInventoryRows().length + 1);
+  // Items that can get a stock row = the Inventory catalog (read once per visit).
+  const [itemCatalog] = useState(() => getCatalog().map(i => ({ id: i.id, name: i.name, stock: i.totalStock })));
+  const [nextId,           setNextId]           = useState(() => nextRowId());
   const [tab,              setTab]              = useState('inventory');
   const [query,            setQuery]            = useState('');
   const [warehouseFilter,  setWarehouseFilter]  = useState('');
@@ -169,7 +158,6 @@ export default function WarehouseInventoryPage() {
   const [opnameHistory,    setOpnameHistory]    = useState(() => getOpnameHistory());
   const [historyWarehouse, setHistoryWarehouse] = useState('');
   const [historyDetail,    setHistoryDetail]    = useState(null);
-  const [stockMovements, setStockMovements] = useState(() => getStockMovements());
   // Rows for items created by a finished production request stay highlighted until
   // their details are completed (saving the row's Edit form counts as completing).
   const [setupOnly,  setSetupOnly]  = useState(false);
@@ -203,7 +191,7 @@ export default function WarehouseInventoryPage() {
       .filter(Boolean)
       .sort((left, right) => left.rank - right.rank || left.item.name.localeCompare(right.item.name))
       .map(entry => entry.item);
-  }, [itemSearchTokens]);
+  }, [itemSearchTokens, itemCatalog]);
   const hasActiveItemSearch = itemSearchTokens.length > 0;
 
   const filtered = useMemo(() => {
@@ -341,7 +329,7 @@ export default function WarehouseInventoryPage() {
       setNextId(id => id + 1);
     }
     setInventoryRows(newRows);
-    saveInventoryRows(newRows);
+    saveInventoryRows(newRows, { reason: 'Manual edit', newRowReason: 'New stock row', by: currentUser?.name || 'Admin' });
     if (editingRowId) {
       // Saving the Edit form of a production-created item counts as completing its setup.
       markItemSetUp(editingItemName);
@@ -355,7 +343,7 @@ export default function WarehouseInventoryPage() {
     if (!deleteTarget) return;
     const newRows = inventoryRows.filter(r => r.id !== deleteTarget.id);
     setInventoryRows(newRows);
-    saveInventoryRows(newRows);
+    saveInventoryRows(newRows, { deleteReason: 'Row deleted', by: currentUser?.name || 'Admin' });
     setDeleteTarget(null);
   }
 
@@ -492,7 +480,7 @@ export default function WarehouseInventoryPage() {
     });
 
     setInventoryRows(newRows);
-    saveInventoryRows(newRows);
+    saveInventoryRows(newRows, { reason: 'Moving order', newRowReason: 'Moving order', note: `To ${moDestWarehouse}`, by: currentUser?.name || 'Admin' });
     setNextId(idCounter);
     setMovingOrders(mo => [...newHistoryEntries, ...mo]);
     setNextMovingOrderId(orderIdCounter);
@@ -978,15 +966,16 @@ export default function WarehouseInventoryPage() {
       {tab === 'production' && (
         <ProductionLogTab
           warehouseNames={warehouseNames}
-          onStockChanged={() => { setInventoryRows([...getInventoryRows()]); setStockMovements([...getStockMovements()]); }}
+          onStockChanged={() => setInventoryRows([...getInventoryRows()])}
         />
       )}
 
       {tab === 'stockhistory' && (
         <div className="card">
           <p style={{ fontSize: 12.5, color: 'var(--text-muted)', margin: '0 0 14px' }}>
-            Stock changes made from other modules, such as an event&rsquo;s Convert request being applied
-            when the event moves to its next stage, or a Production record being marked Done, so every change stays traceable.
+            Every stock change, from every module: manual edits and new rows here, Moving Orders, approved Stock Opname,
+            finished Production, rentals received / returned, an event&rsquo;s Convert request, and opening stock of new items.
+            Newest first. Saved in this browser, so it survives a reload.
           </p>
           <div className="table-wrap">
             <table>
@@ -1003,9 +992,9 @@ export default function WarehouseInventoryPage() {
                 </tr>
               </thead>
               <tbody>
-                {stockMovements.length === 0
+                {getStockMovements().length === 0
                   ? <tr><td colSpan={8} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 32 }}>No stock changes recorded yet.</td></tr>
-                  : stockMovements.map(m => (
+                  : getStockMovements().map(m => (
                     <tr key={m.id}>
                       <td style={{ color: 'var(--text-muted)', fontSize: '12.5px', whiteSpace: 'nowrap' }}>{m.at}</td>
                       <td className="name-cell">{m.itemName}</td>

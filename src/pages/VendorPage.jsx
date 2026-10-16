@@ -30,7 +30,7 @@ const CONFIG = {
   },
   loan: {
     title: 'Loan', newLabel: 'New Loan Vendor', itemsTab: 'Borrowed Items', countLabel: 'Loans', detail: '/loan-vendor-detail',
-    intro: <>Vendors we <strong>borrow or rent</strong> items from for events (Event Detail &rarr; Borrow Item). Click a vendor to see what we borrowed from them and for which event. Lending <em>our</em> items out is handled in Item Loan.</>,
+    intro: <>Vendors we <strong>borrow or rent</strong> items from for events (Event Detail &rarr; Borrow Item). Click a vendor to see what we borrowed from them and for which event. A loan always means <strong>we</strong> rent from the vendor; rentals not tied to an event are made in Borrowed Items &rarr; New Rental.</>,
   },
 };
 
@@ -119,7 +119,7 @@ export default function VendorPage({ kind = 'production' }) {
       </div>
 
       {tab === 'items' && (kind === 'loan'
-        ? <LoanLogTab />
+        ? <LoanLogTab allowCreate />
         : <ProductionLogTab warehouseNames={warehouseNames} />)}
 
       {tab === 'vendors' && (

@@ -6,6 +6,11 @@ import SearchableSelect from '../components/SearchableSelect';
 import { IconSearch, IconPlus, IconEdit, IconDelete, IconClose } from '../components/icons';
 import { categories, stockStatuses } from '../data/inventory';
 import { getCatalog, markItemSetUp } from '../lib/producedItems';
+import { deleteCatalogItem } from '../lib/catalogStore';
+import ItemFormModal from '../components/ItemFormModal';
+import Modal from '../components/Modal';
+import { addActivityLog } from '../lib/activityLogStore';
+import { getCurrentTenantUser } from '../lib/tenantAuth';
 import { formatIDR } from '../lib/superAdminUtils';
 
 function ImgCell({ src, name, onClick }) {
@@ -84,6 +89,23 @@ export default function InventoryPage() {
   // Static seed items + items created by finished production requests (see lib/producedItems.js).
   const [inventoryData, setInventoryData] = useState(() => getCatalog());
   const [setupOnly,   setSetupOnly]   = useState(false);
+  const [formItem,    setFormItem]    = useState(undefined); // undefined = closed, null = new, item = edit
+  const [deleteItem,  setDeleteItem]  = useState(null);
+  const currentUser = getCurrentTenantUser();
+
+  function onSaved(item, isEdit) {
+    addActivityLog({ userName: currentUser?.name || 'Admin', action: isEdit ? 'Update' : 'Create', module: 'Inventory',
+      description: `${isEdit ? 'Updated' : 'Created'} item "${item.name}" (${item.sku}), value ${item.itemValue}` });
+    setInventoryData(getCatalog());
+    setFormItem(undefined);
+  }
+  function confirmDelete() {
+    if (deleteCatalogItem(deleteItem.id)) {
+      addActivityLog({ userName: currentUser?.name || 'Admin', action: 'Delete', module: 'Inventory', description: `Deleted item "${deleteItem.name}"` });
+      setInventoryData(getCatalog());
+    }
+    setDeleteItem(null);
+  }
   const needsSetupCount = inventoryData.filter(r => r.needsSetup).length;
 
   function markSetUp(name) {
@@ -137,7 +159,7 @@ export default function InventoryPage() {
     <>
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:22 }}>
         <h1 className="page-title" style={{ margin:0 }}>Inventory</h1>
-        <button className="btn-new"><IconPlus /> New Item</button>
+        <button className="btn-new" onClick={() => setFormItem(null)}><IconPlus /> New Item</button>
       </div>
 
       {needsSetupCount > 0 && (
@@ -212,7 +234,7 @@ export default function InventoryPage() {
             <button className="btn-search">Search</button>
           </div>
           <div className="toolbar-right">
-            <button className="btn-new"><IconPlus /> New</button>
+            <button className="btn-new" onClick={() => setFormItem(null)}><IconPlus /> New</button>
           </div>
         </div>
 
@@ -250,7 +272,10 @@ export default function InventoryPage() {
                         : <span className="setup-missing">Not set</span>}
                     </td>
                     <td style={{ color:'var(--text-muted)', fontSize:'12.5px' }}>{r.unit || <span className="setup-missing">Not set</span>}</td>
-                    <td>{r.warehouse}</td>
+                    <td>
+                      {r.warehouse || <span className="setup-missing">No stock</span>}
+                      {r.warehouses.length > 1 && <span className="rep-muted" title={r.warehouses.map(w => `${w.name}: ${w.stock}`).join('\n')}> +{r.warehouses.length - 1}</span>}
+                    </td>
                     <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums', fontWeight:600 }}>{r.totalStock}</td>
                     <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums', whiteSpace:'nowrap' }}>
                       {r.itemValue ? formatIDR(r.itemValue) : <span className="setup-missing">Not set</span>}
@@ -275,8 +300,8 @@ export default function InventoryPage() {
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ width:14, height:14 }}><polyline points="20 6 9 17 4 12"/></svg>
                           </button>
                         )}
-                        <button className="btn-icon edit"   title="Edit"><IconEdit /></button>
-                        <button className="btn-icon delete" title="Delete"><IconDelete /></button>
+                        <button className="btn-icon edit"   title="Edit" onClick={() => setFormItem(r)}><IconEdit /></button>
+                        <button className="btn-icon delete" title="Delete" onClick={() => setDeleteItem(r)}><IconDelete /></button>
                       </div>
                     </td>
                   </tr>
@@ -296,6 +321,21 @@ export default function InventoryPage() {
         </div>
         <Pagination currentPage={safePage} total={filtered.length} pageSize={PAGE_SIZE} onPage={p => setPage(p)} label="items" />
       </div>
+
+      {formItem !== undefined && (
+        <ItemFormModal item={formItem} by={currentUser?.name || 'Admin'} onClose={() => setFormItem(undefined)} onSaved={onSaved} />
+      )}
+
+      <Modal open={!!deleteItem} title="Delete Item" onClose={() => setDeleteItem(null)}
+        footer={<>
+          <button className="btn-cancel-modal" onClick={() => setDeleteItem(null)}>{deleteItem?.totalStock > 0 ? 'Close' : 'Cancel'}</button>
+          {deleteItem?.totalStock === 0 && <button className="btn-del-ok" onClick={confirmDelete}>Delete</button>}
+        </>}
+      >
+        {deleteItem?.totalStock > 0
+          ? <p className="confirm-msg"><strong>&ldquo;{deleteItem?.name}&rdquo;</strong> still has <strong>{deleteItem?.totalStock}</strong> in stock ({deleteItem?.warehouses.map(w => `${w.name}: ${w.stock}`).join(', ')}). Move or write off the stock in Warehouse Inventory first.</p>
+          : <p className="confirm-msg">Delete <strong>&ldquo;{deleteItem?.name}&rdquo;</strong>? It has no stock. Events that used it keep its name.</p>}
+      </Modal>
 
       <ImageViewerModal
         open={imgPopup.open}

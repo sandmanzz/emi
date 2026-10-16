@@ -76,13 +76,16 @@ export function EventLoansPanel({ loans, loanEnabled, locked, onAdvance, onCance
 
 // Borrow Item form. `vendors` = loan vendors; `areas` / `subAreas` from Area master data;
 // `catalogNames` = suggestions (a borrowed item doesn't have to be in our catalog).
-export function BorrowItemModal({ vendors, areas, subAreas, catalogNames, defaultDate, onClose, onSubmit }) {
+// target = 'event' (Event Detail → Borrow Item: Area / Sub Area) or 'warehouse'
+// (Loan → New Rental: which of our warehouses keeps it + purpose; `warehouses` required).
+export function BorrowItemModal({ target = 'event', vendors, areas = [], subAreas = {}, warehouses = [], catalogNames, defaultDate, onClose, onSubmit }) {
+  const forEvent = target === 'event';
   const [form, setForm] = useState({
-    itemName: '', qty: 1, unit: 'pcs', area: '', subArea: '', vendorId: '',
+    itemName: '', qty: 1, unit: 'pcs', area: '', subArea: '', warehouse: '', purpose: '', vendorId: '',
     startDate: defaultDate, dueDate: '', rentalCost: '', note: '',
   });
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
-  const valid = form.itemName.trim() && Number(form.qty) >= 1 && form.area && form.vendorId
+  const valid = form.itemName.trim() && Number(form.qty) >= 1 && (forEvent ? form.area : form.warehouse) && form.vendorId
     && form.startDate && form.dueDate && form.dueDate >= form.startDate;
   const total = (Number(form.qty) || 0) * (Number(form.rentalCost) || 0);
 
@@ -91,7 +94,8 @@ export function BorrowItemModal({ vendors, areas, subAreas, catalogNames, defaul
     const vendor = vendors.find(v => String(v.id) === String(form.vendorId));
     onSubmit({
       itemName: form.itemName.trim(), qty: Math.floor(Number(form.qty)), unit: form.unit,
-      area: form.area, subArea: form.subArea, vendorId: vendor?.id ?? null, vendorName: vendor?.name || '',
+      ...(forEvent ? { area: form.area, subArea: form.subArea } : { warehouse: form.warehouse, purpose: form.purpose.trim() }),
+      vendorId: vendor?.id ?? null, vendorName: vendor?.name || '',
       startDate: form.startDate, dueDate: form.dueDate, rentalCost: Math.max(0, Math.floor(Number(form.rentalCost) || 0)),
       note: form.note.trim(),
     });
@@ -100,7 +104,7 @@ export function BorrowItemModal({ vendors, areas, subAreas, catalogNames, defaul
   return (
     <Modal
       open
-      title="Borrow Item"
+      title={forEvent ? 'Borrow Item' : 'New Rental'}
       onClose={onClose}
       footer={
         <>
@@ -110,7 +114,9 @@ export function BorrowItemModal({ vendors, areas, subAreas, catalogNames, defaul
       }
     >
       <p style={{ fontSize: 12.5, color: 'var(--text-muted)', margin: '0 0 14px' }}>
-        Rent an item we don&rsquo;t have (enough of) from a loan vendor. It is added to this event when you mark it received.
+        {forEvent
+          ? <>Rent an item we don&rsquo;t have (enough of) from a loan vendor. It is added to this event when you mark it received.</>
+          : <>Rent items from a loan vendor and keep them in one of our warehouses (not for a specific event). Rented items are not our assets, so our stock and asset value don&rsquo;t change.</>}
       </p>
       <div className="form-group">
         <label>Item <span style={{ color: 'var(--red)' }}>*</span></label>
@@ -127,6 +133,7 @@ export function BorrowItemModal({ vendors, areas, subAreas, catalogNames, defaul
           <SearchableSelect value={form.unit} onChange={v => set('unit', v)} options={UNITS.map(u => ({ value: u, label: u }))} />
         </div>
       </div>
+      {forEvent ? (
       <div className="form-row">
         <div className="form-group">
           <label>Area <span style={{ color: 'var(--red)' }}>*</span></label>
@@ -140,6 +147,19 @@ export function BorrowItemModal({ vendors, areas, subAreas, catalogNames, defaul
             options={(subAreas[form.area] || []).map(s => ({ value: s, label: s }))} />
         </div>
       </div>
+      ) : (
+      <div className="form-row">
+        <div className="form-group">
+          <label>Kept in warehouse <span style={{ color: 'var(--red)' }}>*</span></label>
+          <SearchableSelect value={form.warehouse} onChange={v => set('warehouse', v)} placeholder="Select warehouse"
+            options={warehouses.map(w => ({ value: w, label: w }))} />
+        </div>
+        <div className="form-group">
+          <label>Purpose</label>
+          <input type="text" placeholder="e.g. Buffer for wedding season" value={form.purpose} onChange={e => set('purpose', e.target.value)} />
+        </div>
+      </div>
+      )}
       <div className="form-group">
         <label>Loan Vendor <span style={{ color: 'var(--red)' }}>*</span></label>
         <SearchableSelect value={form.vendorId} onChange={v => set('vendorId', v)} placeholder="Who do we borrow from?"

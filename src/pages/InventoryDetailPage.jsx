@@ -1,8 +1,13 @@
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { IconEdit, IconDelete, IconClose } from '../components/icons';
+import { IconEdit, IconDelete } from '../components/icons';
 import { useState } from 'react';
 import Modal from '../components/Modal';
+import ItemFormModal from '../components/ItemFormModal';
 import { getCatalog } from '../lib/producedItems';
+import { deleteCatalogItem } from '../lib/catalogStore';
+import { getStockMovements } from '../lib/stockOpnameStore';
+import { addActivityLog } from '../lib/activityLogStore';
+import { getCurrentTenantUser } from '../lib/tenantAuth';
 import { getAllProductions, PRODUCTION_BADGE } from '../lib/productionRequests';
 import { formatIDR } from '../lib/superAdminUtils';
 
@@ -27,11 +32,23 @@ export default function InventoryDetailPage() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const id = parseInt(params.get('id'));
-  // Same catalog as the Inventory listing (seed data + items created by finished production requests).
-  const item = getCatalog().find(r => r.id === id);
+  const currentUser = getCurrentTenantUser();
+  const [version, setVersion] = useState(0); // bump to re-read the catalog after an edit
+  // Same catalog as the Inventory listing; stock fields are derived from Warehouse Inventory rows.
+  const item = version >= 0 ? getCatalog().find(r => r.id === id) : null;
   const productions = item ? getAllProductions().filter(p => p.name === item.name) : [];
+  const movements = item ? getStockMovements().filter(m => m.itemName === item.name).slice(0, 12) : [];
 
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+
+  function confirmDelete() {
+    if (deleteCatalogItem(item.id)) {
+      addActivityLog({ userName: currentUser?.name || 'Admin', action: 'Delete', module: 'Inventory', description: `Deleted item "${item.name}"` });
+      navigate('/inventory');
+    }
+    setDeleteOpen(false);
+  }
 
   if (!item) {
     return (
@@ -56,7 +73,7 @@ export default function InventoryDetailPage() {
           Back
         </button>
         <h1 className="page-title" style={{ margin:0, flex:1 }}>{item.name}</h1>
-        <button className="btn-icon edit" title="Edit" style={{ padding:'8px 14px', display:'flex', alignItems:'center', gap:6, border:'1px solid var(--border)', borderRadius:8, fontSize:13, fontWeight:500 }}>
+        <button className="btn-icon edit" title="Edit" onClick={() => setEditOpen(true)} style={{ padding:'8px 14px', display:'flex', alignItems:'center', gap:6, border:'1px solid var(--border)', borderRadius:8, fontSize:13, fontWeight:500 }}>
           <IconEdit /> Edit
         </button>
         <button className="btn-icon delete" title="Delete" onClick={() => setDeleteOpen(true)} style={{ padding:'8px 14px', display:'flex', alignItems:'center', gap:6, border:'1px solid var(--red-bg)', borderRadius:8, fontSize:13, fontWeight:500 }}>
@@ -100,17 +117,19 @@ export default function InventoryDetailPage() {
               <span style={{ fontSize:11, fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'.07em' }}>Stock Summary</span>
             </div>
             <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-              {[
-                { label:'Total Stock', value: item.totalStock, color:'var(--text)', big: true },
-                { label:'Available',   value: Math.floor(item.totalStock * 0.85), color:'var(--green)' },
-                { label:'Reserved',    value: Math.floor(item.totalStock * 0.1),  color:'var(--orange)' },
-                { label:'On Event',    value: Math.floor(item.totalStock * 0.05), color:'var(--brand)' },
-              ].map(s => (
-                <div key={s.label} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', paddingBottom:8, borderBottom:'1px solid var(--bg)' }}>
-                  <span style={{ fontSize:13, color:'var(--text-muted)', fontWeight:500 }}>{s.label}</span>
-                  <span style={{ fontSize: s.big ? 20 : 15, fontWeight:700, color:s.color, fontVariantNumeric:'tabular-nums' }}>{s.value}</span>
-                </div>
-              ))}
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', paddingBottom:8, borderBottom:'1px solid var(--bg)' }}>
+                <span style={{ fontSize:13, color:'var(--text-muted)', fontWeight:500 }}>Total Stock</span>
+                <span style={{ fontSize:20, fontWeight:700, color:'var(--text)', fontVariantNumeric:'tabular-nums' }}>{item.totalStock} <span style={{ fontSize:12, color:'var(--text-muted)', fontWeight:500 }}>{item.unit}</span></span>
+              </div>
+              {item.warehouses.length === 0
+                ? <p style={{ fontSize:12.5, color:'var(--text-muted)', margin:0 }}>No stock in any warehouse.</p>
+                : item.warehouses.map(w => (
+                  <div key={w.name} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', paddingBottom:8, borderBottom:'1px solid var(--bg)' }}>
+                    <span style={{ fontSize:13, color:'var(--text-muted)', fontWeight:500 }}>{w.name}</span>
+                    <span style={{ fontSize:15, fontWeight:700, color:'var(--brand)', fontVariantNumeric:'tabular-nums' }}>{w.stock}</span>
+                  </div>
+                ))}
+              <p style={{ fontSize:11.5, color:'var(--text-muted)', margin:0 }}>From Warehouse Inventory, the single source of stock.</p>
             </div>
           </div>
 
@@ -133,6 +152,31 @@ export default function InventoryDetailPage() {
             }
           </div>
         </div>
+      </div>
+
+      <div className="card" style={{ padding:24, marginTop:16 }}>
+        <div className="section-dot-label"><span style={{ background:'var(--green)' }} />Stock History <em style={{ fontStyle:'normal', textTransform:'none', letterSpacing:0, fontWeight:400 }}>(latest {movements.length})</em></div>
+        {movements.length === 0
+          ? <p style={{ fontSize:13, color:'var(--text-muted)', margin:0 }}>No stock changes recorded for this item yet.</p>
+          : (
+            <div className="table-wrap">
+              <table>
+                <thead><tr><th>Date</th><th>Warehouse</th><th style={{ textAlign:'right' }}>Change</th><th style={{ textAlign:'right' }}>Stock</th><th>Reason</th><th>By</th></tr></thead>
+                <tbody>
+                  {movements.map(m => (
+                    <tr key={m.id}>
+                      <td style={{ whiteSpace:'nowrap', color:'var(--text-muted)', fontSize:12.5 }}>{m.at}</td>
+                      <td>{m.warehouse}</td>
+                      <td style={{ textAlign:'right', fontWeight:700, color: m.change < 0 ? 'var(--red)' : 'var(--green)' }}>{m.change > 0 ? '+' : ''}{m.change}</td>
+                      <td style={{ textAlign:'right', color:'var(--text-muted)' }}>{m.before} → {m.after}</td>
+                      <td><span className="badge badge-orange" style={{ fontSize:11 }}>{m.reason}</span>{m.note && <div style={{ fontSize:11.5, color:'var(--text-muted)' }}>{m.note}</div>}</td>
+                      <td style={{ fontSize:12.5 }}>{m.by || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
       </div>
 
       <div className="card" style={{ padding:24, marginTop:16 }}>
@@ -166,13 +210,24 @@ export default function InventoryDetailPage() {
           )}
       </div>
 
+      {editOpen && (
+        <ItemFormModal item={item} by={currentUser?.name || 'Admin'} onClose={() => setEditOpen(false)}
+          onSaved={saved => {
+            addActivityLog({ userName: currentUser?.name || 'Admin', action: 'Update', module: 'Inventory', description: `Updated item "${saved.name}" (${saved.sku})` });
+            setEditOpen(false);
+            setVersion(v => v + 1);
+          }} />
+      )}
+
       <Modal open={deleteOpen} title="Delete Item" onClose={() => setDeleteOpen(false)}
         footer={<>
-          <button className="btn-cancel-modal" onClick={() => setDeleteOpen(false)}>Cancel</button>
-          <button className="btn-del-ok" onClick={() => { setDeleteOpen(false); navigate('/inventory'); }}>Delete</button>
+          <button className="btn-cancel-modal" onClick={() => setDeleteOpen(false)}>{item.totalStock > 0 ? 'Close' : 'Cancel'}</button>
+          {item.totalStock === 0 && <button className="btn-del-ok" onClick={confirmDelete}>Delete</button>}
         </>}
       >
-        <p className="confirm-msg">Are you sure you want to delete <strong>"{item.name}"</strong>? This action cannot be undone.</p>
+        {item.totalStock > 0
+          ? <p className="confirm-msg"><strong>&ldquo;{item.name}&rdquo;</strong> still has <strong>{item.totalStock}</strong> in stock. Move or write off the stock in Warehouse Inventory first.</p>
+          : <p className="confirm-msg">Delete <strong>&ldquo;{item.name}&rdquo;</strong>? It has no stock. This can&rsquo;t be undone.</p>}
       </Modal>
     </>
   );

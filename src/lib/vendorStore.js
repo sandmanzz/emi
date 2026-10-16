@@ -1,8 +1,7 @@
 import { initialVendors } from '../data/vendors';
 
-// Vendors are managed in the Vendor CMS page (Master Data → Vendor, detail at
-// /vendor-detail?id=) and picked in Item Loan (borrowers) and in Event Detail →
-// Request Production / Warehouse Inventory → Production (who makes an item).
+// Vendors are managed in Master Data → Vendor (production, /vendor-detail?id=) and
+// Master Data → Loan (rental vendors we borrow from, /loan-vendor-detail?id=).
 //
 // Fields: { id, name, origin, kinds, description, phone, address }
 //   origin — 'Internal' | 'External'. Production requests filter vendors by this.
@@ -30,10 +29,16 @@ function normalize(v) {
   };
 }
 
+// One-time cleanup of data saved before 2026-10-16: drop the 4 seed vendors that were only
+// Item Loan borrowers (people we lent to), matched by seed id + name, so they don't show up
+// as rental vendors with 0 loans.
+const LEGACY_BORROWERS = { 1: 'Ari Setiawan', 2: 'Studio Foto Kilau', 3: 'Divisi Marketing', 4: 'Katering Bu Yuni' };
+const isLegacyBorrower = v => LEGACY_BORROWERS[v.id] === v.name;
+
 export function getVendors() {
   try {
     const stored = JSON.parse(localStorage.getItem(KEY));
-    if (Array.isArray(stored)) return stored.map(normalize);
+    if (Array.isArray(stored)) return stored.filter(v => !isLegacyBorrower(v)).map(normalize);
   } catch {
     // fall through to seed
   }

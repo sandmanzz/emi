@@ -6,7 +6,6 @@ import { IconEdit } from '../components/icons';
 import { getVendor, updateVendor } from '../lib/vendorStore';
 import { getAllProductions, PRODUCTION_STATUSES, PRODUCTION_BADGE } from '../lib/productionRequests';
 import { getCatalog } from '../lib/producedItems';
-import { getLoans } from '../lib/itemLoanStore';
 import { formatIDR } from '../lib/superAdminUtils';
 import { addActivityLog } from '../lib/activityLogStore';
 import { getCurrentTenantUser } from '../lib/tenantAuth';
@@ -35,7 +34,6 @@ export default function VendorDetailPage() {
 
   const productions = useMemo(() => getAllProductions().filter(p => p.vendorId === id), [id]);
   const valueByName = useMemo(() => new Map(getCatalog().map(i => [i.name, i.itemValue || 0])), []);
-  const loans = useMemo(() => getLoans().filter(l => l.vendorId === id), [id]);
 
   if (!vendor) {
     return (
@@ -189,26 +187,6 @@ export default function VendorDetailPage() {
         </div>
       </div>
 
-      {loans.length > 0 && (
-        <div className="card" style={{ marginTop: 16 }}>
-          <div className="section-dot-label"><span style={{ background: 'var(--purple)' }} />Item Loans ({loans.length})</div>
-          <div className="table-wrap">
-            <table>
-              <thead><tr><th>Loan Date</th><th>Purpose</th><th>Items</th><th>Due</th></tr></thead>
-              <tbody>
-                {loans.map(l => (
-                  <tr key={l.id} className="row-clickable" onClick={() => navigate(`/item-loan-detail?id=${l.id}`)}>
-                    <td style={{ whiteSpace: 'nowrap', color: 'var(--text-muted)', fontSize: '12.5px' }}>{l.loanDate}</td>
-                    <td>{l.purpose}</td>
-                    <td style={{ fontSize: '12.5px' }}>{l.items.map(it => `${it.qty} × ${it.itemName}`).join(', ')}</td>
-                    <td style={{ whiteSpace: 'nowrap', color: 'var(--text-muted)', fontSize: '12.5px' }}>{l.dueDate}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
 
       {editOpen && <VendorFormModal vendor={vendor} onClose={() => setEditOpen(false)} onSave={save} />}
     </>

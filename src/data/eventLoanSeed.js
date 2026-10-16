@@ -51,3 +51,22 @@ export const SEED_EVENT_LOANS = {
     loan(1, { itemName: 'Hanging Rattan 1', qty: 6, unit: 'pcs', area: 'CEREMONY', subArea: 'Altar Setup', vendorId: 6, vendorName: 'Toko Dekorasi Rina', startDate: '2026-05-16', dueDate: '2026-05-18', rentalCost: 60000, status: 'Requested', stage: 'Finish setup', requestedAt: '2026-04-09' }),
   ],
 };
+
+// Rentals NOT tied to an event (Loan → Borrowed Items → "New Rental"): items we rent and keep
+// in one of our warehouses, e.g. a buffer before a busy season. They replace the old outbound
+// "Item Loan" module (2026-10-16), whose direction was wrong — in EMI a loan always means
+// WE borrow / rent from a vendor. Rented items are not ours, so they never change our stock.
+export const SEED_GENERAL_RENTALS = [
+  { id: 4, itemName: 'Champagne Glass Coupe', qty: 300, unit: 'pcs', warehouse: 'Warehouse C9', purpose: 'Glass buffer for the May events',
+    vendorId: 17, vendorName: 'Glassware Pro Rental', startDate: '2026-04-01', dueDate: '2026-05-20', rentalCost: 3000, status: 'Borrowed',
+    requestedBy: 'Novi', requestedAt: '2026-03-25', borrowedAt: '2026-04-01', returnedAt: null, note: '' },
+  { id: 3, itemName: 'Projector Screen 3x2m', qty: 2, unit: 'unit', warehouse: 'Warehouse Cililitan', purpose: 'Client presentation week',
+    vendorId: 18, vendorName: 'Nusantara Sound & Light', startDate: '2026-03-30', dueDate: '2026-04-05', rentalCost: 250000, status: 'Borrowed',
+    requestedBy: 'Darmian', requestedAt: '2026-03-27', borrowedAt: '2026-03-30', returnedAt: null, note: 'Vendor asked to extend or return.' },
+  { id: 2, itemName: 'Tiffany Chair', qty: 100, unit: 'unit', warehouse: 'Warehouse Bali 66', purpose: 'Buffer stock for the July wedding season',
+    vendorId: 15, vendorName: 'Sewa Kursi Jaya Rental', startDate: '2026-06-28', dueDate: '2026-07-31', rentalCost: 15000, status: 'Requested',
+    requestedBy: 'Dewi Anjani', requestedAt: '2026-04-08', borrowedAt: null, returnedAt: null, note: 'Monthly rate.' },
+  { id: 1, itemName: 'Forklift Electric 1.5T', qty: 1, unit: 'unit', warehouse: 'Warehouse Surabaya', purpose: 'Re-racking during stock opname',
+    vendorId: 19, vendorName: 'Tenda Megah Rental', startDate: '2026-02-10', dueDate: '2026-02-12', rentalCost: 1500000, status: 'Returned',
+    requestedBy: 'Anto', requestedAt: '2026-02-03', borrowedAt: '2026-02-10', returnedAt: '2026-02-12', note: '' },
+];

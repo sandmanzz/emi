@@ -26,8 +26,6 @@ import AIAnalyzerPage from './pages/AIAnalyzerPage';
 import MainDashboardPage from './pages/DashboardPage';
 import InventoryReportPage from './pages/InventoryReportPage';
 import OverviewReportPage from './pages/OverviewReportPage';
-import ItemLoanPage from './pages/ItemLoanPage';
-import ItemLoanDetailPage from './pages/ItemLoanDetailPage';
 import LogPage from './pages/LogPage';
 import UsersPage from './pages/UsersPage';
 import RequireAuth from './components/RequireAuth';
@@ -84,8 +82,9 @@ export default function App() {
           <Route path="inventory" element={<InventoryPage />} />
           <Route path="inventory-detail" element={<InventoryDetailPage />} />
           <Route path="sync-inventory" element={<SyncInventoryPage />} />
-          <Route path="item-loan" element={<ItemLoanPage />} />
-          <Route path="item-loan-detail" element={<ItemLoanDetailPage />} />
+          {/* Item Loan (we lent our items out) was removed 2026-10-16: a loan always means WE rent. Old links land on Loan. */}
+          <Route path="item-loan" element={<Navigate to="/loan?tab=items" replace />} />
+          <Route path="item-loan-detail" element={<Navigate to="/loan?tab=items" replace />} />
           <Route path="area" element={<AreaPage />} />
           <Route path="area-detail" element={<AreaDetailPage />} />
           <Route path="sub-area" element={<SubAreaPage />} />

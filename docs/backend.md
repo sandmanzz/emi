@@ -126,6 +126,23 @@ whose status is still `on-going`.
 
 ---
 
+## Single stock source, catalog CRUD, rentals only (2026-10-16, R31)
+
+Spec: [prd/PRD-2026-10-16.md](prd/PRD-2026-10-16.md) §11.
+
+- **Stock lives only in warehouse stock rows** `(itemId, warehouseId, qty, min, valuation, location…)`. Item Total Stock, status
+  and asset value are computed from them (`GET /items` returns them computed; never store a separate total).
+- **Ledger is mandatory:** every endpoint that changes a row writes `stock_movements` in the same transaction
+  `{ rowId, itemId, warehouseId, change, before, after, reason, eventId?, note, userId, at }`. Reasons used today: Manual edit,
+  New stock row, Row deleted, Moving order, Stock opname, Production, Opening stock, Convert.
+- **Items CRUD:** `POST /items` (optional `openingStock: { warehouseId, qty }`), `PATCH /items/{id}` (name and SKU unique per tenant;
+  changing `itemValue` updates row valuations), `DELETE /items/{id}` → 409 while any row has qty > 0. Join everything by `itemId`,
+  not by name. That removes the rename problem (PRD Q12).
+- **Loans = rentals from vendors only.** Drop any "lend out" endpoints. `rentals` table:
+  `{ id, vendorId, itemName, qty, unit, eventId | null, area?, subArea?, warehouseId?, purpose?, startDate, dueDate, rentalCost,
+  status, receivedAt, returnedAt }`. Exactly one of `eventId` / `warehouseId`. Rentals never touch stock rows.
+- Event production Done adds `qty` to the deploy-to warehouse row (reason 'Production').
+
 ## Event loans (Borrow Item), vendor kinds, event report (2026-10-16)
 
 Spec: [prd/PRD-2026-10-16.md](prd/PRD-2026-10-16.md) §4.2, §5, §7.

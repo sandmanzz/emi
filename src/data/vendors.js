@@ -1,20 +1,13 @@
-// Seed vendors. ids 1-6 are referenced by Item Loan seed data (data/itemLoans.js),
-// ids 6-14 by the production seed (data/productionSeed.js) and 5-6 + 15-19 by the event
-// loan seed (data/eventLoanSeed.js) — keep the ids stable.
+// Seed vendors. ids 6-14 are referenced by the production seed (data/productionSeed.js) and
+// 5-6 + 15-19 by the rental seed (data/eventLoanSeed.js) — keep the ids stable.
+// ids 1-4 were Item Loan *borrowers* (people we lent our items to). That module was removed
+// on 2026-10-16 (a loan in EMI always means WE rent), so those 4 are gone; see vendorStore.
 // Fields: { id, name, origin: 'Internal' | 'External', kinds, description, phone, address }
 //   kinds — which CMS lists the vendor: 'production' (Master Data → Vendor) and/or
 //           'loan' (Master Data → Loan, vendors we borrow/rent items from).
 export const initialVendors = [
-  { id: 1,  name: 'Ari Setiawan',            origin: 'External', kinds: ['loan'], phone: '0812-3456-7890', address: 'Jl. Raya Sesetan No. 18, Denpasar, Bali',
-    description: 'Freelance decorator. Borrows furniture for small community events.' },
-  { id: 2,  name: 'Studio Foto Kilau',       origin: 'External', kinds: ['loan'], phone: '0813-2233-4455', address: 'Jl. Teuku Umar No. 210, Denpasar, Bali',
-    description: 'Photography studio. Borrows backdrop stands and lighting for product shoots.' },
-  { id: 3,  name: 'Divisi Marketing',        origin: 'Internal', kinds: ['loan'], phone: 'Ext. 104',       address: 'Head office, 2nd floor, Jakarta',
-    description: 'Our own marketing team. Borrows equipment for office documentation and content.' },
-  { id: 4,  name: 'Katering Bu Yuni',        origin: 'External', kinds: ['loan'], phone: '0857-1111-2222', address: 'Jl. Rungkut Madya No. 45, Surabaya',
-    description: 'Catering partner. Borrows buffet tables for its own events.' },
   { id: 5,  name: 'Wedding Organizer Mitra', origin: 'External', kinds: ['loan'], phone: '0819-4567-8901', address: 'Jl. Kemang Raya No. 7, South Jakarta',
-    description: 'Partner wedding organizer that rents our decoration items.' },
+    description: 'Partner wedding organizer. Rents out tableware, charger plates and décor to us.' },
   { id: 6,  name: 'Toko Dekorasi Rina',      origin: 'External', kinds: ['production', 'loan'], phone: '0821-9988-7766', address: 'Pasar Kumbasari Blok B-12, Denpasar, Bali',
     description: 'Decoration rental shop. Produces small decorative pieces on request.' },
   { id: 7,  name: 'Bengkel Las Maju Jaya',   origin: 'External', kinds: ['production'], phone: '0812-7788-1200', address: 'Jl. Gatot Subroto Barat No. 88, Denpasar, Bali',
