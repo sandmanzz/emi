@@ -1040,7 +1040,9 @@ export default function EventDetailPage() {
       }]);
       setNextId(n => n + 1);
     }
-    setProductionRequests(rs => rs.map(r => r.id === req.id ? { ...r, status: nextStatus } : r));
+    setProductionRequests(rs => rs.map(r => r.id === req.id
+      ? { ...r, status: nextStatus, ...(nextStatus === 'Done' ? { finishedAt: new Date().toLocaleDateString('en-CA') } : {}) }
+      : r));
     addActivityLog({
       userName: currentUser?.name || 'Admin', action: 'Update', module: 'Event Detail',
       description: `Production request "${req.name}" on ${eventName} → ${nextStatus}`,
@@ -1969,7 +1971,7 @@ export default function EventDetailPage() {
                   onChange={v => setProductionForm(f => ({ ...f, vendorId: v }))}
                   placeholder={`Select ${productionForm.vendorOrigin.toLowerCase()} vendor`}
                   emptyText="No vendor found"
-                  options={vendorOptions.map(v => ({ value: String(v.id), label: v.name, meta: v.type || '' }))}
+                  options={vendorOptions.map(v => ({ value: String(v.id), label: v.name, meta: v.phone || '' }))}
                 />
               </div>
               {vendorOptions.length === 0 && (

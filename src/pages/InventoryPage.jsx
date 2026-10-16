@@ -6,6 +6,7 @@ import SearchableSelect from '../components/SearchableSelect';
 import { IconSearch, IconPlus, IconEdit, IconDelete, IconClose } from '../components/icons';
 import { categories, stockStatuses } from '../data/inventory';
 import { getCatalog, markItemSetUp } from '../lib/producedItems';
+import { formatIDR } from '../lib/superAdminUtils';
 
 function ImgCell({ src, name, onClick }) {
   return (
@@ -74,7 +75,7 @@ function stockBadge(s) {
 export default function InventoryPage() {
   const navigate = useNavigate();
   const [query,       setQuery]       = useState('');
-  const [catFilter,   setCatFilter]   = useState('');
+  const [catFilters,  setCatFilters]  = useState([]); // multi-select; empty = all categories
   const [stockFilter, setStockFilter] = useState('');
   const [page,        setPage]        = useState(1);
   const [sortCol,     setSortCol]     = useState(0);
@@ -92,15 +93,16 @@ export default function InventoryPage() {
     if (!next.some(r => r.needsSetup)) setSetupOnly(false); // nothing left to filter on
   }
 
-  const sortKeys = ['name','sku','category','unit','warehouse','totalStock','stockStatus','updatedAt'];
+  const sortKeys = ['name','sku','category','unit','warehouse','totalStock','itemValue','totalValue','stockStatus','updatedAt'];
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase();
     const key = sortKeys[sortCol] || 'name';
     return inventoryData
+      .map(r => ({ ...r, totalValue: (r.itemValue || 0) * (r.totalStock || 0) }))
       .filter(r => {
         const mQ = !q || r.name.toLowerCase().includes(q) || r.sku.toLowerCase().includes(q);
-        const mC = !catFilter   || r.category    === catFilter;
+        const mC = catFilters.length === 0 || catFilters.includes(r.category);
         const mS = !stockFilter || r.stockStatus === stockFilter;
         const mU = !setupOnly || r.needsSetup;
         return mQ && mC && mS && mU;
@@ -109,7 +111,7 @@ export default function InventoryPage() {
         const va = String(a[key] ?? ''), vb = String(b[key] ?? '');
         return sortAsc ? va.localeCompare(vb, undefined, { numeric:true }) : vb.localeCompare(va, undefined, { numeric:true });
       });
-  }, [inventoryData, query, catFilter, stockFilter, setupOnly, sortCol, sortAsc]);
+  }, [inventoryData, query, catFilters, stockFilter, setupOnly, sortCol, sortAsc]);
 
   function handleSort(col) {
     if (sortCol === col) setSortAsc(a => !a);
@@ -124,6 +126,12 @@ export default function InventoryPage() {
   const availableCount  = inventoryData.filter(r => r.stockStatus === 'Available').length;
   const lowStockCount   = inventoryData.filter(r => r.stockStatus === 'Low Stock').length;
   const outOfStockCount = inventoryData.filter(r => r.stockStatus === 'Out of Stock').length;
+
+  // Asset value = sum of (Item Value × Total Stock). Items without an Item Value count as 0.
+  const totalAssetValue    = inventoryData.reduce((sum, r) => sum + (r.itemValue || 0) * (r.totalStock || 0), 0);
+  const filteredAssetValue = filtered.reduce((sum, r) => sum + r.totalValue, 0);
+  const noValueCount       = inventoryData.filter(r => !r.itemValue).length;
+  const isFiltered         = filtered.length !== inventoryData.length;
 
   return (
     <>
@@ -157,6 +165,24 @@ export default function InventoryPage() {
         ))}
       </div>
 
+      <div className="asset-value-card">
+        <div>
+          <div className="asset-value-label">Total Asset Value</div>
+          <div className="asset-value-amount">{formatIDR(totalAssetValue)}</div>
+          <div className="asset-value-sub">
+            Sum of Item Value &times; Total Stock across {inventoryData.length} items
+            {noValueCount > 0 && <> &middot; <span style={{ color:'var(--orange)' }}>{noValueCount} item{noValueCount === 1 ? '' : 's'} without an Item Value</span></>}
+          </div>
+        </div>
+        {isFiltered && (
+          <div className="asset-value-filtered">
+            <div className="asset-value-label">Current filter</div>
+            <div className="asset-value-amount small">{formatIDR(filteredAssetValue)}</div>
+            <div className="asset-value-sub">{filtered.length} item{filtered.length === 1 ? '' : 's'}</div>
+          </div>
+        )}
+      </div>
+
       <div className="card">
         <div className="toolbar">
           <div className="toolbar-left">
@@ -169,10 +195,12 @@ export default function InventoryPage() {
             </div>
             <SearchableSelect
               inline
-              value={catFilter}
-              onChange={v => { setCatFilter(v); setPage(1); }}
-              options={[{ value: '', label: 'All Categories' }, ...categories.map(c => ({ value: c, label: c }))]}
+              multiple
+              value={catFilters}
+              onChange={v => { setCatFilters(v); setPage(1); }}
+              options={categories.map(c => ({ value: c, label: c, meta: String(inventoryData.filter(r => r.category === c).length) }))}
               placeholder="All Categories"
+              searchPlaceholder="Search category…"
             />
             <SearchableSelect
               inline
@@ -192,21 +220,23 @@ export default function InventoryPage() {
           <table>
             <thead>
               <tr>
-                <SortTh label="Name"         colIndex={0} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} />
+                <SortTh label="Name"         colIndex={0} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ minWidth:200 }} />
                 <SortTh label="SKU"          colIndex={1} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width:90 }} />
                 <SortTh label="Category"     colIndex={2} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width:105 }} />
                 <SortTh label="Unit"         colIndex={3} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width:70 }} />
                 <SortTh label="Warehouse"    colIndex={4} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ minWidth:120 }} />
                 <SortTh label="Total Stock"  colIndex={5} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width:90, textAlign:'right' }} />
-                <SortTh label="Status"       colIndex={6} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width:110 }} />
-                <SortTh label="Updated At"   colIndex={7} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width:100 }} />
+                <SortTh label="Item Value"   colIndex={6} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width:120, textAlign:'right' }} />
+                <SortTh label="Total Value"  colIndex={7} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width:140, textAlign:'right' }} />
+                <SortTh label="Status"       colIndex={8} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width:110 }} />
+                <SortTh label="Updated At"   colIndex={9} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width:100 }} />
                 <th style={{ width:60, textAlign:'center' }}>Image</th>
                 <th style={{ width:80, textAlign:'center' }}>Action</th>
               </tr>
             </thead>
             <tbody>
               {pageData.length === 0
-                ? <tr><td colSpan={10} style={{ textAlign:'center', color:'var(--text-muted)', padding:32 }}>No results found.</td></tr>
+                ? <tr><td colSpan={12} style={{ textAlign:'center', color:'var(--text-muted)', padding:32 }}>No results found.</td></tr>
                 : pageData.map(r => (
                   <tr key={r.id} className={r.needsSetup ? 'row-needs-setup' : undefined}>
                     <td className="name-cell">
@@ -222,6 +252,10 @@ export default function InventoryPage() {
                     <td style={{ color:'var(--text-muted)', fontSize:'12.5px' }}>{r.unit || <span className="setup-missing">Not set</span>}</td>
                     <td>{r.warehouse}</td>
                     <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums', fontWeight:600 }}>{r.totalStock}</td>
+                    <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums', whiteSpace:'nowrap' }}>
+                      {r.itemValue ? formatIDR(r.itemValue) : <span className="setup-missing">Not set</span>}
+                    </td>
+                    <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums', whiteSpace:'nowrap', fontWeight:600 }}>{r.itemValue ? formatIDR(r.totalValue) : '—'}</td>
                     <td>{stockBadge(r.stockStatus)}</td>
                     <td style={{ color:'var(--text-muted)', fontSize:'12.5px' }}>{r.updatedAt === '-' ? '—' : r.updatedAt}</td>
                     <td style={{ textAlign:'center' }}>
@@ -249,6 +283,15 @@ export default function InventoryPage() {
                 ))
               }
             </tbody>
+            {filtered.length > 0 && (
+              <tfoot>
+                <tr className="table-total-row">
+                  <td colSpan={7}>Total value · {filtered.length} item{filtered.length === 1 ? '' : 's'}{isFiltered ? ' (filtered)' : ''}</td>
+                  <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums', whiteSpace:'nowrap' }}>{formatIDR(filteredAssetValue)}</td>
+                  <td colSpan={4} />
+                </tr>
+              </tfoot>
+            )}
           </table>
         </div>
         <Pagination currentPage={safePage} total={filtered.length} pageSize={PAGE_SIZE} onPage={p => setPage(p)} label="items" />

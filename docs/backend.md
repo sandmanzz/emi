@@ -126,6 +126,39 @@ whose status is still `on-going`.
 
 ---
 
+## Item Value, production log, vendor detail (2026-10-16)
+
+Details and open questions: [context-claude-web.md](context-claude-web.md).
+
+**Item Value.** Inventory items get `itemValue` (integer Rupiah per unit). The listing needs
+`totalAssetValue = Σ(itemValue × totalStock)` for the tenant, and the same sum for the current filter.
+Compute it server-side (`GET /inventory/summary?category=Floral&category=Lighting…` → `{ totalAssetValue, count }`)
+rather than summing a paginated page on the client. Today the warehouse `valuation` holds the same number in a separate
+field. Decide whether it is derived from `itemValue` (open question 3).
+
+**Category filter is multi-value.** `GET /inventory?category=Floral&category=Lighting` (OR within categories).
+
+**Production log.** One list across events and restocks:
+
+```
+GET /productions?status=&source=event|manual&warehouse=&vendorId=&itemName=
+→ [{ id, source, eventId|null, itemName, qty, warehouse, vendorId, vendorName, vendorOrigin,
+     status: 'Requested'|'In Production'|'Done', reason: 'broken'|null, note,
+     requestedBy, requestedAt, finishedAt }]
+POST  /productions                 (restock: no eventId)
+PATCH /productions/{id}/status     { status }
+```
+
+Rules:
+- Status only moves forward: Requested → In Production → Done. A record can be cancelled only while Requested.
+- **Restock Done** adds `qty` to the (item, warehouse) stock row, in the same transaction as a stock-ledger line
+  (`reason: 'Production'`). It opens the row if it is missing. An unknown item becomes a "needs setup" draft.
+- Event productions are moved from the event (Done also adds the item to the event). Whether they should also add
+  warehouse stock is open question 5.
+
+**Vendor detail.** `GET /vendors/{id}` plus `GET /productions?vendorId=` and `GET /item-loans?vendorId=`. The page
+groups productions by item (qty done / qty total, list of events).
+
 ## Stage moves, broken items, production, convert (2026-10-05 → 2026-10-09)
 
 Everything below is currently frontend-only (localStorage / component state). The rules are what the UI enforces and
@@ -161,9 +194,11 @@ category/unit) unless the name already exists, and (c) create a warehouse stock 
 **Stock ledger** (`GET /stock-movements`): `{ at, itemName, warehouse, change, before, after, reason, eventName, stage, note, by }`.
 Powers Warehouse Inventory → Stock History. Every stock change from outside Warehouse Inventory must write one.
 
-**Vendors** (`/vendors` CRUD): `{ id, name, contact, type (free-text category), origin ('Internal'|'External') }`.
+**Vendors** (`/vendors` CRUD): `{ id, name, origin ('Internal'|'External'), description, phone, address }`
+(changed 2026-10-16: `contact` → `phone`, free-text `type` dropped, `description` + `address` added).
 Used by Item Loan and by production requests (filtered by `origin`). Deleting a vendor must not break old records:
-loans and requests store `vendorName` as well as `vendorId`.
+loans and requests store `vendorName` as well as `vendorId`. See "Item Value, production log, vendor detail" above for
+the vendor detail endpoint.
 
 ## Other mocked stores that need real endpoints
 

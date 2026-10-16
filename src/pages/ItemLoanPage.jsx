@@ -70,7 +70,7 @@ export default function ItemLoanPage() {
   const [addNewUnit,     setAddNewUnit]     = useState('pcs');
 
   const [vendorModalOpen, setVendorModalOpen] = useState(false);
-  const [vendorForm,     setVendorForm]     = useState({ name: '', contact: '', type: '' });
+  const [vendorForm,     setVendorForm]     = useState({ name: '', phone: '', description: '' });
 
   function setInventoryRows(rows) {
     setInventoryRowsState(rows);
@@ -116,13 +116,13 @@ export default function ItemLoanPage() {
   }
 
   function openAddVendor() {
-    setVendorForm({ name: '', contact: '', type: '' });
+    setVendorForm({ name: '', phone: '', description: '' });
     setVendorModalOpen(true);
   }
 
   function saveVendor() {
     if (!vendorForm.name.trim()) return;
-    const created = addVendor({ name: vendorForm.name.trim(), contact: vendorForm.contact.trim(), type: vendorForm.type.trim() });
+    const created = addVendor({ name: vendorForm.name.trim(), phone: vendorForm.phone.trim(), description: vendorForm.description.trim() });
     setVendors(getVendors());
     setHeaderForm(f => ({ ...f, vendorId: String(created.id) }));
     setVendorModalOpen(false);
@@ -175,7 +175,7 @@ export default function ItemLoanPage() {
       id: Math.max(0, ...loans.map(l => l.id)) + 1,
       vendorId: vendor.id, vendorName: vendor.name,
       contactPerson: headerForm.contactPerson.trim() || vendor.name,
-      contactPhone: headerForm.contactPhone.trim() || vendor.contact,
+      contactPhone: headerForm.contactPhone.trim() || vendor.phone,
       purpose: headerForm.purpose.trim(), loanDate: headerForm.loanDate, dueDate: headerForm.dueDate,
       items: pendingItems.map((it, idx) => ({
         id: idx + 1, itemName: it.itemName, source: it.source, warehouse: it.warehouse,
@@ -302,7 +302,7 @@ export default function ItemLoanPage() {
             <SearchableSelect
               value={headerForm.vendorId}
               onChange={v => setHeaderForm(f => ({ ...f, vendorId: v }))}
-              options={vendors.map(v => ({ value: String(v.id), label: v.name, meta: v.type }))}
+              options={vendors.map(v => ({ value: String(v.id), label: v.name, meta: v.origin }))}
               placeholder="Select vendor…"
               searchPlaceholder="Search vendors…"
             />
@@ -411,12 +411,12 @@ export default function ItemLoanPage() {
         </div>
         <div className="form-row">
           <div className="form-group">
-            <label>Contact</label>
-            <input type="text" placeholder="Phone number / email" value={vendorForm.contact} onChange={e => setVendorForm(f => ({ ...f, contact: e.target.value }))} />
+            <label>Phone</label>
+            <input type="text" placeholder="Phone number" value={vendorForm.phone} onChange={e => setVendorForm(f => ({ ...f, phone: e.target.value }))} />
           </div>
           <div className="form-group">
-            <label>Type</label>
-            <input type="text" placeholder="e.g. Event Organizer, Individual" value={vendorForm.type} onChange={e => setVendorForm(f => ({ ...f, type: e.target.value }))} />
+            <label>Description</label>
+            <input type="text" placeholder="e.g. Event Organizer, Individual" value={vendorForm.description} onChange={e => setVendorForm(f => ({ ...f, description: e.target.value }))} />
           </div>
         </div>
       </Modal>

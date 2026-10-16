@@ -11,6 +11,7 @@ export default function SearchableSelect({
   emptyText = 'No results found',
   disabled = false,
   inline = false,
+  multiple = false, // value is an array; picking toggles and keeps the menu open
   style,
 }) {
   const [open, setOpen] = useState(false);
@@ -19,7 +20,15 @@ export default function SearchableSelect({
   const triggerRef = useRef(null);
   const menuRef = useRef(null);
 
-  const selected = options.find(o => String(o.value) === String(value ?? ''));
+  const selectedValues = multiple ? (value || []).map(String) : [String(value ?? '')];
+  const isSelected = o => selectedValues.includes(String(o.value));
+  const selected = multiple ? null : options.find(isSelected);
+  // Multi: "Floral", "Floral, Fabric", or "Floral +2". Empty falls back to the placeholder.
+  const multiLabels = multiple ? options.filter(isSelected).map(o => o.label) : [];
+  const triggerLabel = multiple
+    ? (multiLabels.length === 0 ? placeholder : multiLabels.length <= 2 ? multiLabels.join(', ') : `${multiLabels[0]} +${multiLabels.length - 1}`)
+    : (selected ? selected.label : placeholder);
+  const hasValue = multiple ? multiLabels.length > 0 : !!selected;
 
   useEffect(() => {
     if (!open) return;
@@ -77,6 +86,13 @@ export default function SearchableSelect({
 
   function pick(opt) {
     if (opt.disabled) return;
+    if (multiple) {
+      const current = value || [];
+      onChange(current.some(v => String(v) === String(opt.value))
+        ? current.filter(v => String(v) !== String(opt.value))
+        : [...current, opt.value]);
+      return;
+    }
     onChange(opt.value);
     setOpen(false);
   }
@@ -87,10 +103,10 @@ export default function SearchableSelect({
         type="button"
         ref={triggerRef}
         disabled={disabled}
-        className={`ss-trigger${open ? ' open' : ''}${!selected ? ' placeholder' : ''}`}
+        className={`ss-trigger${open ? ' open' : ''}${!hasValue ? ' placeholder' : ''}`}
         onClick={() => !disabled && setOpen(o => !o)}
       >
-        <span className="ss-trigger-label">{selected ? selected.label : placeholder}</span>
+        <span className="ss-trigger-label">{triggerLabel}</span>
         <IconChevronDown />
       </button>
       {open && createPortal(
@@ -106,15 +122,22 @@ export default function SearchableSelect({
               value={query} onChange={e => setQuery(e.target.value)}
             />
           </div>
+          {multiple && (
+            <div className="ss-multi-bar">
+              <span>{selectedValues.length} selected</span>
+              <button type="button" disabled={selectedValues.length === 0} onClick={() => onChange([])}>Clear</button>
+            </div>
+          )}
           <div className="ss-list" style={{ maxHeight: pos?.maxHeight }}>
             {filtered.length === 0
               ? <div className="ss-empty">{emptyText}</div>
               : filtered.map(o => (
                 <div
                   key={o.value}
-                  className={`ss-item${String(o.value) === String(value ?? '') ? ' selected' : ''}${o.disabled ? ' disabled' : ''}`}
+                  className={`ss-item${isSelected(o) ? ' selected' : ''}${o.disabled ? ' disabled' : ''}${multiple ? ' ss-item-multi' : ''}`}
                   onClick={() => pick(o)}
                 >
+                  {multiple && <span className={`ss-check${isSelected(o) ? ' on' : ''}`} aria-hidden="true" />}
                   <span className="ss-item-label">{o.label}</span>
                   {o.meta && <span className="ss-item-meta">{o.meta}</span>}
                 </div>

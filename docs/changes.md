@@ -50,6 +50,50 @@ explains a few non-obvious conventions that the entries below assume you already
 
 ---
 
+## Round 28 — Item Value + asset total, multi-select category, Production tab, Vendor CMS + detail, mock data
+
+Full write-up (request, decisions, open questions): [context-claude-web.md](context-claude-web.md), session 2026-10-16.
+
+**Files:** new `src/components/ProductionLogTab.jsx`, `src/components/VendorFormModal.jsx`, `src/pages/VendorDetailPage.jsx`,
+`src/data/productionSeed.js`. Changed: `src/App.jsx`, `src/components/SearchableSelect.jsx`, `src/data/inventory.js`,
+`src/data/warehouseInventory.js`, `src/data/vendors.js`, `src/lib/productionRequests.js`, `src/lib/vendorStore.js`,
+`src/pages/InventoryPage.jsx`, `src/pages/InventoryDetailPage.jsx`, `src/pages/WarehouseInventoryPage.jsx`,
+`src/pages/VendorPage.jsx`, `src/pages/ItemLoanPage.jsx`, `src/pages/EventDetailPage.jsx`, `src/style.css`.
+
+**How it works**
+- `itemValue` (Rupiah per unit) on every catalog item. Inventory computes `totalValue = itemValue × totalStock` per row.
+  The **Total Asset Value** card sums it for all items, plus the filtered total. There are Item Value / Total Value
+  columns and a `<tfoot>` total row.
+- `SearchableSelect` takes `multiple`: `value` is an array, clicking toggles without closing, and a "N selected · Clear"
+  bar sits above the list. Inventory's category filter uses it (`catFilters`, empty = all).
+- `lib/productionRequests.js`: `getProductionRequests(eventKey)` falls back to `SEED_EVENT_PRODUCTION[eventKey]` while
+  nothing is stored for that event. New `getManualProductions` / `saveManualProductions` (`emi_production_log`,
+  seeded from `SEED_MANUAL_PRODUCTION`), `getAllProductions()` (every event + manual, converts excluded,
+  each tagged `uid`, `source: 'event' | 'manual'`, `eventKey`, `eventName`) and `eventLabel(key)`.
+- `ProductionLogTab`: Warehouse Inventory → Production. Event rows are read-only. Manual rows go Requested → In Production → Done.
+  On Done, `stockIn()` calls `applyStockMovement(+qty, reason 'Production')` on the (item, warehouse) row. If that row is
+  missing, it first opens one at 0 (known item) or creates a `addProducedItem` draft (unknown item). The parent then
+  refreshes rows and stock movements through `onStockChanged`.
+- Event Detail now stamps `finishedAt` when a production request is marked Done.
+- Vendors: `{ id, name, origin, description, phone, address }`. `normalize()` maps the old `contact`/`type`.
+  `getVendor(id)` was added. Vendor list rows open `/vendor-detail?id=`. The detail page aggregates `getAllProductions()` by
+  `vendorId` and also shows the vendor's Item Loans.
+- `InventoryDetailPage` used a private 22-item copy of the catalog (ids 23+ → "Item not found"). It now uses `getCatalog()`
+  and has a Production History card.
+
+**Mock data**
+- Catalog ids 73–98 and Warehouse Inventory ids 81–106 are the 26 Event Detail demo item names, which used to be missing,
+  so the drawer showed "—". Every warehouse row now has a valuation (= item value).
+- 8 new vendors (ids 7–14). Every vendor has description/phone/address. 26 event productions over 11 events and 6 restock records.
+
+**Gotchas**
+- Seeds only apply while nothing is stored: clear `emi_vendors`, `emi_production_requests` and `emi_production_log` to see them.
+- Catalog `totalStock` does not follow Warehouse Inventory (pre-existing), so a restock raises the warehouse row but not
+  Inventory's Total Stock or asset value. Open question 4 in context-claude-web.md.
+- Lint is unchanged at the 18-problem baseline. The vendor form is mounted only while open (no setState-in-effect).
+
+---
+
 ## Round 27 — Responsive UI (phone / tablet)
 
 **Files:** `src/components/useMediaQuery.js` (new), `src/components/useSidebar.js` (new), `src/components/Layout.jsx`,

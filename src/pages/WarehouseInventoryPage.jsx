@@ -10,6 +10,7 @@ import { initialWarehouses } from '../data/warehouses';
 import { getInventoryRows, setInventoryRows as saveInventoryRows, getOpnameHistory, hasPendingOpname, resolveOpname, getStockMovements } from '../lib/stockOpnameStore';
 import { isTenantAdmin, getCurrentTenantUser } from '../lib/tenantAuth';
 import { isNeedsSetup, markItemSetUp } from '../lib/producedItems';
+import ProductionLogTab from '../components/ProductionLogTab';
 
 const PAGE_SIZE = 10;
 const sortKeys = ['name','warehouseStock','warehouseName','itemStock','stokMin','stokUsed','valuation','totalValuation','minStatus','flag1','flag2','asile','rack','level','lantai','lorong','updatedAt'];
@@ -168,7 +169,7 @@ export default function WarehouseInventoryPage() {
   const [opnameHistory,    setOpnameHistory]    = useState(() => getOpnameHistory());
   const [historyWarehouse, setHistoryWarehouse] = useState('');
   const [historyDetail,    setHistoryDetail]    = useState(null);
-  const [stockMovements] = useState(() => getStockMovements());
+  const [stockMovements, setStockMovements] = useState(() => getStockMovements());
   // Rows for items created by a finished production request stay highlighted until
   // their details are completed (saving the row's Edit form counts as completing).
   const [setupOnly,  setSetupOnly]  = useState(false);
@@ -528,6 +529,7 @@ export default function WarehouseInventoryPage() {
           { id:'movingorder',    label:'Moving Order' },
           { id:'opnamehistory',  label:'Opname History' },
           { id:'stockhistory',   label:'Stock History' },
+          { id:'production',     label:'Production' },
         ].map(t => (
           <button key={t.id} className={`wi-tab-btn${tab === t.id ? ' active' : ''}`} onClick={() => setTab(t.id)}>
             {t.label}
@@ -973,11 +975,18 @@ export default function WarehouseInventoryPage() {
         )}
       </Modal>
 
+      {tab === 'production' && (
+        <ProductionLogTab
+          warehouseNames={warehouseNames}
+          onStockChanged={() => { setInventoryRows([...getInventoryRows()]); setStockMovements([...getStockMovements()]); }}
+        />
+      )}
+
       {tab === 'stockhistory' && (
         <div className="card">
           <p style={{ fontSize: 12.5, color: 'var(--text-muted)', margin: '0 0 14px' }}>
             Stock changes made from other modules, such as an event&rsquo;s Convert request being applied
-            when the event moves to its next stage, so every change stays traceable.
+            when the event moves to its next stage, or a Production record being marked Done, so every change stays traceable.
           </p>
           <div className="table-wrap">
             <table>

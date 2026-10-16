@@ -2,32 +2,10 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { IconEdit, IconDelete, IconClose } from '../components/icons';
 import { useState } from 'react';
 import Modal from '../components/Modal';
-import { getProducedCatalog } from '../lib/producedItems';
+import { getCatalog } from '../lib/producedItems';
+import { getAllProductions, PRODUCTION_BADGE } from '../lib/productionRequests';
+import { formatIDR } from '../lib/superAdminUtils';
 
-const inventoryData = [
-  { id:1,  name:'Artificial Flower Chrysant Giant White', sku:'AFG-001', category:'Floral',     unit:'pcs',   warehouse:'Warehouse Bali 66',   totalStock:342, stockStatus:'Available',    updatedAt:'12 Mar 2025', desc:'Premium artificial chrysanthemum flowers for event decoration. Large size, white color.' },
-  { id:2,  name:'Artificial Flower Lunaria White',        sku:'AFL-002', category:'Floral',     unit:'pcs',   warehouse:'Warehouse Bali 66',   totalStock:327, stockStatus:'Available',    updatedAt:'10 Mar 2025', desc:'' },
-  { id:3,  name:'Artificial Rose Pink',                   sku:'ARP-003', category:'Floral',     unit:'pcs',   warehouse:'Warehouse Bali 66',   totalStock:182, stockStatus:'Available',    updatedAt:'08 Mar 2025', desc:'' },
-  { id:4,  name:'Backdrop Stand 2m',                      sku:'BSD-004', category:'Equipment',  unit:'unit',  warehouse:'Warehouse C9',        totalStock:8,   stockStatus:'Low Stock',    updatedAt:'07 Mar 2025', desc:'' },
-  { id:5,  name:'White Latex Balloon',                    sku:'BLP-005', category:'Decoration', unit:'pcs',   warehouse:'Warehouse Surabaya',  totalStock:500, stockStatus:'Available',    updatedAt:'-', desc:'' },
-  { id:6,  name:'Large Round Candle Holder',               sku:'CHB-006', category:'Decoration', unit:'pcs',   warehouse:'Warehouse Bali 70',   totalStock:60,  stockStatus:'Available',    updatedAt:'-', desc:'' },
-  { id:7,  name:'Cylinder-Shaped Crystal',                sku:'CBT-007', category:'Decoration', unit:'pcs',   warehouse:'Warehouse Bali 66',   totalStock:100, stockStatus:'Available',    updatedAt:'-', desc:'' },
-  { id:8,  name:'Plain White Fabric 3m',                  sku:'FPP-008', category:'Fabric',     unit:'meter', warehouse:'Warehouse Cililitan', totalStock:20,  stockStatus:'Low Stock',    updatedAt:'05 Mar 2025', desc:'' },
-  { id:9,  name:'Iron Flower Arch 60cm',                  sku:'FAB-009', category:'Decoration', unit:'unit',  warehouse:'Warehouse Bali 70',   totalStock:12,  stockStatus:'Available',    updatedAt:'-', desc:'' },
-  { id:10, name:'Carved Teak Gebyok',                     sku:'GJU-010', category:'Furniture',  unit:'unit',  warehouse:'Warehouse Cililitan', totalStock:2,   stockStatus:'Low Stock',    updatedAt:'01 Mar 2025', desc:'' },
-  { id:11, name:'Yellow Palm Leaf',                       sku:'JKN-011', category:'Decoration', unit:'pcs',   warehouse:'Warehouse Bali 66',   totalStock:50,  stockStatus:'Available',    updatedAt:'-', desc:'' },
-  { id:12, name:'Wahyu Tumurun Batik Cloth',              sku:'KBW-012', category:'Fabric',     unit:'meter', warehouse:'Warehouse Cililitan', totalStock:80,  stockStatus:'Available',    updatedAt:'28 Feb 2025', desc:'' },
-  { id:13, name:'White Tiffany Chair',                    sku:'KTP-013', category:'Furniture',  unit:'unit',  warehouse:'Warehouse Bali 66',   totalStock:80,  stockStatus:'Available',    updatedAt:'20 Feb 2025', desc:'' },
-  { id:14, name:'Large Red Candle',                       sku:'LMB-014', category:'Decoration', unit:'pcs',   warehouse:'Warehouse Bali 66',   totalStock:50,  stockStatus:'Available',    updatedAt:'15 Feb 2025', desc:'' },
-  { id:15, name:'White Buffet Table',                     sku:'MBP-015', category:'Furniture',  unit:'unit',  warehouse:'Warehouse Surabaya',  totalStock:8,   stockStatus:'Low Stock',    updatedAt:'-', desc:'' },
-  { id:16, name:'Gold Ribbon Roll',                       sku:'PER-016', category:'Decoration', unit:'roll',  warehouse:'Warehouse Bali 66',   totalStock:100, stockStatus:'Available',    updatedAt:'-', desc:'' },
-  { id:17, name:'White Tablecloth 2x1m',                  sku:'TMP-017', category:'Fabric',     unit:'pcs',   warehouse:'Warehouse Bali 66',   totalStock:30,  stockStatus:'Available',    updatedAt:'10 Feb 2025', desc:'' },
-  { id:18, name:'Tall Tealight Holder 15cm',              sku:'THL-018', category:'Decoration', unit:'pcs',   warehouse:'Warehouse Bali 70',   totalStock:27,  stockStatus:'Available',    updatedAt:'-', desc:'' },
-  { id:19, name:'Mini Camera Tripod',                     sku:'TKM-019', category:'Equipment',  unit:'unit',  warehouse:'Warehouse Cililitan', totalStock:5,   stockStatus:'Low Stock',    updatedAt:'-', desc:'' },
-  { id:20, name:'Tall White Ceramic Vase',                sku:'VKP-020', category:'Decoration', unit:'pcs',   warehouse:'Warehouse Bali 66',   totalStock:15,  stockStatus:'Available',    updatedAt:'-', desc:'' },
-  { id:21, name:'Acrylic Ball Silver 20cm',               sku:'ABS-021', category:'Decoration', unit:'pcs',   warehouse:'Warehouse Bali 70',   totalStock:189, stockStatus:'Available',    updatedAt:'-', desc:'' },
-  { id:22, name:'Plain White Fabric 6m',                  sku:'KPP-022', category:'Fabric',     unit:'meter', warehouse:'Warehouse Bali 70',   totalStock:1,   stockStatus:'Out of Stock', updatedAt:'-', desc:'' },
-];
 
 function statusBadge(s) {
   if (s === 'Available')    return <span className="badge badge-green">{s}</span>;
@@ -49,8 +27,9 @@ export default function InventoryDetailPage() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const id = parseInt(params.get('id'));
-  // Items created by finished production requests aren't in the static list above.
-  const item = inventoryData.find(r => r.id === id) || getProducedCatalog().find(r => r.id === id);
+  // Same catalog as the Inventory listing (seed data + items created by finished production requests).
+  const item = getCatalog().find(r => r.id === id);
+  const productions = item ? getAllProductions().filter(p => p.name === item.name) : [];
 
   const [deleteOpen, setDeleteOpen] = useState(false);
 
@@ -98,6 +77,8 @@ export default function InventoryDetailPage() {
             <Field label="Unit" value={item.unit} />
             <Field label="Warehouse" value={item.warehouse} />
             <Field label="Updated At" value={item.updatedAt === '-' ? null : item.updatedAt} />
+            <Field label="Item Value" value={item.itemValue ? formatIDR(item.itemValue) : null} />
+            <Field label="Total Value" value={item.itemValue ? `${formatIDR(item.itemValue * item.totalStock)} (${item.totalStock} × ${formatIDR(item.itemValue)})` : null} />
             <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
               <span style={{ fontSize:11.5, fontWeight:600, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'.05em' }}>Status</span>
               {statusBadge(item.stockStatus)}
@@ -152,6 +133,37 @@ export default function InventoryDetailPage() {
             }
           </div>
         </div>
+      </div>
+
+      <div className="card" style={{ padding:24, marginTop:16 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:14 }}>
+          <span style={{ width:8, height:8, borderRadius:'50%', background:'var(--orange)' }} />
+          <span style={{ fontSize:11, fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'.07em' }}>Production History</span>
+          <span style={{ fontSize:12, color:'var(--text-muted)' }}>({productions.length})</span>
+        </div>
+        {productions.length === 0
+          ? <p style={{ fontSize:13, color:'var(--text-muted)', margin:0 }}>This item has never been produced.</p>
+          : (
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Requested</th><th style={{ textAlign:'right' }}>Qty</th><th>Vendor</th><th>Event</th><th>Deploy to</th><th>Status</th></tr>
+                </thead>
+                <tbody>
+                  {productions.map(p => (
+                    <tr key={p.uid}>
+                      <td style={{ whiteSpace:'nowrap', color:'var(--text-muted)', fontSize:12.5 }}>{p.requestedAt}</td>
+                      <td style={{ textAlign:'right', fontWeight:600 }}>{p.qty}</td>
+                      <td>{p.vendorId ? <button type="button" className="link-btn" onClick={() => navigate(`/vendor-detail?id=${p.vendorId}`)}>{p.vendorName}</button> : (p.vendorName || '—')}</td>
+                      <td>{p.eventKey ? <button type="button" className="link-btn" onClick={() => navigate(`/event-detail?name=${encodeURIComponent(p.eventKey)}`)}>{p.eventName}</button> : <span style={{ color:'var(--text-muted)' }}>Restock (no event)</span>}</td>
+                      <td>{p.warehouse || '—'}</td>
+                      <td><span className={`badge ${PRODUCTION_BADGE[p.status] || 'badge-gray'}`} style={{ fontSize:11 }}>{p.status}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
       </div>
 
       <Modal open={deleteOpen} title="Delete Item" onClose={() => setDeleteOpen(false)}

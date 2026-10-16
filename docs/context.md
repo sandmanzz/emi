@@ -899,6 +899,24 @@ clashes or seems off) — proceeding with the stated assumption unless corrected
 
 ## Raw instruction log
 
+### 2026-10-16 — Item Value, multi-select category, Production tab, Vendor CMS detail, mock data (Claude Web)
+> 1. ss 1 : di modul barang ,perlu ada namanya item value, dimana di listing perlu ada tampikan total nilai asset nya yang dibaca dari sum item value.
+> 2. ss 2 : tolong pastikan category bisa multi select
+> 3. ss 3 : di bagian warehouse inventory perlu ada tambahan tab untuk production untuk mencatat barang barang yang di produksi
+> 4. buatkan CMS vendor, nama, internal, external, description,phone, address ketika di klik salah satu row nya kita melihat detail nya termasuk barang apa saja yang kita produksi dari mereka dan dari event mana
+> 5. bermainlah dengan mock data, jika belum ada buatkan mock data yang proper agar bisa terlihat lebih detail
+> 6. buat md file baru untuk menyimpan semuanya bernama context-claude-web
+
+All decisions, assumptions and open questions for this request are in
+[context-claude-web.md](context-claude-web.md) (session 2026-10-16). In short:
+- Item Value = per unit. Total Asset Value = Σ(Item Value × Total Stock) ⚠️ read "sum item value" as value × stock.
+- The category multi-select is the **Inventory filter**. An item still has one category.
+- Warehouse Inventory → **Production** tab: every event production (read-only) plus restock productions recorded there.
+  When a restock is marked Done, its stock is added to the warehouse.
+- Vendor = name, Internal/External, description, phone, address. Clicking a row opens the vendor detail, with everything
+  they produced and for which event.
+- Mock data: the 26 Event Detail demo items added to the catalog and warehouse, item values, 14 vendors and 32 production records.
+
 ### 2026-10-09 — Make the whole UI responsive
 > saya mau secara UI semuanya pastikan responsive
 
