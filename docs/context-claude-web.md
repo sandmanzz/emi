@@ -36,6 +36,38 @@ Newest session first.
 
 ---
 
+## Session 2026-10-16 (5) — Event Calendar with item clashes, Event Report v2, Stock Opname Report
+
+Spec: [prd/PRD-2026-10-16.md](prd/PRD-2026-10-16.md) **§12**.
+
+### Request (verbatim)
+> 1. Kalender event yang menampilkan bentrok pemakaian barang: barang yang sama dipesan dua event di tanggal yang sama.
+> 2. Report event tolong dibuat lebih baik lagi
+> 3. Report stock opname tolong dibuat jika belum ada
+
+### Decisions (⚠️ = assumption)
+- **#1** `/event-calendar`: a month grid by booking window (load-in date → finish). It flags an item booked by ≥ 2 events on
+  the same day as a clash, and as a shortage when their combined qty is more than total stock.
+  - ⚠️ No load-out buffer after `finish`.
+  - ⚠️ Total stock across all warehouses.
+  - Outsourced / rented lines don't count.
+  - Two overlapping demo events were added, and generated item quantities are now sized from real stock, so the demo shows a realistic mix.
+- **#2** The Event Report gained a cost strip (rental cost, production, clashes, open issues) and four tabs: Overview,
+  Items, Rentals & Production, and Issues (shortages vs other events, overdue rentals, broken, not scanned in, not cross-checked).
+- **#3** `/stock-opname-report` did not exist (only Warehouse Inventory → Opname History).
+  - It covers accuracy, shrinkage and found-extra value, per warehouse (with "Due" after 60 days), the monthly trend,
+    the items most often off, and the opname log with lines, plus CSV and print.
+  - Opname submits now save `countedCount` and line `valuation`.
+  - The seed has 14 opnames across 5 warehouses.
+
+### Verified
+- In Chromium the calendar loads in under 1 s. April has 4 clash days / 16 items short; July has 71 clashing / 15 short.
+- Report v2 tabs work: Wedding Bali Season shows a Rp4.600.000 rental cost and 15 issues.
+- The opname report shows 12 approved opnames at 78.5% accuracy and Rp73.731.000 shrinkage.
+- Lint is at 11 (pre-existing), build OK, no console errors.
+
+---
+
 ## Session 2026-10-16 (4) — Item form, single persistent stock source, one loan concept (we rent)
 
 Spec: [prd/PRD-2026-10-16.md](prd/PRD-2026-10-16.md) **§11**, which overrides earlier sections.

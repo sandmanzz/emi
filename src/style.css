@@ -2549,3 +2549,72 @@ th.num { text-align: right; }
 .item-form-wh li { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--border); }
 .item-form-wh li:last-child { border-bottom: none; }
 .item-form-wh li.total { font-weight: 700; }
+
+/* ── Event Calendar (EventCalendarPage.jsx) ─────────────────────────────────── */
+.cal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+.cal-nav { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cal-nav-btn { width: 32px; height: 32px; border: 1px solid var(--border); border-radius: var(--r); background: var(--white); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text-2); }
+.cal-nav-btn svg { width: 16px; height: 16px; }
+.cal-month { font-size: 15px; font-weight: 700; min-width: 140px; text-align: center; color: var(--text); }
+.cal-intro { font-size: 12.5px; color: var(--text-muted); margin: 0 0 16px; max-width: 900px; line-height: 1.6; }
+.cal-chip-key { padding: 1px 7px; border-radius: 999px; font-weight: 600; font-size: 11.5px; }
+.cal-chip-key.shared { background: var(--orange-bg); color: var(--orange); }
+.cal-chip-key.shortage { background: var(--red-bg); color: var(--red); }
+.cal-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; align-items: start; }
+.cal-card { padding: 12px; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.cal-weekday { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; text-align: center; padding: 4px 0; }
+.cal-cell { min-height: 104px; border: 1px solid var(--border); border-radius: 8px; background: var(--white); padding: 5px; display: flex; flex-direction: column; gap: 3px; text-align: left; cursor: pointer; font: inherit; min-width: 0; }
+.cal-cell:hover { border-color: var(--brand); }
+.cal-cell.out { background: var(--bg); opacity: .45; cursor: default; }
+.cal-cell.today .cal-day { background: var(--brand); color: #fff; }
+.cal-cell.selected { box-shadow: 0 0 0 2px var(--brand); border-color: var(--brand); }
+.cal-cell.has-clash { background: #fffbeb; }
+.cal-cell.has-shortage { background: #fef2f2; }
+.cal-day { font-size: 12px; font-weight: 700; color: var(--text-2); width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; }
+.cal-event { font-size: 11px; line-height: 1.3; padding: 2px 5px; border-left: 3px solid; border-radius: 4px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cal-more { font-size: 10.5px; color: var(--text-muted); padding-left: 4px; }
+.cal-clash { margin-top: auto; font-size: 10.5px; font-weight: 700; padding: 1px 6px; border-radius: 999px; align-self: flex-start; }
+.cal-clash.shared { background: var(--orange-bg); color: var(--orange); }
+.cal-clash.shortage { background: var(--red-bg); color: var(--red); }
+.cal-side { padding: 16px; position: sticky; top: 12px; max-height: calc(100vh - 100px); overflow: auto; }
+.cal-side-empty { color: var(--text-muted); font-size: 13px; text-align: center; padding: 30px 6px; }
+.cal-side-events { list-style: none; margin: 0; padding: 0; }
+.cal-side-events li { display: flex; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--bg); }
+.cal-dot { width: 9px; height: 9px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+.cal-clash-list { display: flex; flex-direction: column; gap: 8px; }
+.cal-clash-row { border: 1px solid var(--border); border-left: 3px solid var(--orange); border-radius: 6px; padding: 7px 9px; font-size: 12.5px; }
+.cal-clash-row.shortage { border-left-color: var(--red); }
+.cal-clash-item { display: flex; justify-content: space-between; gap: 6px; align-items: center; }
+.cal-clash-bar { height: 5px; background: var(--bg); border-radius: 999px; overflow: hidden; margin: 5px 0 3px; }
+.cal-clash-bar div { height: 100%; background: var(--orange); }
+.cal-clash-row.shortage .cal-clash-bar div { background: var(--red); }
+@media (max-width: 1100px) { .cal-layout { grid-template-columns: 1fr; } .cal-side { position: static; max-height: none; } }
+@media (max-width: 560px) { .cal-cell { min-height: 64px; } .cal-event { display: none; } .cal-grid { gap: 2px; } }
+
+/* Event Report v2 — cost strip, tabs, issues */
+.rep-cost-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+.rep-cost-strip > div { background: var(--white); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 10px 14px; display: flex; flex-direction: column; gap: 2px; }
+.rep-cost-strip span { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; }
+.rep-cost-strip strong { font-size: 18px; color: var(--text); font-variant-numeric: tabular-nums; }
+.rep-cost-strip em { font-style: normal; font-size: 12px; color: var(--text-muted); }
+.rep-cost-strip .warn { border-color: #fecaca; background: #fff7f7; }
+.rep-cost-strip .warn strong { color: var(--red); }
+.rep-tabs { margin-bottom: 16px; }
+.wi-tab-btn.rep-tab-warn:not(.active) { color: var(--red); }
+.rep-stack { display: flex; flex-direction: column; gap: 16px; }
+.rep-ok { text-align: center; color: var(--green); font-weight: 600; padding: 28px; }
+.rep-issue { border-left: 4px solid var(--red); }
+.rep-issue-list { margin: 0; padding-left: 18px; font-size: 13px; color: var(--text-2); line-height: 1.8; }
+.rep-issue-cols { columns: 2; column-gap: 32px; }
+@media (max-width: 900px) { .rep-cost-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } .rep-issue-cols { columns: 1; } }
+
+/* Stock Opname Report */
+.opr-month { padding: 6px 0; border-bottom: 1px solid var(--bg); }
+.opr-month:last-child { border-bottom: none; }
+.opr-month-head { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; margin-bottom: 4px; }
+.opr-month-head span { color: var(--text-muted); font-size: 11.5px; }
+.opr-lines-row > td { background: var(--bg); padding: 10px 14px !important; }
+.opr-lines { width: 100%; font-size: 12.5px; }
+.opr-lines th { background: transparent; }
+.opr-reject { color: var(--red); font-size: 12.5px; font-weight: 600; margin-bottom: 6px; }

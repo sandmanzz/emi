@@ -3,6 +3,8 @@ import Layout from './components/Layout';
 import EventPage from './pages/EventPage';
 import EventDetailPage from './pages/EventDetailPage';
 import EventSummaryPage from './pages/EventSummaryPage';
+import EventCalendarPage from './pages/EventCalendarPage';
+import StockOpnameReportPage from './pages/StockOpnameReportPage';
 import WarehousePage from './pages/WarehousePage';
 import WarehouseDetailPage from './pages/WarehouseDetailPage';
 import WarehouseInventoryPage from './pages/WarehouseInventoryPage';
@@ -68,6 +70,7 @@ export default function App() {
           <Route index element={<Navigate to="/event" replace />} />
           <Route path="prd" element={<PRDPage />} />
           <Route path="stock-opname" element={<StockOpnamePage />} />
+          <Route path="stock-opname-report" element={<StockOpnameReportPage />} />
           <Route path="upgrade" element={<UpgradePage />} />
           <Route path="dashboard" element={<MainDashboardPage />} />
           <Route path="inventory-report" element={<InventoryReportPage />} />
@@ -75,6 +78,7 @@ export default function App() {
           <Route path="event" element={<EventPage />} />
           <Route path="event-detail" element={<EventDetailPage />} />
           <Route path="event-summary" element={<EventSummaryPage />} />
+          <Route path="event-calendar" element={<EventCalendarPage />} />
           <Route path="warehouse" element={<WarehousePage />} />
           <Route path="warehouse-detail" element={<WarehouseDetailPage />} />
           <Route path="warehouse-inventory" element={<WarehouseInventoryPage />} />

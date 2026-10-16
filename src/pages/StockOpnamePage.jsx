@@ -89,11 +89,14 @@ export default function StockOpnamePage() {
       diff: variance(r),
       condition: getCondition(r),
       note: getCondition(r) === 'Poor' ? (conditionNote[r.id] || '') : '',
+      valuation: Number(r.valuation) || 0, // unit value, for the variance value in the Stock Opname Report
     }));
     addOpnameHistory({
       appliedAt: formatToday(),
       appliedBy: currentUser?.name || 'Admin',
       warehouse: selectedWarehouse,
+      // every row of the warehouse was counted; only changed rows are listed in `items` (accuracy in the report)
+      countedCount: inventoryRows.filter(x => x.warehouseName === selectedWarehouse).length,
       status: 'Pending',
       resolvedAt: null,
       resolvedBy: null,

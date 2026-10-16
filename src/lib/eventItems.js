@@ -76,7 +76,10 @@ function generate(event, key) {
     const r = rand();
     const ownership = r < 0.7 ? 'IHC' : r < 0.9 ? 'IHP' : 'Outsource';
     const broken = (scanIn && rand() < 0.04) ? 1 + Math.floor(rand() * 3) : 0;
-    const qty = lo + Math.floor(rand() * (hi - lo + 1));
+    // Realistic size: a line takes a slice (8–33%) of what we actually own, within the category's range,
+    // so two overlapping events sometimes fit in our stock and sometimes don't (Event Calendar clashes).
+    const share = Math.max(1, Math.round((cat.totalStock || 3) * (0.08 + rand() * 0.25)));
+    const qty = Math.min(lo + Math.floor(rand() * (hi - lo + 1)), share);
     return {
       id: i + 1, name: cat.name, area, subArea: subs.length && rand() < 0.5 ? pick(subs) : '',
       stage: stages[Math.floor(Math.pow(rand(), 0.7) * (stageIdx + 1))] || stages[0],

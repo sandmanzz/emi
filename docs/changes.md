@@ -50,6 +50,31 @@ explains a few non-obvious conventions that the entries below assume you already
 
 ---
 
+## Round 32 — Event Calendar (item clashes), Event Report v2, Stock Opname Report
+
+Spec: [prd/PRD-2026-10-16.md](prd/PRD-2026-10-16.md) §12.
+
+**Files:** new `src/pages/EventCalendarPage.jsx`, `src/lib/eventClashes.js`, `src/pages/StockOpnameReportPage.jsx`. Changed:
+`src/pages/EventSummaryPage.jsx` (cost strip, tabs, supply + issues), `src/pages/StockOpnamePage.jsx` (`countedCount`,
+line `valuation`), `src/lib/eventItems.js` (qty sized from stock), `src/data/events.js` (ids 100–101), `src/pages/EventPage.jsx`
+(next id 102), `src/data/stockOpnameHistory.js` (14 opnames), `src/App.jsx`, `src/components/Sidebar.jsx`, `src/style.css`.
+
+**How it works**
+- `computeClashes(from, to)` walks each day of the range. For every day with ≥ 2 active events it groups their demand by item
+  (≥ 2 users = clash; demand > `getCatalog().totalStock` = shortage), then merges consecutive days with the same item + event
+  set into ranges. Demand per event is cached in the module for the session.
+- Event Report: `showTab(t)` renders one tab, and while printing renders Overview + Items. Issues are computed from the enriched
+  items, `getEventLoans`, and `clashesForEvent`.
+- Stock Opname Report: one memoised enrichment pass (dates parsed from "DD Mon YYYY", line values), then filtered aggregates
+  (per warehouse, per month, per item). Log rows expand with a `Fragment` + detail row. Printing expands all of them.
+
+**Gotchas**
+- Clash results depend on the generated item lists, which are seeded per event id. Changing an event's `itemCount` changes its lines.
+- Old opname records without `countedCount` count only their changed lines, so their accuracy reads low. The seed has
+  `countedCount` on every record.
+
+---
+
 ## Round 31 — Item form, single persistent stock source + full ledger, Item Loan replaced by warehouse rentals
 
 Spec: [prd/PRD-2026-10-16.md](prd/PRD-2026-10-16.md) §11.

@@ -11,6 +11,10 @@ import { resolveEventStage } from '../lib/eventProgress';
 import { getEventClosing } from '../lib/eventClosing';
 import { CLOSING_LABELS } from '../lib/eventClosingLabels';
 import { formatIDR } from '../lib/superAdminUtils';
+import { getEventLoans, loanDisplayStatus, loanTotalCost, LOAN_BADGE } from '../lib/eventLoans';
+import { getProductionRequests, PRODUCTION_BADGE } from '../lib/productionRequests';
+import { clashesForEvent } from '../lib/eventClashes';
+import { TODAY } from '../data/events';
 
 // Event Report (/event-summary?name=<event key>): everything about one event's items on one
 // page, built for the real case of HUNDREDS of item lines per event.
@@ -45,7 +49,7 @@ function pct(n, total) { return total ? Math.round((n / total) * 100) : 0; }
 // Short Rupiah for KPI tiles: Rp7,54 M (miliar) / Rp865 jt (juta). Full value goes in the sub line.
 function shortIDR(n) {
   if (n >= 1e9) return `Rp${(n / 1e9).toLocaleString('id-ID', { maximumFractionDigits: 2 })} M`;
-  if (n >= 1e6) return `Rp${(n / 1e6).toLocaleString('id-ID', { maximumFractionDigits: 1 })} jt`;
+  if (n >= 1e6) return `Rp${Math.round(n / 1e6).toLocaleString('id-ID')} jt`;
   return formatIDR(n);
 }
 function progressOf(it) {
@@ -131,7 +135,9 @@ export default function EventSummaryPage() {
   function selectEvent(key) {
     setSearchParams({ name: key });
     resetFilters();
+    setTab('overview');
   }
+  const [tab, setTab] = useState('overview'); // overview | items | supply | issues
 
   const stage = resolveEventStage(event.key);
   const stageIdx = stages.indexOf(stage);
@@ -264,6 +270,25 @@ export default function EventSummaryPage() {
     { label: 'Broken', value: stats.broken, sub: stats.broken ? `${stats.brokenQty} pcs reported` : 'No reports', accent: stats.broken ? 'red' : 'green' },
   ];
 
+  // Rentals, production and clashes for this event (Rentals & Production / Issues tabs).
+  const loans = useMemo(() => getEventLoans(event.key).map(l => ({ ...l, display: loanDisplayStatus(l, TODAY), total: loanTotalCost(l) })), [event.key]);
+  const productions = useMemo(() => getProductionRequests(event.key).filter(p => p.type !== 'convert'), [event.key]);
+  const converts = useMemo(() => getProductionRequests(event.key).filter(p => p.type === 'convert'), [event.key]);
+  const clashes = useMemo(() => clashesForEvent(event.key), [event.key]);
+  const rentalCost = loans.reduce((s, l) => s + l.total, 0);
+  const scanInIdx = stages.findIndex(s => /scan in/i.test(s));
+  const pastScanIn = finished || closing === 'checking-inventory' || (scanInIdx >= 0 && stageIdx > scanInIdx);
+  const crossCheckPhase = finished || closing === 'checking-inventory';
+  const issues = {
+    broken: items.filter(it => it.brokenQty > 0),
+    notScanned: pastScanIn ? items.filter(it => !it.scanIn && !it.scanned) : [],
+    notChecked: crossCheckPhase ? items.filter(it => !it.checked) : [],
+    overdue: loans.filter(l => l.display === 'Overdue'),
+    shortages: clashes.filter(c => c.shortage),
+  };
+  const issueCount = issues.broken.length + issues.notScanned.length + issues.notChecked.length + issues.overdue.length + issues.shortages.length;
+  const showTab = t => printing ? t !== 'supply' && t !== 'issues' ? true : false : tab === t;
+
   const progressCounts = useMemo(() => {
     const m = {};
     items.forEach(it => { m[it.progress] = (m[it.progress] || 0) + 1; });
@@ -327,6 +352,25 @@ export default function EventSummaryPage() {
         ))}
       </div>
 
+      <div className="rep-cost-strip">
+        <div><span>Rental cost</span><strong>{formatIDR(rentalCost)}</strong><em>{loans.length} rental{loans.length === 1 ? '' : 's'} · {loans.filter(l => l.status === 'Borrowed').length} out now</em></div>
+        <div><span>Production</span><strong>{productions.length}</strong><em>{productions.filter(p => p.status === 'Done').length} done · {converts.length} convert{converts.length === 1 ? '' : 's'}</em></div>
+        <div><span>Clashes with other events</span><strong>{clashes.length}</strong><em>{issues.shortages.length} short of stock</em></div>
+        <div className={issueCount ? 'warn' : ''}><span>Open issues</span><strong>{issueCount}</strong><em>{issueCount ? 'see the Issues tab' : 'nothing to follow up'}</em></div>
+      </div>
+
+      <div className="wi-tabs no-print rep-tabs">
+        {[
+          { id: 'overview', label: 'Overview' },
+          { id: 'items', label: `Items (${items.length})` },
+          { id: 'supply', label: `Rentals & Production (${loans.length + productions.length + converts.length})` },
+          { id: 'issues', label: `Issues (${issueCount})` },
+        ].map(t => (
+          <button key={t.id} type="button" className={`wi-tab-btn${tab === t.id ? ' active' : ''}${t.id === 'issues' && issueCount ? ' rep-tab-warn' : ''}`} onClick={() => setTab(t.id)}>{t.label}</button>
+        ))}
+      </div>
+
+      {showTab('overview') && (
       <div className="rep-grid">
         <div className="card rep-area-card">
           <div className="rep-section-title">
@@ -372,6 +416,9 @@ export default function EventSummaryPage() {
         </div>
       </div>
 
+      )}
+
+      {showTab('items') && (
       <div className="card rep-items">
         <div className="rep-section-title">
           Items <span className="rep-muted">{isFiltered ? `${filtered.length} of ${items.length} lines match` : `${items.length} lines`} · {filteredQty.toLocaleString('id-ID')} pcs · {formatIDR(filteredValue)}</span>
@@ -464,6 +511,116 @@ export default function EventSummaryPage() {
           </div>
         )}
       </div>
+      )}
+
+      {showTab('supply') && (
+        <div className="rep-stack">
+          <div className="card">
+            <div className="rep-section-title">Rentals <span className="rep-muted">items borrowed from loan vendors for this event · {formatIDR(rentalCost)}</span></div>
+            {loans.length === 0 ? <p className="rep-muted" style={{ margin: 0 }}>Nothing rented for this event.</p> : (
+              <div className="table-wrap">
+                <table>
+                  <thead><tr><th>Item</th><th className="num">Qty</th><th>Vendor</th><th>Area</th><th>Period</th><th className="num">Cost</th><th>Status</th></tr></thead>
+                  <tbody>
+                    {loans.map(l => (
+                      <tr key={l.id}>
+                        <td className="name-cell">{l.itemName}</td>
+                        <td className="num">{l.qty} <span className="rep-muted">{l.unit}</span></td>
+                        <td><button type="button" className="link-btn" onClick={() => navigate(`/loan-vendor-detail?id=${l.vendorId}`)}>{l.vendorName}</button></td>
+                        <td className="rep-small">{l.area}{l.subArea ? ` · ${l.subArea}` : ''}</td>
+                        <td className="rep-small rep-nowrap">{fmtDate(l.startDate)} → {fmtDate(l.dueDate)}</td>
+                        <td className="num rep-nowrap">{l.total ? formatIDR(l.total) : '—'}</td>
+                        <td><span className={`badge ${LOAN_BADGE[l.display]}`} style={{ fontSize: 11 }}>{l.display}</span></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+          <div className="card">
+            <div className="rep-section-title">Production <span className="rep-muted">new items made for this event, and converts</span></div>
+            {productions.length + converts.length === 0 ? <p className="rep-muted" style={{ margin: 0 }}>No production or convert requests.</p> : (
+              <div className="table-wrap">
+                <table>
+                  <thead><tr><th>Type</th><th>Item</th><th className="num">Qty</th><th>Vendor / from</th><th>Deploy to</th><th>Requested</th><th>Status</th></tr></thead>
+                  <tbody>
+                    {productions.map(p => (
+                      <tr key={`p${p.id}`}>
+                        <td><span className="badge badge-purple" style={{ fontSize: 10.5 }}>Production</span></td>
+                        <td className="name-cell">{p.name}{p.reason === 'broken' && <span className="badge badge-red" style={{ fontSize: 10, marginLeft: 6 }}>Replaces broken</span>}</td>
+                        <td className="num">{p.qty}</td>
+                        <td>{p.vendorId ? <button type="button" className="link-btn" onClick={() => navigate(`/vendor-detail?id=${p.vendorId}`)}>{p.vendorName}</button> : (p.vendorName || '—')}</td>
+                        <td className="rep-small">{p.warehouse || '—'}</td>
+                        <td className="rep-small rep-nowrap">{p.requestedAt}</td>
+                        <td><span className={`badge ${PRODUCTION_BADGE[p.status] || 'badge-gray'}`} style={{ fontSize: 11 }}>{p.status}</span></td>
+                      </tr>
+                    ))}
+                    {converts.map(c => (
+                      <tr key={`c${c.id}`}>
+                        <td><span className="badge badge-blue" style={{ fontSize: 10.5 }}>Convert</span></td>
+                        <td className="name-cell">{c.fromQty} × {c.fromName} → {c.toQty} × {c.toName}</td>
+                        <td className="num">{c.toQty}</td>
+                        <td className="rep-small">{c.fromWarehouse}</td>
+                        <td className="rep-small">—</td>
+                        <td className="rep-small rep-nowrap">{c.requestedAt}</td>
+                        <td><span className={`badge ${c.status === 'Converted' ? 'badge-green' : 'badge-orange'}`} style={{ fontSize: 11 }}>{c.status}</span></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {showTab('issues') && (
+        <div className="rep-stack">
+          {issueCount === 0 && <div className="card rep-ok">No open issues for this event.</div>}
+          {issues.shortages.length > 0 && (
+            <div className="card rep-issue">
+              <div className="rep-section-title">Short of stock because of other events <span className="rep-muted">{issues.shortages.length} items · <button type="button" className="link-btn" onClick={() => navigate('/event-calendar')}>open Event Calendar</button></span></div>
+              <div className="table-wrap"><table>
+                <thead><tr><th>Item</th><th>Dates</th><th>Booked by</th><th className="num">Needed</th><th className="num">In stock</th></tr></thead>
+                <tbody>{issues.shortages.map(c => (
+                  <tr key={`${c.item}-${c.from}`}>
+                    <td className="name-cell">{c.item}</td>
+                    <td className="rep-small rep-nowrap">{fmtDate(c.from)}{c.to !== c.from ? ` – ${fmtDate(c.to)}` : ''}</td>
+                    <td className="rep-small">{c.entries.map(x => `${x.name} (${x.qty})`).join(' · ')}</td>
+                    <td className="num" style={{ color: 'var(--red)', fontWeight: 700 }}>{c.demand}</td>
+                    <td className="num">{c.stock}</td>
+                  </tr>
+                ))}</tbody>
+              </table></div>
+            </div>
+          )}
+          {issues.overdue.length > 0 && (
+            <div className="card rep-issue">
+              <div className="rep-section-title">Overdue rentals <span className="rep-muted">return to the vendor</span></div>
+              <ul className="rep-issue-list">{issues.overdue.map(l => <li key={l.id}><strong>{l.itemName}</strong> · {l.qty} {l.unit} from {l.vendorName} · due {fmtDate(l.dueDate)}</li>)}</ul>
+            </div>
+          )}
+          {issues.broken.length > 0 && (
+            <div className="card rep-issue">
+              <div className="rep-section-title">Broken items <span className="rep-muted">{issues.broken.reduce((s, it) => s + it.brokenQty, 0)} pcs reported</span></div>
+              <ul className="rep-issue-list">{issues.broken.map(it => <li key={it.id}><strong>{it.name}</strong> · {it.area} · {it.brokenQty} of {it.qty} broken{it.brokenNote ? ` — ${it.brokenNote}` : ''}</li>)}</ul>
+            </div>
+          )}
+          {issues.notScanned.length > 0 && (
+            <div className="card rep-issue">
+              <div className="rep-section-title">Not scanned in <span className="rep-muted">{issues.notScanned.length} lines, although the event is past the scan-in stage</span></div>
+              <ul className="rep-issue-list rep-issue-cols">{issues.notScanned.map(it => <li key={it.id}><strong>{it.name}</strong> · {it.area} · {it.qty}</li>)}</ul>
+            </div>
+          )}
+          {issues.notChecked.length > 0 && (
+            <div className="card rep-issue">
+              <div className="rep-section-title">Not cross-checked <span className="rep-muted">{issues.notChecked.length} lines still to check during closing</span></div>
+              <ul className="rep-issue-list rep-issue-cols">{issues.notChecked.map(it => <li key={it.id}><strong>{it.name}</strong> · {it.area} · {it.qty}</li>)}</ul>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

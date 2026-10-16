@@ -282,7 +282,7 @@ export default function EventPage() {
     itemCount: Number.isFinite(e.itemCount) ? e.itemCount : 0,
     updatedAt: e.updatedAt || e.date || e.start || '-',
   })));
-  const [nextId, setNextId] = useState(100); // seed events use ids up to 99
+  const [nextId, setNextId] = useState(102); // seed events use ids up to 101
 
   // One shared search query + page, reset whenever the active tab changes —
   // simpler than a separate pair per tab now that there are 6 of them.

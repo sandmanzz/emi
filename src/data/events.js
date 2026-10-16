@@ -37,4 +37,8 @@ export const initialEvents = [
   { id:97, name:'Engagement Rina & Bayu',      desc:'Engagement ceremony, 60 guests',     start:'2026-05-17', finish:'2026-05-17', date:'2026-05-15', code:'ERB',    location:'Surabaya',    type:'upcoming', itemCount:8,   updatedAt:'2026-04-09' },
   { id:98, name:'Product Photoshoot Kilau',    desc:'Half-day studio shoot',              start:'2026-04-15', finish:'2026-04-15', date:'2026-04-14', code:'PPK',    location:'Denpasar',    type:'upcoming', itemCount:3,   updatedAt:'2026-04-09' },
   { id:99, name:'Office Townhall Q2',          desc:'Quarterly all-hands meeting',        start:'2026-06-20', finish:'2026-06-20', date:'2026-06-18', code:'OTQ2',   location:'Jakarta',     type:'upcoming', itemCount:6,   updatedAt:'2026-04-05' },
+  // Clash demo (2026-10-16): booked on the same dates as a big event, so the Event Calendar
+  // shows items wanted by two events at once (lib/eventClashes.js).
+  { id:100, name:'Corporate Gala Bali',        desc:'Client gala, same week as Wedding Bali Season', start:'2026-07-13', finish:'2026-07-14', date:'2026-07-12', code:'CGB',    location:'Bali',        type:'upcoming', itemCount:140, updatedAt:'2026-04-08' },
+  { id:101, name:'Summit Afterparty',          desc:'Afterparty during Corporate Summit 2026',       start:'2026-05-31', finish:'2026-06-01', date:'2026-05-30', code:'SAP',    location:'Jakarta',     type:'upcoming', itemCount:64,  updatedAt:'2026-04-07' },
 ];

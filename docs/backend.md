@@ -126,6 +126,18 @@ whose status is still `on-going`.
 
 ---
 
+## Event calendar clashes, opname report (2026-10-16, R32)
+
+Spec: [prd/PRD-2026-10-16.md](prd/PRD-2026-10-16.md) §12.
+
+- **Clashes:** `GET /events/clashes?from=&to=` → per item: `{ itemId, from, to, events: [{eventId, qty}], demand, stock, shortage }`.
+  Compute server-side from event items joined by `itemId`, over each event's booking window
+  (`min(loadInDate, start)` → `max(finish, …)`). Exclude outsourced / rented lines and transferred events. This should become a
+  validation warning when items are added to an event (`POST /events/{id}/items` → `warnings: [{itemId, shortBy, otherEvents}]`).
+- **Opname report:** store `countedCount` per opname and `unitValue` per line at submit time.
+  `GET /stock-opnames/report?warehouseId=&status=&from=&to=` → totals, per warehouse (with last approved date), per month,
+  top items by value lost.
+
 ## Single stock source, catalog CRUD, rentals only (2026-10-16, R31)
 
 Spec: [prd/PRD-2026-10-16.md](prd/PRD-2026-10-16.md) §11.

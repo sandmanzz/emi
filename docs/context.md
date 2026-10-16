@@ -899,6 +899,16 @@ clashes or seems off) — proceeding with the stated assumption unless corrected
 
 ## Raw instruction log
 
+### 2026-10-16 (5) — Event Calendar with item clashes, better Event Report, Stock Opname Report (Claude Web)
+> 1. Kalender event yang menampilkan bentrok pemakaian barang: barang yang sama dipesan dua event di tanggal yang sama.
+> 2. Report event tolong dibuat lebih baik lagi
+> 3. Report stock opname tolong dibuat jika belum ada
+
+Built: `/event-calendar` (clash = same item booked by ≥ 2 events on a day; shortage = more than total stock),
+Event Report v2 (cost strip + Overview / Items / Rentals & Production / Issues tabs), `/stock-opname-report` (new).
+Details and assumptions (no load-out buffer, total stock across warehouses, "Due" after 60 days):
+[prd/PRD-2026-10-16.md](prd/PRD-2026-10-16.md) §12.
+
 ### 2026-10-16 (4) — Item form, single stock source, loan = we rent (Claude Web)
 > 1. Form New/Edit Item di Inventory (termasuk Item Value), supaya nilai aset bisa dikelola.
 > 2. Satu sumber stok yang tersimpan saat reload: Total Stock di Inventory dihitung dari baris gudang, dan semua perubahan stok masuk ke Stock History.
