@@ -10,6 +10,17 @@ const KEY = 'emi_event_progress'; // { [eventName]: statusName }
 // itself user-editable. Only applies when nothing's been explicitly saved yet.
 const SEED_AT_LAST_STAGE = ['2026-10-18 | ROOFTOP SUNSET MIXER'];
 
+// Seeded stage for the small demo events (data/events.js ids 95-99), whose items in
+// data/eventItemsSeed.js were added at or before these stages. A stage name that no
+// longer exists in Event Status is ignored (resolveEventStage falls back to the first).
+const SEED_STAGE = {
+  '2026-04-22 | INTIMATE DINNER UBUD':     'On preparing items',
+  '2026-04-28 | BABY SHOWER MILA':         'Created by admin up',
+  '2026-05-15 | ENGAGEMENT RINA & BAYU':   'Finish setup',
+  '2026-04-14 | PRODUCT PHOTOSHOOT KILAU': 'Waiting scan in',
+  '2026-06-18 | OFFICE TOWNHALL Q2':       'Created by admin up',
+};
+
 function readAll() {
   try {
     return JSON.parse(localStorage.getItem(KEY)) || {};
@@ -21,6 +32,7 @@ function readAll() {
 export function getEventProgress(eventName) {
   const saved = readAll()[eventName];
   if (saved) return saved;
+  if (SEED_STAGE[eventName]) return SEED_STAGE[eventName];
   if (SEED_AT_LAST_STAGE.includes(eventName)) {
     const stages = getEventStageNames();
     return stages[stages.length - 1] || null;

@@ -899,6 +899,22 @@ clashes or seems off) — proceeding with the stated assumption unless corrected
 
 ## Raw instruction log
 
+### 2026-10-16 (2) — One Add Item button, favicon, Print Plan, Allow Delete, small mock events (Claude Web)
+> 1. ss 1. kita gabung saja antara cart dan add item disini tolong jadikan 1
+> 2. update favicon
+> 3. ss 2. tolong tambahkan 3dot icon untuk print. plan, ketika diklik maka ada print untuk menampilkan list barang yang dibutuhkan untuk barang dengan location tersebut. jadi harus ada option nya juga. tapi intinya fungsinya adalah itu
+> 4. ss 3 : tambahkan allow delete option juga
+> 5. buatkan tambahan mock data untuk event dengan jumlah item yang lebih sedikit
+
+Details: [context-claude-web.md](context-claude-web.md), session 2026-10-16 (2). In short:
+- Cart + Add Item → one "+ Add Item" button with a cart count.
+- New EMI favicon. Tab title "EMI Inventory".
+- ⋮ → **Print Plan**: a per-location (Area) preparation list, with options for locations, item scope, columns
+  and page breaks. ⚠️ location = Area.
+- Event Status **Allow Delete** (per stage): when False, items can't be deleted from an event at that stage.
+  ⚠️ Read as item deletion, not deleting the status row.
+- 5 new small events (3–8 items each), each with its own items and seeded stage.
+
 ### 2026-10-16 — Item Value, multi-select category, Production tab, Vendor CMS detail, mock data (Claude Web)
 > 1. ss 1 : di modul barang ,perlu ada namanya item value, dimana di listing perlu ada tampikan total nilai asset nya yang dibaca dari sum item value.
 > 2. ss 2 : tolong pastikan category bisa multi select

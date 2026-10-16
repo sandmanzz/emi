@@ -9,10 +9,12 @@ import { initialAreas, SUB_AREAS } from '../data/areas';
 import { inventoryData, categories } from '../data/inventory';
 import { initialWarehouses } from '../data/warehouses';
 import { wiData } from '../data/warehouseInventory';
-import { getEventStageNames, isScanStage, isCuttingStockStage, isStockReturnStage, isProductionStage, isCheckOwnershipStage } from '../lib/eventStatuses';
+import { getEventStageNames, isScanStage, isCuttingStockStage, isStockReturnStage, isProductionStage, isCheckOwnershipStage, isDeleteAllowedStage } from '../lib/eventStatuses';
 import { getInventoryRows, applyStockMovement, addInventoryRow } from '../lib/stockOpnameStore';
 import { getVendors, VENDOR_ORIGINS } from '../lib/vendorStore';
 import { getCatalog, addProducedItem } from '../lib/producedItems';
+import PrintPlanModal from '../components/PrintPlanModal';
+import { SEED_EVENT_ITEMS } from '../data/eventItemsSeed';
 import { getProductionRequests, saveProductionRequests, PRODUCTION_STATUSES, PRODUCTION_BADGE } from '../lib/productionRequests';
 import { resolveEventStage, saveEventProgress, getEventFurthestStage, saveEventFurthestStage } from '../lib/eventProgress';
 import { getEventClosing, setEventClosing, isOnGoingByItems } from '../lib/eventClosing';
@@ -354,18 +356,21 @@ export default function EventDetailPage() {
 
   const currentUser = getCurrentTenantUser();
 
+  // Small demo events have their own item list; every other event shows the 26 generic items.
+  const baseItems = SEED_EVENT_ITEMS[eventName] || initialItems;
+  const baseNextId = Math.max(0, ...baseItems.map(i => i.id)) + 1;
   const [items, setItems] = useState(() => {
     const incoming = getIncomingItems(eventName);
-    if (incoming.length === 0) return initialItems;
-    let id = 27;
+    if (incoming.length === 0) return baseItems;
+    let id = baseNextId;
     const added = incoming.map(inc => ({
       id: id++, name: inc.name, area: inc.area, subArea: inc.subArea || '', stage: inc.stage,
       scanned: false, groupId: null, qty: inc.qty, pic: inc.pic || '', checking: false,
       scanIn: null, scanOut: null, note: inc.note || '', checked: false, ownership: inc.ownership || 'IHC',
     }));
-    return [...initialItems, ...added];
+    return [...baseItems, ...added];
   });
-  const [nextId, setNextId] = useState(() => 27 + getIncomingItems(eventName).length);
+  const [nextId, setNextId] = useState(() => baseNextId + getIncomingItems(eventName).length);
   const [stages] = useState(() => getEventStageNames());
   const [eventStatus, setEventStatus] = useState(() => resolveEventStage(eventName) || 'Preparation');
   const stageScanEnabled = isScanStage(eventStatus);
@@ -392,6 +397,7 @@ export default function EventDetailPage() {
   const [transferTargetEvent, setTransferTargetEvent] = useState('');
   const [transferTargetStage, setTransferTargetStage] = useState('');
   const [summaryOpen, setSummaryOpen] = useState(false);
+  const [printPlanOpen, setPrintPlanOpen] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const moreMenuRef = useRef(null);
 
@@ -656,11 +662,14 @@ export default function EventDetailPage() {
     try { localStorage.setItem('emi_event_detail_view', mode); } catch { /* ignore */ }
   }
 
+  // Event Status "Allow Delete" (2026-10-16): at a stage with allowDelete: false, items can't be deleted.
+  const deleteAllowed = !itemsLocked && isDeleteAllowedStage(eventStatus);
+
   // Shared props for ItemCard / ItemTable; locked actions are passed as undefined.
   const itemActionProps = {
     onOpen: it => setDetailItemId(it.id),
     onModify: itemsLocked ? undefined : openModifyItem,
-    onDelete: itemsLocked ? undefined : deleteItem,
+    onDelete: deleteAllowed ? deleteItem : undefined,
     onCycleOwnership: itemsLocked ? undefined : cycleItemOwnership,
   };
 
@@ -758,7 +767,7 @@ export default function EventDetailPage() {
   }
 
   function deleteItem(id) {
-    if (closingStatus !== 'on-going') return;
+    if (closingStatus !== 'on-going' || !isDeleteAllowedStage(eventStatus)) return;
     if (!window.confirm('Delete this item from the event?')) return;
     setItems(is => is.filter(i => i.id !== id));
   }
@@ -1217,17 +1226,16 @@ export default function EventDetailPage() {
                 Request Production
               </button>
             )}
-            <button className="action-icon-btn btn-cart-outline" title={addLocked ? 'Stock has been returned — no more items can be added' : 'Cart'} disabled={addLocked} onClick={() => setPickerOpen(true)}>
-              <IconCart />
-              {cart.length > 0 && <span className="action-icon-badge">{cart.length}</span>}
-            </button>
+            {/* One button for picking items and reviewing the cart (they open the same picker);
+                the badge shows how many items are waiting in the cart. */}
             <button
-              className="btn-new"
+              className="btn-new btn-add-item-cart"
               disabled={addLocked}
-              title={addLocked ? 'Stock has been returned — no more items can be added' : undefined}
+              title={addLocked ? 'Stock has been returned — no more items can be added' : cart.length > 0 ? `${cart.length} item(s) in the cart — open to review and save` : undefined}
               onClick={() => { setPickerQuery(''); setPickerCategory(''); setPickerOpen(true); }}
             >
               <IconPlus /> Add Item
+              {cart.length > 0 && <span className="add-item-cart-count" aria-label={`${cart.length} in cart`}><IconCart />{cart.length}</span>}
             </button>
             <div className="more-menu-wrap" ref={moreMenuRef}>
               <button className="action-icon-btn more-btn" title="More menu" onClick={() => setMoreMenuOpen(o => !o)}>
@@ -1254,8 +1262,11 @@ export default function EventDetailPage() {
                   <button className="more-menu-item" onClick={() => { setSummaryOpen(true); setMoreMenuOpen(false); }}>
                     <IconBarChart /> Summary
                   </button>
+                  <button className="more-menu-item" onClick={() => { setPrintPlanOpen(true); setMoreMenuOpen(false); }}>
+                    <IconPrint /> Print Plan
+                  </button>
                   <button className="more-menu-item" onClick={() => { window.print(); setMoreMenuOpen(false); }}>
-                    <IconPrint /> Print
+                    <IconPrint /> Print Page
                   </button>
                 </div>
               )}
@@ -1713,6 +1724,18 @@ export default function EventDetailPage() {
         </div>
       </Modal>
 
+      {printPlanOpen && (
+        <PrintPlanModal
+          eventName={eventName}
+          eventSeed={currentEventSeed}
+          currentStage={eventStatus}
+          stages={stages}
+          items={items}
+          printedBy={currentUser?.name || 'Admin'}
+          onClose={() => setPrintPlanOpen(false)}
+        />
+      )}
+
       <Modal open={summaryOpen} title="Event Summary" onClose={() => setSummaryOpen(false)} size="lg">
         <div style={{ fontWeight: 700, fontSize: 14.5, color: 'var(--text)', marginBottom: 2 }}>{eventName}</div>
         <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginBottom: 18 }}>Status: {eventStatus}</div>
@@ -1752,8 +1775,10 @@ export default function EventDetailPage() {
           <>
             {itemsLocked ? (
               <span className="drawer-lock-note">Locked — event is in {CLOSING_LABELS[closingStatus]?.label || 'closing'}</span>
-            ) : (
+            ) : deleteAllowed ? (
               <button className="btn-del-ok" style={{ marginRight: 'auto' }} onClick={() => deleteItemFromDrawer(detailItem.id)}><IconDelete /> Delete</button>
+            ) : (
+              <span className="drawer-lock-note">Delete is off at &ldquo;{eventStatus}&rdquo; (Event Status &rarr; Allow Delete)</span>
             )}
             {stageScanEnabled && (
               <button className="btn btn-ghost" onClick={() => openScanPopup(detailItem)}>{detailItem.scanned ? 'Re-scan' : 'Scan'}</button>

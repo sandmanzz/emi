@@ -50,6 +50,34 @@ explains a few non-obvious conventions that the entries below assume you already
 
 ---
 
+## Round 29 — One Add Item button, favicon, Print Plan, Event Status "Allow Delete", small mock events
+
+Full write-up: [context-claude-web.md](context-claude-web.md), session 2026-10-16 (2).
+
+**Files:** new `src/components/PrintPlanModal.jsx`, `src/data/eventItemsSeed.js`. Changed: `public/favicon.svg`,
+`index.html`, `src/pages/EventDetailPage.jsx`, `src/pages/EventStatusPage.jsx`, `src/pages/EventPage.jsx`,
+`src/data/eventStatuses.js`, `src/data/events.js`, `src/lib/eventStatuses.js`, `src/lib/eventProgress.js`, `src/style.css`.
+
+**How it works**
+- Event Detail header: the cart icon button was removed. `.btn-add-item-cart` (the old "+ Add Item") opens the picker
+  and renders `.add-item-cart-count` (cart icon + `cart.length`) while the cart isn't empty.
+- `PrintPlanModal` gets `items`, `stages` and the current stage from Event Detail. It groups by area → sub area,
+  sorts items by name, and looks up SKU/category/unit through `getCatalog()`. The preview and the printout share
+  `PRINT_CSS` (all rules scoped to `.pp-*`). Print writes the preview's `innerHTML` into a hidden iframe, prints it,
+  then removes it.
+- `allowDelete` on Event Status rows. `isDeleteAllowedStage(name)` treats a missing field as true. Event Detail computes
+  `deleteAllowed = !itemsLocked && isDeleteAllowedStage(eventStatus)` and passes `onDelete` only when it is true.
+  `deleteItem` re-checks it. The drawer swaps Delete for a note.
+- `SEED_EVENT_ITEMS[eventKey]` replaces `initialItems` for that event. `nextId` now starts at max(seed id) + 1
+  instead of a hard-coded 27. `getEventProgress` falls back to `SEED_STAGE[eventKey]` before `SEED_AT_LAST_STAGE`.
+
+**Gotchas**
+- When adding a per-event seed, keep each item's `stage` ≤ the seeded stage, and use existing area names.
+  `RECEPTION`, used by the generic items, is *not* in the Area master list.
+- `.form-group label` uppercases labels, so the Print Plan checkboxes use their own `.pp-check` labels.
+
+---
+
 ## Round 28 — Item Value + asset total, multi-select category, Production tab, Vendor CMS + detail, mock data
 
 Full write-up (request, decisions, open questions): [context-claude-web.md](context-claude-web.md), session 2026-10-16.

@@ -39,7 +39,7 @@ export default function EventStatusPage() {
   const [deleteModal,  setDeleteModal]  = useState(false);
   const [editingId,    setEditingId]    = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [form, setForm] = useState({ status: '', code: '', scan: 'None', productionItem: false, checkOwnership: false, order: '' });
+  const [form, setForm] = useState({ status: '', code: '', scan: 'None', productionItem: false, checkOwnership: false, allowDelete: true, order: '' });
 
   // Reordering is edit-mode + explicit Save, not instant-apply-per-click.
   const [reorderMode,    setReorderMode]    = useState(false);
@@ -83,7 +83,7 @@ export default function EventStatusPage() {
 
   function openNew() {
     setEditingId(null);
-    setForm({ status: '', code: '', scan: 'None', productionItem: false, checkOwnership: false, order: String(statuses.length + 1) });
+    setForm({ status: '', code: '', scan: 'None', productionItem: false, checkOwnership: false, allowDelete: true, order: String(statuses.length + 1) });
     setStatusModal(true);
   }
 
@@ -91,7 +91,7 @@ export default function EventStatusPage() {
     const r = statuses.find(x => x.id === id);
     if (!r) return;
     setEditingId(id);
-    setForm({ status: r.status, code: r.code || '', scan: r.scan, productionItem: r.productionItem === true, checkOwnership: r.checkOwnership === true, order: String(r.order) });
+    setForm({ status: r.status, code: r.code || '', scan: r.scan, productionItem: r.productionItem === true, checkOwnership: r.checkOwnership === true, allowDelete: r.allowDelete !== false, order: String(r.order) });
     setStatusModal(true);
   }
 
@@ -101,11 +101,11 @@ export default function EventStatusPage() {
     const now = new Date().toISOString().slice(0, 10);
     if (editingId) {
       setStatuses(ss => ss.map(s => s.id === editingId
-        ? { ...s, status: form.status, code: form.code, scan: form.scan, productionItem: form.productionItem, checkOwnership: form.checkOwnership, order: parseInt(form.order) || s.order, updatedAt: now }
+        ? { ...s, status: form.status, code: form.code, scan: form.scan, productionItem: form.productionItem, checkOwnership: form.checkOwnership, allowDelete: form.allowDelete, order: parseInt(form.order) || s.order, updatedAt: now }
         : s
       ));
     } else {
-      setStatuses(ss => [...ss, { id: nextId, order: parseInt(form.order) || ss.length + 1, status: form.status, code: form.code, scan: form.scan, productionItem: form.productionItem, checkOwnership: form.checkOwnership, eventRunning: 0, updatedAt: now }]);
+      setStatuses(ss => [...ss, { id: nextId, order: parseInt(form.order) || ss.length + 1, status: form.status, code: form.code, scan: form.scan, productionItem: form.productionItem, checkOwnership: form.checkOwnership, allowDelete: form.allowDelete, eventRunning: 0, updatedAt: now }]);
       setNextId(n => n + 1);
     }
     setStatusModal(false);
@@ -153,6 +153,7 @@ export default function EventStatusPage() {
   const scanEnabled    = statuses.filter(s => s.scan === 'Scan').length;
   const productionEnabled = statuses.filter(s => s.productionItem === true).length;
   const ownershipEnabled = statuses.filter(s => s.checkOwnership === true).length;
+  const deleteAllowed = statuses.filter(s => s.allowDelete !== false).length; // missing field = allowed (pre-2026-10-16 data)
 
   return (
     <>
@@ -169,15 +170,17 @@ export default function EventStatusPage() {
         Ownership set to &ldquo;True&rdquo; asks whether any item needs an ownership change
         before the event moves on from that stage. A status with Production Item set
         to &ldquo;True&rdquo; lets users request new items to be produced while an
-        event is at that stage.
+        event is at that stage. A status with Allow Delete set to &ldquo;False&rdquo; stops
+        items from being deleted from an event while it is at that stage.
       </p>
 
-      <div className="stats-bar" style={{ gridTemplateColumns:'repeat(5,1fr)' }}>
+      <div className="stats-bar" style={{ gridTemplateColumns:'repeat(6,1fr)' }}>
         {[
           { label:'Total Statuses',  value:statuses.length, color:'var(--brand)',  bg:'var(--brand-bg)' },
           { label:'Scan Enabled',    value:scanEnabled,     color:'var(--green)',  bg:'var(--green-bg)' },
           { label:'Check Ownership', value:ownershipEnabled, color:'var(--green)',  bg:'var(--green-bg)' },
           { label:'Production Item', value:productionEnabled, color:'var(--purple)', bg:'var(--purple-bg)' },
+          { label:'Allow Delete',    value:deleteAllowed,   color:'var(--red)',    bg:'var(--red-bg)' },
           { label:'Events Running',  value:runningTotal,    color:'var(--orange)', bg:'var(--orange-bg)' },
         ].map(s => (
           <div key={s.label} className="stat-card">
@@ -231,11 +234,12 @@ export default function EventStatusPage() {
               <tr>
                 <SortTh label="Order"         colIndex={0} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width:70, textAlign:'center' }} />
                 <th style={{ width:80, textAlign:'center' }}>Edit Order</th>
-                <SortTh label="Status"        colIndex={1} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} />
+                <SortTh label="Status"        colIndex={1} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ minWidth:170 }} />
                 <th style={{ width:80, textAlign:'center' }}>Code</th>
                 <th style={{ width:100, textAlign:'center' }}>Scan</th>
-                <th style={{ width:130, textAlign:'center' }}>Production Item</th>
-                <th style={{ width:130, textAlign:'center' }}>Check Ownership</th>
+                <th style={{ width:96, textAlign:'center', whiteSpace:'normal', lineHeight:1.3 }}>Production Item</th>
+                <th style={{ width:96, textAlign:'center', whiteSpace:'normal', lineHeight:1.3 }}>Check Ownership</th>
+                <th style={{ width:96, textAlign:'center', whiteSpace:'normal', lineHeight:1.3 }}>Allow Delete</th>
                 <SortTh label="Event Running" colIndex={4} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width:120, textAlign:'right' }} />
                 <SortTh label="Updated At"    colIndex={5} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width:120 }} />
                 <th style={{ width:100, textAlign:'center' }}>Action</th>
@@ -243,7 +247,7 @@ export default function EventStatusPage() {
             </thead>
             <tbody>
               {pageData.length === 0
-                ? <tr><td colSpan={10} style={{ textAlign:'center', padding:40, color:'var(--text-muted)' }}>No statuses found.</td></tr>
+                ? <tr><td colSpan={11} style={{ textAlign:'center', padding:40, color:'var(--text-muted)' }}>No statuses found.</td></tr>
                 : pageData.map((r, idx) => (
                   <tr key={r.id}>
                     <td style={{ textAlign:'center' }}>
@@ -282,6 +286,7 @@ export default function EventStatusPage() {
                     <td style={{ textAlign:'center' }}><ScanBadge scan={r.scan} /></td>
                     <td style={{ textAlign:'center' }}><BoolBadge value={r.productionItem === true} /></td>
                     <td style={{ textAlign:'center' }}><BoolBadge value={r.checkOwnership === true} /></td>
+                    <td style={{ textAlign:'center' }}><BoolBadge value={r.allowDelete !== false} /></td>
                     <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums', fontWeight:600 }}>
                       {r.eventRunning > 0
                         ? <span style={{ color:'var(--orange)' }}>{r.eventRunning}</span>
@@ -366,6 +371,21 @@ export default function EventStatusPage() {
           />
           <p style={{ fontSize: 11.5, color: 'var(--text-muted)', margin: '5px 0 0' }}>
             When True, moving an event on from this status first asks whether any item needs an ownership change.
+          </p>
+        </div>
+        <div className="form-group">
+          <label>Allow Delete</label>
+          <SearchableSelect
+            value={form.allowDelete ? 'true' : 'false'}
+            onChange={v => setForm(f => ({ ...f, allowDelete: v === 'true' }))}
+            options={[
+              { value: 'true',  label: 'True' },
+              { value: 'false', label: 'False' },
+            ]}
+            placeholder="True"
+          />
+          <p style={{ fontSize: 11.5, color: 'var(--text-muted)', margin: '5px 0 0' }}>
+            When False, items can&rsquo;t be deleted from an event while it is at this status.
           </p>
         </div>
       </Modal>

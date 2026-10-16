@@ -28,4 +28,11 @@ export const initialEvents = [
   { id:92, name:'Harvest Festival Bazaar',     desc:'Community harvest bazaar',           start:'2026-06-12', finish:'2026-06-14', date:'2026-06-10', code:'HFB',    location:'Malang',      type:'upcoming', itemCount:140, updatedAt:'2026-06-10' }, // Checking Inventory
   { id:93, name:'Downtown Product Launch',     desc:'Tech product launch event',          start:'2026-05-15', finish:'2026-05-15', date:'2026-05-12', code:'DPL',    location:'Surabaya',    type:'upcoming', itemCount:0,   updatedAt:'2026-05-12' }, // Transferred
   { id:94, name:'Beachside Anniversary',       desc:'10th anniversary beach celebration', start:'2026-04-20', finish:'2026-04-21', date:'2026-04-18', code:'BSA',    location:'Bali',        type:'upcoming', itemCount:64,  updatedAt:'2026-04-18' }, // Returned & Completed
+  // Small events (2026-10-16): each has its own short item list in data/eventItemsSeed.js
+  // and a seeded stage in lib/eventProgress.js (SEED_STAGE), instead of the 26 generic items.
+  { id:95, name:'Intimate Dinner Ubud',        desc:'Private dinner for 12 guests',       start:'2026-04-25', finish:'2026-04-25', date:'2026-04-22', code:'IDU',    location:'Ubud, Bali',  type:'upcoming', itemCount:5,   updatedAt:'2026-04-08' },
+  { id:96, name:'Baby Shower Mila',            desc:'Small family baby shower',           start:'2026-05-02', finish:'2026-05-02', date:'2026-04-28', code:'BSM',    location:'Jakarta',     type:'upcoming', itemCount:4,   updatedAt:'2026-04-07' },
+  { id:97, name:'Engagement Rina & Bayu',      desc:'Engagement ceremony, 60 guests',     start:'2026-05-17', finish:'2026-05-17', date:'2026-05-15', code:'ERB',    location:'Surabaya',    type:'upcoming', itemCount:8,   updatedAt:'2026-04-09' },
+  { id:98, name:'Product Photoshoot Kilau',    desc:'Half-day studio shoot',              start:'2026-04-15', finish:'2026-04-15', date:'2026-04-14', code:'PPK',    location:'Denpasar',    type:'upcoming', itemCount:3,   updatedAt:'2026-04-09' },
+  { id:99, name:'Office Townhall Q2',          desc:'Quarterly all-hands meeting',        start:'2026-06-20', finish:'2026-06-20', date:'2026-06-18', code:'OTQ2',   location:'Jakarta',     type:'upcoming', itemCount:6,   updatedAt:'2026-04-05' },
 ];

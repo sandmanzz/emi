@@ -54,6 +54,13 @@ export function isCheckOwnershipStage(statusName) {
   return record?.checkOwnership === true;
 }
 
+// While the event is at this stage, items may be deleted. Missing field counts as true
+// (status lists saved before the flag existed keep the old behaviour).
+export function isDeleteAllowedStage(statusName) {
+  const record = getEventStatuses().find(s => s.status === statusName);
+  return record?.allowDelete !== false;
+}
+
 // Moving into this stage returns cut items to warehouse stock; after it, the event
 // can't take new items.
 export function isStockReturnStage(statusName) {

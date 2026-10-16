@@ -2432,3 +2432,26 @@ td.id-cell   { color: var(--text-muted); font-size: 12px; }
 @media (max-width: 560px) {
   .vendor-info-row { grid-template-columns: 1fr; gap: 2px; }
 }
+
+/* Event Detail — Add Item and Cart merged into one button (2026-10-16) */
+.btn-add-item-cart { gap: 6px; }
+.add-item-cart-count {
+  display: inline-flex; align-items: center; gap: 3px; margin-left: 4px; padding: 1px 7px 1px 5px;
+  border-radius: 999px; background: #fff; color: var(--green); font-size: 11.5px; font-weight: 700; line-height: 18px;
+}
+.add-item-cart-count svg { width: 12px; height: 12px; }
+
+/* Event Detail — Print Plan modal (the sheet itself is styled by PRINT_CSS in PrintPlanModal.jsx) */
+.pp-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 16px; }
+.pp-options-wide { grid-column: 1 / -1; }
+.pp-options-wide { margin-bottom: 16px; }
+.pp-checks-label { font-size: 12.5px; font-weight: 600; color: var(--text-2); margin-bottom: 8px; }
+.pp-checks { display: flex; flex-wrap: wrap; gap: 8px 20px; }
+.pp-check { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: var(--text-2); cursor: pointer; }
+.pp-check input { width: 15px; height: 15px; margin: 0; accent-color: var(--brand); cursor: pointer; }
+.pp-preview-label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .07em; margin: 4px 0 8px; }
+.pp-preview { border: 1px solid var(--border); border-radius: var(--r); background: #fff; padding: 22px; max-height: 52vh; overflow: auto; }
+@media (max-width: 560px) {
+  .pp-options { grid-template-columns: 1fr; }
+  .pp-preview { padding: 12px; }
+}

@@ -126,6 +126,19 @@ whose status is still `on-going`.
 
 ---
 
+## Allow Delete per stage, print plan (2026-10-16)
+
+**Event Status `allowDelete`** (boolean, default true). While an event's current stage has `allowDelete: false`,
+`DELETE /events/{eventId}/items/{itemId}` must be refused (409/422) server-side. The UI only hides the button.
+Existing rule unchanged: no item changes from Checking Inventory onward.
+
+**Print Plan** is client-only today (built from the event's items + catalog). If it should be printable for big
+events without loading everything, a `GET /events/{eventId}/plan?area=…&scope=upto|all` returning items grouped by
+area/sub area (with SKU, category, unit, warehouse) would serve it.
+
+**Per-event items.** Each event has its own item list. The demo only fakes this for 5 events
+(`src/data/eventItemsSeed.js`); the rest share one generic list.
+
 ## Item Value, production log, vendor detail (2026-10-16)
 
 Details and open questions: [context-claude-web.md](context-claude-web.md).

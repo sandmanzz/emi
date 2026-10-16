@@ -33,6 +33,97 @@ Newest session first.
 
 ---
 
+## Session 2026-10-16 (2) — One Add Item button, favicon, Print Plan, Allow Delete, small mock events
+
+### Request (verbatim)
+> 1. ss 1. kita gabung saja antara cart dan add item disini tolong jadikan 1
+> 2. update favicon
+> 3. ss 2. tolong tambahkan 3dot icon untuk print. plan, ketika diklik maka ada print untuk menampilkan list barang yang dibutuhkan untuk barang dengan location tersebut. jadi harus ada option nya juga. tapi intinya fungsinya adalah itu
+> 4. ss 3 : tambahkan allow delete option juga
+> 5. buatkan tambahan mock data untuk event dengan jumlah item yang lebih sedikit
+
+Screenshots: (1) the Event Detail header with the cart icon button next to "+ Add Item", (2) Event Detail
+of Autumn Garden Party, (3) the Event Status table with its Scan / Production Item / Check Ownership columns.
+
+### Decisions and assumptions (change them if wrong)
+
+**#1 One button.** The cart icon button is gone. **"+ Add Item"** opens the same picker (catalog on the
+left, cart on the right). While the cart has items, the button shows a small white pill with a cart icon
+and the count, e.g. `+ Add Item 🛒 1`. Nothing else changed: the cart still lives only in this page's state,
+and "Save to Event" still adds the items.
+
+**#2 Favicon.** `public/favicon.svg` was Vite's default logo. It is now an EMI mark: a brand-indigo
+(`#4f46e5`) rounded tile with a white box (inventory) and a green check badge (event ready).
+The tab title is now **"EMI Inventory"** (was "emi-react"). Also added `theme-color` and `apple-touch-icon`.
+
+**#3 Print Plan** (Event Detail ⋮ → **Print Plan**). A printable **Preparation Plan**: what has to be
+prepared for each location (Area) of the event.
+- Options:
+  - **Location**: multi-select over the areas that have items, with counts. Empty = all.
+  - **Items**: "up to the current stage" (same as the All tab, the default) or "all items on the event".
+  - **Show**: Warehouse / Ownership / PIC / Note columns, and **One page per location**.
+- The sheet has a header (event, dates, location, current stage, printed at/by), a summary (locations,
+  item lines, total pcs), and one section per location, split by sub area. Each item row has #, item + SKU,
+  category, qty + unit, warehouse, owner, PIC, note, and an empty "Ready" box to tick by hand.
+  Signature lines are at the bottom: Prepared by, Checked by, Received at location.
+- The modal shows a live preview. **Print** copies that preview into a hidden iframe and prints it, so only
+  the sheet prints, not the app.
+- The old ⋮ "Print" (prints the whole page) is kept, renamed **"Print Page"**.
+- ⚠️ "location" was read as the event's **Area** (the "All Place" filter). Warehouse comes from the item
+  (picked warehouse) or else the catalog's home warehouse.
+
+**#4 Allow Delete** (Event Status). New per-status boolean `allowDelete`. It has a column, a KPI card,
+and a True/False field in New/Edit Status, like the other flags.
+- ⚠️ Read as "**items may be deleted from an event while it is at this status**", the same kind of
+  per-stage rule as the other flags in that table. It is **not** about deleting the status row itself.
+  If that was meant, say so.
+- While the event is at a stage with `allowDelete: false`, Event Detail hides the delete button on cards
+  and list rows. The drawer shows "Delete is off at "<stage>" (Event Status → Allow Delete)" instead of Delete.
+- Seed: **True** for Created by admin up, On preparing items, Finish setup, Postphone, Disable.
+  **False** for Waiting scan in, Event running, Waiting scan out, Finished (once items are being moved,
+  removing them should be blocked). A missing field counts as **True**, so a status list already saved in
+  localStorage keeps the old behaviour (delete allowed) until it is edited.
+- The existing lock is unchanged: from Checking Inventory onward nothing can be modified or deleted.
+
+**#5 Small mock events.** Until now every event's detail showed the same 26 generic items. Five new
+upcoming events (ids 95–99) have their **own short item lists** (`src/data/eventItemsSeed.js`) and a
+seeded stage (`SEED_STAGE` in `lib/eventProgress.js`):
+
+| Event | Items | Seeded stage | Shows off |
+|---|---|---|---|
+| Intimate Dinner Ubud | 5 | On preparing items | 2 locations, Print Plan |
+| Baby Shower Mila | 4 | Created by admin up | delete allowed |
+| Engagement Rina & Bayu | 8 | Finish setup | sub areas, Production + Check Ownership stage |
+| Product Photoshoot Kilau | 3 | Waiting scan in | 1 scanned / 2 not, Next blocked, delete off |
+| Office Townhall Q2 | 6 | Created by admin up | an out-of-stock mic with a note |
+
+All item names exist in the catalog (so the drawer shows Category / SKU / Warehouse), and every item's
+stage is at or before the event's stage. They appear in the **On Going** tab, because `itemCount` > 0.
+EventPage's next new-event id moved from 95 to 100.
+
+### Open questions
+1. Allow Delete = per-stage **item** deletion (see #4). Confirm.
+2. Print Plan "location" = **Area**. Should it also be possible to print per **warehouse** (a pick list
+   for the warehouse team)? It would be a small extra option.
+3. Items on Event Detail are still not saved per event (pre-existing): adding or deleting items is lost on
+   reload. The new per-event seeds only fix *which* items an event starts with.
+
+### Files
+New: `src/components/PrintPlanModal.jsx`, `src/data/eventItemsSeed.js`.
+Changed: `public/favicon.svg`, `index.html`, `src/pages/EventDetailPage.jsx`, `src/pages/EventStatusPage.jsx`,
+`src/pages/EventPage.jsx`, `src/data/eventStatuses.js`, `src/data/events.js`, `src/lib/eventStatuses.js`
+(`isDeleteAllowedStage`), `src/lib/eventProgress.js` (`SEED_STAGE`), `src/style.css`.
+
+### Verified
+- Build passes. Lint is still at the 18-problem baseline.
+- In Chromium: the merged button shows `🛒 1` after adding one item. Print Plan preview for Engagement
+  Rina & Bayu (3 locations, sub areas), the GUEST TABLE filter → 1 section, and Print sends exactly the sheet
+  to the print document. Allow Delete: 0 delete buttons at "Waiting scan in" (Product Photoshoot Kilau)
+  with the drawer note, and 4 at "Created by admin up" (Baby Shower Mila). Event Status table + new KPI.
+  The favicon renders, and the tab title is "EMI Inventory".
+
+---
+
 ## Session 2026-10-16 — Item Value, multi-select category, Production tab, Vendor CMS + detail, mock data
 
 ### Request (verbatim, with the screenshot each point referred to)
