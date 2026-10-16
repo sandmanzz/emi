@@ -21,6 +21,9 @@ Newest session first.
 - **Standing rules (from context.md):** log every instruction, re-read the docs before new
   work, and say so when a request clashes with an earlier decision instead of guessing.
   Every code change gets a `changes.md` entry. Backend-relevant behaviour goes into `backend.md`.
+- **Git (standing rule, 2026-10-16):** "selalu langsung merge ke main saja". Every finished change is
+  committed and **merged straight into `main`** (fast-forward, no PR), without asking first. A work branch
+  `claude/<topic>` may be pushed as well, but `main` is where the change must end up.
 - **Stack:** React 19 + Vite + react-router, plain JSX/CSS. **No backend.** Data is seeded from
   `src/data/*.js` and mutated in module stores (`src/lib/*Store.js`) or `localStorage`.
 - **Mock today:** `TODAY = 2026-04-09` (`src/data/events.js`). Seed dates are written around it.

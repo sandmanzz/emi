@@ -899,6 +899,12 @@ clashes or seems off) — proceeding with the stated assumption unless corrected
 
 ## Raw instruction log
 
+### 2026-10-16 — Standing rule: always merge straight to main (Claude Web)
+> selalu langsung merge ke main saja
+
+From now on every finished change is merged straight into `main` with no PR and without asking first.
+Also recorded in [context-claude-web.md](context-claude-web.md) under "How to work".
+
 ### 2026-10-16 (2) — One Add Item button, favicon, Print Plan, Allow Delete, small mock events (Claude Web)
 > 1. ss 1. kita gabung saja antara cart dan add item disini tolong jadikan 1
 > 2. update favicon
