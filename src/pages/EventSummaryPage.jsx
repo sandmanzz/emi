@@ -1,342 +1,469 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useDeferredValue } from 'react';
+import { flushSync } from 'react-dom';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
-import Pagination from '../components/Pagination';
 import SearchableSelect from '../components/SearchableSelect';
-import { IconSearch, IconPrint, IconChevronLeft } from '../components/icons';
+import { IconSearch, IconPrint } from '../components/icons';
+import { initialEvents } from '../data/events';
+import { getEventSeedItems, eventKeyOf } from '../lib/eventItems';
+import { getCatalog } from '../lib/producedItems';
+import { getEventStageNames } from '../lib/eventStatuses';
+import { resolveEventStage } from '../lib/eventProgress';
+import { getEventClosing } from '../lib/eventClosing';
+import { CLOSING_LABELS } from '../lib/eventClosingLabels';
+import { formatIDR } from '../lib/superAdminUtils';
 
-const TABLE_PAGE_SIZE = 12;
+// Event Report (/event-summary?name=<event key>): everything about one event's items on one
+// page, built for the real case of HUNDREDS of item lines per event.
+// - Data: the same item list Event Detail starts with (lib/eventItems.js), enriched once
+//   with catalog data (SKU, category, unit, Item Value) in a single memoised pass.
+// - Aggregates (KPIs, per-area table, breakdowns) are computed in one loop over the items.
+// - The item table only renders the current page (25/50/100 rows, or All); search is
+//   deferred (useDeferredValue) so typing stays smooth; sorting/filtering are memoised.
+// - Print renders every filtered row (not just the page) and hides the app chrome.
+// - Export CSV downloads the filtered rows.
 
-const EVENTS = [
-  { name: 'SAMPLE WEDDING 2024',         code: 'EVT-001', date: '2024-06-15', venue: 'Grand Ballroom, Hotel Mulia',    pic: 'Sarah W.',   status: 'Completed' },
-  { name: 'GALA DINNER JAN 2025',         code: 'EVT-042', date: '2025-01-20', venue: 'Rooftop Garden, The Ritz',       pic: 'Michael T.', status: 'Upcoming' },
-  { name: 'CORPORATE EVENT MARCH 2025',   code: 'EVT-058', date: '2025-03-12', venue: 'Convention Hall B, JHCC',        pic: 'Diana R.',   status: 'Upcoming' },
-  { name: 'INTIMATE WEDDING APRIL 2025',  code: 'EVT-063', date: '2025-04-05', venue: 'Villa Garden, Sentul',           pic: 'Kevin S.',   status: 'Upcoming' },
+const PROGRESS = {
+  broken:    { label: 'Broken',      badge: 'badge-red' },
+  'scan-out': { label: 'Scanned out', badge: 'badge-green' },
+  'scan-in':  { label: 'Scanned in',  badge: 'badge-blue' },
+  checked:   { label: 'Checked',     badge: 'badge-purple' },
+  pending:   { label: 'Not checked', badge: 'badge-gray' },
+};
+const PAGE_SIZES = [25, 50, 100, 'all'];
+const COLUMNS = [
+  { key: 'name', label: 'Item' },
+  { key: 'area', label: 'Area' },
+  { key: 'qty', label: 'Qty', num: true },
+  { key: 'value', label: 'Value', num: true },
+  { key: 'ownership', label: 'Owner' },
+  { key: 'stageIdx', label: 'Added at' },
+  { key: 'progressRank', label: 'Progress' },
+  { key: 'pic', label: 'PIC' },
 ];
 
-const RAW_ITEMS = {
-  0: [
-    { id:1,  name:'Crystal Chandelier',       area:'CEREMONY',        qty:2,  status:'In Use',  checking:true,  warehouseItem:true,  scanIn:'Jun 14, 2024 08:30 AM', scanOut:'Jun 15, 2024 11:00 PM', pic:'Ari S.' },
-    { id:2,  name:'White Aisle Runner',        area:'CEREMONY',        qty:1,  status:'In Use',  checking:true,  warehouseItem:true,  scanIn:'Jun 14, 2024 09:00 AM', scanOut:'Jun 15, 2024 11:30 PM', pic:'Ari S.' },
-    { id:3,  name:'Flower Arch',               area:'BRIDAL BACKDROP', qty:1,  status:'In Use',  checking:true,  warehouseItem:false, scanIn:'Jun 14, 2024 09:15 AM', scanOut:null,                   pic:'Lina M.' },
-    { id:4,  name:'Backdrop Stand',            area:'BRIDAL BACKDROP', qty:2,  status:'In Use',  checking:true,  warehouseItem:true,  scanIn:'Jun 14, 2024 09:20 AM', scanOut:'Jun 16, 2024 08:00 AM', pic:'Lina M.' },
-    { id:5,  name:'Dressing Mirror',           area:'BRIDAL ROOM',     qty:2,  status:'Ready',   checking:false, warehouseItem:true,  scanIn:null,                    scanOut:null,                   pic:'Siti R.' },
-    { id:6,  name:'Bridal Chair Set',          area:'BRIDAL ROOM',     qty:4,  status:'Ready',   checking:true,  warehouseItem:true,  scanIn:'Jun 14, 2024 10:00 AM', scanOut:null,                   pic:'Siti R.' },
-    { id:7,  name:'Long Table Linen',          area:'BRIDAL TABLE',    qty:5,  status:'In Use',  checking:true,  warehouseItem:true,  scanIn:'Jun 14, 2024 10:30 AM', scanOut:'Jun 16, 2024 09:00 AM', pic:'Budi T.' },
-    { id:8,  name:'Centerpiece Rose Vase',     area:'BRIDAL TABLE',    qty:3,  status:'In Use',  checking:true,  warehouseItem:false, scanIn:'Jun 14, 2024 11:00 AM', scanOut:null,                   pic:'Budi T.' },
-    { id:9,  name:'Car Ribbon Set',            area:'CAR DECOR',       qty:3,  status:'In Use',  checking:true,  warehouseItem:false, scanIn:'Jun 15, 2024 07:00 AM', scanOut:'Jun 15, 2024 03:00 PM', pic:'Yuni K.' },
-    { id:10, name:'Car Flower Bouquet',        area:'CAR DECOR',       qty:2,  status:'Missing', checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                   pic:'Yuni K.' },
-    { id:11, name:'Champagne Tower Stand',     area:'CHAMPAGNE WALL',  qty:1,  status:'In Use',  checking:true,  warehouseItem:true,  scanIn:'Jun 14, 2024 02:00 PM', scanOut:'Jun 15, 2024 11:00 PM', pic:'Eko P.' },
-    { id:12, name:'Glass Holder Wall',         area:'CHAMPAGNE WALL',  qty:2,  status:'Ready',   checking:false, warehouseItem:true,  scanIn:null,                    scanOut:null,                   pic:'Eko P.' },
-    { id:13, name:'Cocktail High-Top Table',   area:'COCKTAIL',        qty:6,  status:'In Use',  checking:true,  warehouseItem:true,  scanIn:'Jun 14, 2024 03:00 PM', scanOut:null,                   pic:'Wati S.' },
-    { id:14, name:'Bar Stool',                 area:'COCKTAIL',        qty:12, status:'In Use',  checking:true,  warehouseItem:true,  scanIn:'Jun 14, 2024 03:15 PM', scanOut:null,                   pic:'Wati S.' },
-    { id:15, name:'Welcome Signage Board',     area:'ENTRANCE',        qty:1,  status:'In Use',  checking:true,  warehouseItem:false, scanIn:'Jun 14, 2024 08:00 AM', scanOut:'Jun 15, 2024 10:30 PM', pic:'Rudi H.' },
-    { id:16, name:'Balloon Arch Entry',        area:'ENTRANCE',        qty:1,  status:'In Use',  checking:true,  warehouseItem:false, scanIn:'Jun 14, 2024 08:10 AM', scanOut:null,                   pic:'Rudi H.' },
-    { id:17, name:'Flower Gate',               area:'ENTRANCE',        qty:1,  status:'Damaged', checking:false, warehouseItem:false, scanIn:'Jun 14, 2024 08:30 AM', scanOut:null,                   pic:'Rudi H.' },
-    { id:18, name:'Guest Table Centerpiece',   area:'GUEST TABLE',     qty:20, status:'In Use',  checking:true,  warehouseItem:false, scanIn:'Jun 14, 2024 04:00 PM', scanOut:null,                   pic:'Indah F.' },
-    { id:19, name:'Guest Table Name Card Set', area:'GUEST TABLE',     qty:22, status:'In Use',  checking:true,  warehouseItem:true,  scanIn:'Jun 14, 2024 04:30 PM', scanOut:null,                   pic:'Indah F.' },
-    { id:20, name:'Guest Table Linen',         area:'GUEST TABLE',     qty:22, status:'Ready',   checking:false, warehouseItem:true,  scanIn:null,                    scanOut:null,                   pic:'Indah F.' },
-    { id:21, name:'Lounge Sofa 3-Seat',        area:'LOUNGE',          qty:3,  status:'In Use',  checking:true,  warehouseItem:true,  scanIn:'Jun 14, 2024 01:00 PM', scanOut:'Jun 16, 2024 10:00 AM', pic:'Agus N.' },
-    { id:22, name:'Coffee Table Wooden',       area:'LOUNGE',          qty:3,  status:'In Use',  checking:true,  warehouseItem:true,  scanIn:'Jun 14, 2024 01:15 PM', scanOut:null,                   pic:'Agus N.' },
-    { id:23, name:'White Rose Arrangement',    area:'FLORIST',         qty:15, status:'Ready',   checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                   pic:'Dewi L.' },
-    { id:24, name:'Greenery Garland',          area:'FLORIST',         qty:8,  status:'In Use',  checking:true,  warehouseItem:false, scanIn:'Jun 14, 2024 11:30 AM', scanOut:null,                   pic:'Dewi L.' },
-    { id:25, name:'Labour Team A Kit',         area:'LABOUR',          qty:1,  status:'Ready',   checking:false, warehouseItem:true,  scanIn:null,                    scanOut:null,                   pic:'Hendra B.' },
-  ],
-};
-
-function genItems(seed) {
-  const names = ['Crystal Vase','Table Linen','Chair Cover','Balloon Set','LED Stand','Flower Wall','Backdrop Frame','Centerpiece','Candle Holder','Stage Riser','Spotlight','Drape Curtain','Arch Decor','Ribbon Bundle','Name Card Set'];
-  const areas = ['CEREMONY','ENTRANCE','GUEST TABLE','LOUNGE','FLORIST','BRIDAL BACKDROP'];
-  const stats = ['In Use','Ready','Missing','Damaged'];
-  const pics  = ['Ari S.','Lina M.','Budi T.','Dewi L.','Rudi H.'];
-  const count = 14 + seed * 3;
-  return Array.from({ length: count }, (_, idx) => {
-    const i = idx + 1;
-    const r = (seed * 37 + i * 13) % names.length;
-    const a = (seed * 11 + i * 7)  % areas.length;
-    const s = (seed * 5  + i * 3)  % stats.length;
-    return {
-      id: i, name: names[r] + ` #${i}`, area: areas[a], qty: 1 + (i % 5),
-      status: stats[s], checking: i % 3 !== 0, warehouseItem: i % 2 === 0,
-      scanIn:  s < 3 ? 'Jan 19, 2025 09:00 AM' : null,
-      scanOut: s === 0 ? 'Jan 20, 2025 11:00 PM' : null,
-      pic: pics[i % pics.length],
-    };
-  });
+function pct(n, total) { return total ? Math.round((n / total) * 100) : 0; }
+// Short Rupiah for KPI tiles: Rp7,54 M (miliar) / Rp865 jt (juta). Full value goes in the sub line.
+function shortIDR(n) {
+  if (n >= 1e9) return `Rp${(n / 1e9).toLocaleString('id-ID', { maximumFractionDigits: 2 })} M`;
+  if (n >= 1e6) return `Rp${(n / 1e6).toLocaleString('id-ID', { maximumFractionDigits: 1 })} jt`;
+  return formatIDR(n);
 }
-
-for (let i = 1; i < EVENTS.length; i++) RAW_ITEMS[i] = genItems(i);
-
-const STATUS_BADGE = { 'In Use':'badge-blue', Ready:'badge-green', Missing:'badge-red', Damaged:'badge-orange' };
-
-function pct(n, total) { return total === 0 ? 0 : Math.round((n / total) * 100); }
+function progressOf(it) {
+  if (it.brokenQty > 0) return 'broken';
+  if (it.scanOut) return 'scan-out';
+  if (it.scanIn || it.scanned) return 'scan-in';
+  if (it.checking) return 'checked';
+  return 'pending';
+}
+const PROGRESS_RANK = { pending: 0, checked: 1, 'scan-in': 2, 'scan-out': 3, broken: 4 };
 
 function fmtDate(d) {
   if (!d) return '—';
-  return new Date(d).toLocaleDateString('en-US', { day:'numeric', month:'short', year:'numeric' });
+  return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-function DotOk() {
-  return <span style={{ display:'inline-flex', alignItems:'center', justifyContent:'center', width:20, height:20, borderRadius:4, background:'var(--brand)' }}>
-    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ width:9, height:9 }}><polyline points="20 6 9 17 4 12"/></svg>
-  </span>;
+function Bar({ value, total, color }) {
+  const p = pct(value, total);
+  return (
+    <div className="rep-bar" title={`${value} / ${total} (${p}%)`}>
+      <div className="rep-bar-track"><div className="rep-bar-fill" style={{ width: `${p}%`, background: color }} /></div>
+      <span>{p}%</span>
+    </div>
+  );
 }
-function DotNo() {
-  return <span style={{ display:'inline-flex', alignItems:'center', justifyContent:'center', width:20, height:20, borderRadius:4, background:'var(--border)', color:'var(--text-muted)', fontSize:10, fontWeight:700 }}>—</span>;
+
+function BreakdownCard({ title, rows, total, color, unit = 'lines' }) {
+  return (
+    <div className="card rep-breakdown">
+      <div className="rep-section-title">{title}</div>
+      {rows.length === 0 && <div className="rep-muted">—</div>}
+      {rows.map(r => (
+        <div key={r.label} className="rep-breakdown-row">
+          <span className="rep-breakdown-label">{r.label}</span>
+          <div className="rep-bar-track"><div className="rep-bar-fill" style={{ width: `${pct(r.value, total)}%`, background: color }} /></div>
+          <span className="rep-breakdown-val">{r.value} <em>{unit}</em></span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function toCsv(rows) {
+  const head = ['No', 'Item', 'SKU', 'Category', 'Area', 'Sub Area', 'Qty', 'Unit', 'Unit Value', 'Total Value', 'Ownership', 'Added at stage', 'Progress', 'Checking', 'Scan In', 'Scan Out', 'Cross-checked', 'Broken qty', 'PIC', 'Note'];
+  const esc = v => {
+    const s = v == null ? '' : String(v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const lines = rows.map((r, i) => [i + 1, r.name, r.sku, r.category, r.area, r.subArea, r.qty, r.unit, r.unitValue, r.value, r.ownership, r.stage,
+    PROGRESS[r.progress].label, r.checking ? 'Yes' : 'No', r.scanIn || '', r.scanOut || '', r.checked ? 'Yes' : 'No', r.brokenQty || 0, r.pic, r.note].map(esc).join(','));
+  return [head.join(','), ...lines].join('\n');
 }
 
 export default function EventSummaryPage() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-  const requestedName = searchParams.get('name');
-  const [eventIdx, setEventIdx] = useState(() => {
-    if (!requestedName) return 0;
-    const idx = EVENTS.findIndex(e => e.name.toLowerCase() === requestedName.toLowerCase());
-    return idx >= 0 ? idx : 0;
-  });
-  const [tableSearch, setTableSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [areaFilter, setAreaFilter] = useState('');
-  const [tablePage, setTablePage] = useState(1);
+  const stages = useMemo(() => getEventStageNames(), []);
 
-  const items = RAW_ITEMS[eventIdx] || [];
-  const ev = EVENTS[eventIdx];
+  // All events, newest first. ?name= may be an event key ("<date> | NAME") or just the name.
+  const events = useMemo(() => initialEvents
+    .map(e => ({ ...e, key: eventKeyOf(e) }))
+    .sort((a, b) => (b.date || '').localeCompare(a.date || '')), []);
+  const requested = searchParams.get('name') || '';
+  const event = events.find(e => e.key === requested)
+    || events.find(e => e.name.toUpperCase() === requested.toUpperCase())
+    || [...events].sort((a, b) => (b.itemCount || 0) - (a.itemCount || 0))[0];
 
-  const total    = items.length;
-  const checked  = items.filter(i => i.checking).length;
-  const scanIn   = items.filter(i => i.scanIn).length;
-  const scanOut  = items.filter(i => i.scanOut).length;
-  const missing  = items.filter(i => i.status === 'Missing').length;
-  const damaged  = items.filter(i => i.status === 'Damaged').length;
-  const totalQty = items.reduce((s, i) => s + i.qty, 0);
+  const [query, setQuery] = useState('');
+  const deferredQuery = useDeferredValue(query);
+  const [areas, setAreas] = useState([]);
+  const [progress, setProgress] = useState('');
+  const [ownership, setOwnership] = useState('');
+  const [category, setCategory] = useState('');
+  const [sort, setSort] = useState({ key: 'area', asc: true });
+  const [pageSize, setPageSize] = useState(50);
+  const [page, setPage] = useState(1);
+  const [groupByArea, setGroupByArea] = useState(true);
+  const [printing, setPrinting] = useState(false);
 
-  const areaNames = useMemo(() => [...new Set(items.map(i => i.area))].sort(), [eventIdx]);
+  function resetFilters() {
+    setQuery(''); setAreas([]); setProgress(''); setOwnership(''); setCategory(''); setPage(1);
+  }
+  function selectEvent(key) {
+    setSearchParams({ name: key });
+    resetFilters();
+  }
 
-  const areaMap = useMemo(() => {
-    const m = {};
-    items.forEach(it => {
-      if (!m[it.area]) m[it.area] = { total:0, checked:0, scanIn:0, statuses:{} };
-      const a = m[it.area];
-      a.total++;
-      if (it.checking) a.checked++;
-      if (it.scanIn)   a.scanIn++;
-      a.statuses[it.status] = (a.statuses[it.status] || 0) + 1;
+  const stage = resolveEventStage(event.key);
+  const stageIdx = stages.indexOf(stage);
+  const closing = getEventClosing(event.key);
+  const closingLabel = event.type === 'past' ? CLOSING_LABELS['returned-completed'] : CLOSING_LABELS[closing];
+  const finished = event.type === 'past' || closing === 'returned-completed' || closing === 'transferred';
+
+  // One pass: enrich items with catalog data + progress.
+  const items = useMemo(() => {
+    const catalog = new Map(getCatalog().map(c => [c.name, c]));
+    return getEventSeedItems(event.key).map(it => {
+      const c = catalog.get(it.name);
+      const unitValue = c?.itemValue || 0;
+      const p = progressOf(it);
+      return {
+        ...it, sku: c?.sku || '', category: c?.category || 'Uncategorised', unit: c?.unit || '',
+        unitValue, value: unitValue * Number(it.qty || 0), progress: p, progressRank: PROGRESS_RANK[p],
+        stageIdx: stages.indexOf(it.stage), pic: it.pic || '', subArea: it.subArea || '',
+      };
     });
-    return m;
-  }, [eventIdx]);
+  }, [event.key, stages]);
 
-  const tableFiltered = useMemo(() => {
-    const q = tableSearch.toLowerCase();
-    return items.filter(i =>
-      (!q           || i.name.toLowerCase().includes(q) || i.area.toLowerCase().includes(q) || (i.pic||'').toLowerCase().includes(q)) &&
-      (!statusFilter || i.status === statusFilter) &&
-      (!areaFilter   || i.area === areaFilter)
+  // One pass: KPIs + per-area + breakdowns.
+  const stats = useMemo(() => {
+    const s = { lines: items.length, qty: 0, value: 0, checked: 0, scanIn: 0, scanOut: 0, crossChecked: 0, broken: 0, brokenQty: 0,
+      areas: new Map(), owners: new Map(), categories: new Map(), stagesCount: new Map() };
+    for (const it of items) {
+      s.qty += Number(it.qty || 0);
+      s.value += it.value;
+      const a = s.areas.get(it.area) || { area: it.area, lines: 0, qty: 0, value: 0, checked: 0, scanIn: 0, scanOut: 0, broken: 0 };
+      a.lines += 1; a.qty += Number(it.qty || 0); a.value += it.value;
+      if (it.checking) { s.checked += 1; a.checked += 1; }
+      if (it.scanIn || it.scanned) { s.scanIn += 1; a.scanIn += 1; }
+      if (it.scanOut) { s.scanOut += 1; a.scanOut += 1; }
+      if (it.checked) s.crossChecked += 1;
+      if (it.brokenQty > 0) { s.broken += 1; s.brokenQty += it.brokenQty; a.broken += 1; }
+      s.areas.set(it.area, a);
+      s.owners.set(it.ownership || '—', (s.owners.get(it.ownership || '—') || 0) + 1);
+      s.categories.set(it.category, (s.categories.get(it.category) || 0) + 1);
+      s.stagesCount.set(it.stage, (s.stagesCount.get(it.stage) || 0) + 1);
+    }
+    return s;
+  }, [items]);
+
+  const [areaSort, setAreaSort] = useState({ key: 'lines', asc: false });
+  const areaRows = useMemo(() => {
+    const rows = [...stats.areas.values()];
+    const k = areaSort.key;
+    rows.sort((a, b) => {
+      const va = k === 'area' ? a.area : k.endsWith('Pct') ? pct(a[k.replace('Pct', '')], a.lines) : a[k];
+      const vb = k === 'area' ? b.area : k.endsWith('Pct') ? pct(b[k.replace('Pct', '')], b.lines) : b[k];
+      const c = typeof va === 'string' ? va.localeCompare(vb) : va - vb;
+      return areaSort.asc ? c : -c;
+    });
+    return rows;
+  }, [stats, areaSort]);
+
+  const filtered = useMemo(() => {
+    const q = deferredQuery.trim().toLowerCase();
+    const rows = items.filter(it =>
+      (areas.length === 0 || areas.includes(it.area)) &&
+      (!progress || it.progress === progress) &&
+      (!ownership || it.ownership === ownership) &&
+      (!category || it.category === category) &&
+      (!q || it.name.toLowerCase().includes(q) || it.sku.toLowerCase().includes(q) || it.pic.toLowerCase().includes(q)
+        || it.area.toLowerCase().includes(q) || it.subArea.toLowerCase().includes(q))
     );
-  }, [items, tableSearch, statusFilter, areaFilter]);
+    const { key, asc } = sort;
+    rows.sort((a, b) => {
+      // Grouped view always keeps areas together, then applies the chosen sort inside each area.
+      if (groupByArea && key !== 'area') {
+        const g = a.area.localeCompare(b.area);
+        if (g) return g;
+      }
+      const va = a[key], vb = b[key];
+      const c = typeof va === 'number' ? va - vb : String(va).localeCompare(String(vb), undefined, { numeric: true });
+      return (asc ? c : -c) || a.name.localeCompare(b.name);
+    });
+    return rows;
+  }, [items, deferredQuery, areas, progress, ownership, category, sort, groupByArea]);
 
-  const tableTotalPages = Math.max(1, Math.ceil(tableFiltered.length / TABLE_PAGE_SIZE));
-  const safePage = Math.min(tablePage, tableTotalPages);
-  const pageData = tableFiltered.slice((safePage - 1) * TABLE_PAGE_SIZE, safePage * TABLE_PAGE_SIZE);
+  const size = printing || pageSize === 'all' ? filtered.length || 1 : pageSize;
+  const pages = Math.max(1, Math.ceil(filtered.length / size));
+  const safePage = Math.min(page, pages);
+  const pageRows = printing ? filtered : filtered.slice((safePage - 1) * size, safePage * size);
+  const filteredQty = useMemo(() => filtered.reduce((s, it) => s + Number(it.qty || 0), 0), [filtered]);
+  const filteredValue = useMemo(() => filtered.reduce((s, it) => s + it.value, 0), [filtered]);
+  const isFiltered = filtered.length !== items.length;
 
-  const statusBadge = ev.status === 'Completed' ? 'badge-green' : ev.status === 'Upcoming' ? 'badge-blue' : 'badge-orange';
+  // Subtotals per area for the group header rows (over the filtered set, not just the page).
+  const groupTotals = useMemo(() => {
+    const m = new Map();
+    for (const it of filtered) {
+      const g = m.get(it.area) || { lines: 0, qty: 0, value: 0 };
+      g.lines += 1; g.qty += Number(it.qty || 0); g.value += it.value;
+      m.set(it.area, g);
+    }
+    return m;
+  }, [filtered]);
+
+  function sortBy(key) {
+    setSort(s => ({ key, asc: s.key === key ? !s.asc : key !== 'qty' && key !== 'value' }));
+    setPage(1);
+  }
+  function toggleArea(area) {
+    setAreas(a => a.includes(area) ? a.filter(x => x !== area) : [...a, area]);
+    setPage(1);
+  }
+  function exportCsv() {
+    const blob = new Blob([toCsv(filtered)], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `event-report-${event.code || event.id}-${event.date}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+  function print() {
+    flushSync(() => setPrinting(true));
+    window.print();
+    setPrinting(false);
+  }
 
   const kpis = [
-    { label:'Total Items',  value:total,    sub:`Total qty: ${totalQty} units`, accent:'brand',  style:{} },
-    { label:'Checked',      value:checked,  sub:`${pct(checked,total)}% of all items`, accent:'green', style:{} },
-    { label:'Scan In',      value:scanIn,   sub:`${pct(scanIn,total)}% scanned in`, accent:'brand', style:{ borderLeftColor:'var(--purple)' } },
-    { label:'Scan Out',     value:scanOut,  sub:`${pct(scanOut,total)}% scanned out`, accent:'green', style:{ borderLeftColor:'var(--green)' } },
-    { label:'Missing',      value:missing,  sub:`${pct(missing,total)}% of items`, accent:'red',   style:{}, valueStyle:{ color:'var(--red)' } },
-    { label:'Damaged',      value:damaged,  sub:`${pct(damaged,total)}% of items`, accent:'orange', style:{}, valueStyle:{ color:'var(--orange)' } },
+    { label: 'Item Lines', value: stats.lines, sub: `${stats.qty.toLocaleString('id-ID')} pcs in total`, accent: 'brand' },
+    { label: 'Value in Use', value: shortIDR(stats.value), sub: `${formatIDR(stats.value)} · qty × Item Value`, accent: 'brand' },
+    { label: 'Checked', value: `${pct(stats.checked, stats.lines)}%`, sub: `${stats.checked} of ${stats.lines} lines`, accent: 'green' },
+    { label: 'Scanned In', value: `${pct(stats.scanIn, stats.lines)}%`, sub: `${stats.scanIn} of ${stats.lines} lines`, accent: 'brand' },
+    { label: 'Scanned Out', value: `${pct(stats.scanOut, stats.lines)}%`, sub: `${stats.scanOut} of ${stats.lines} lines`, accent: 'green' },
+    { label: 'Broken', value: stats.broken, sub: stats.broken ? `${stats.brokenQty} pcs reported` : 'No reports', accent: stats.broken ? 'red' : 'green' },
   ];
 
-  const progressBars = [
-    { label:'Checking Completion', value:checked, total, color:'var(--brand)' },
-    { label:'Scan In Completion',  value:scanIn,  total, color:'var(--purple)' },
-    { label:'Scan Out Completion', value:scanOut, total, color:'var(--green)' },
-  ];
+  const progressCounts = useMemo(() => {
+    const m = {};
+    items.forEach(it => { m[it.progress] = (m[it.progress] || 0) + 1; });
+    return m;
+  }, [items]);
+
+  const colCount = 9;
 
   return (
-    <>
-      <div className="breadcrumb">
+    <div className={`event-report${printing ? ' is-printing' : ''}`}>
+      <div className="breadcrumb no-print">
         <Link to="/event">Event</Link>
         <span className="breadcrumb-sep">/</span>
-        {requestedName
-          ? <Link to={`/event-detail?name=${encodeURIComponent(requestedName)}`}>{requestedName}</Link>
-          : <span>{ev.name}</span>
-        }
+        <Link to={`/event-detail?name=${encodeURIComponent(event.key)}`}>{event.name}</Link>
         <span className="breadcrumb-sep">/</span>
-        <span className="breadcrumb-current">Summary</span>
+        <span className="breadcrumb-current">Report</span>
       </div>
 
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:18, flexWrap:'wrap', gap:10 }}>
-        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-          <button onClick={() => navigate('/event')} style={{ display:'flex', alignItems:'center', color:'var(--text-muted)', background:'none', border:'none', cursor:'pointer' }}>
-            <IconChevronLeft />
-          </button>
-          <h1 className="page-title" style={{ margin:0 }}>Event Summary</h1>
-        </div>
-        <div style={{ display:'flex', gap:8 }}>
+      <div className="rep-head">
+        <h1 className="page-title" style={{ margin: 0 }}>Event Report</h1>
+        <div className="rep-head-actions no-print">
           <SearchableSelect
             inline
-            style={{ minWidth:220 }}
-            value={String(eventIdx)}
-            onChange={v => { setEventIdx(parseInt(v)); setTablePage(1); }}
-            options={EVENTS.map((ev, i) => ({ value: String(i), label: ev.name }))}
+            style={{ minWidth: 260 }}
+            value={event.key}
+            onChange={selectEvent}
+            options={events.map(e => ({ value: e.key, label: `${e.name}`, meta: `${e.date} · ${e.itemCount || 0}` }))}
             placeholder="Select event…"
             searchPlaceholder="Search events…"
           />
-          <button className="btn-print" onClick={() => window.print()}><IconPrint /> Print Report</button>
+          <button className="btn btn-ghost" onClick={exportCsv} disabled={filtered.length === 0}>Export CSV</button>
+          <button className="btn-print" onClick={print}><IconPrint /> Print</button>
         </div>
       </div>
 
-      {/* Event Info */}
-      <div className="event-info-block" style={{ display:'flex', flexWrap:'wrap', alignItems:'center', gap:'14px 32px', background:'var(--white)', border:'1px solid var(--border)', borderRadius:'var(--r-lg)', padding:'18px 22px', marginBottom:22, boxShadow:'0 1px 4px rgba(0,0,0,.05)' }}>
+      <div className="rep-event card">
         <div>
-          <div className="event-info-name">{ev.name}</div>
+          <div className="rep-event-name">{event.name}</div>
+          <div className="rep-event-meta">
+            <span>{event.code}</span>
+            <span>{fmtDate(event.start)}{event.finish && event.finish !== event.start ? ` – ${fmtDate(event.finish)}` : ''}</span>
+            <span>{event.location}</span>
+            {finished
+              ? <span><strong>Event finished</strong></span>
+              : <span>Stage {stageIdx + 1}/{stages.length}: <strong>{stage}</strong></span>}
+          </div>
         </div>
-        <div className="event-info-meta" style={{ display:'flex', flexWrap:'wrap', gap:'6px 16px', alignItems:'center' }}>
-          <div className="event-info-chip"><span>{fmtDate(ev.date)}</span></div>
-          <div className="event-info-chip"><span>{ev.venue}</span></div>
-          <div className="event-info-chip"><span>{ev.pic}</span></div>
-          <div className="event-info-chip"><span>Code: <strong>{ev.code}</strong></span></div>
-          <span className={`badge ${statusBadge}`}>{ev.status}</span>
+        <div className="rep-event-right">
+          {closingLabel && <span className={`badge ${closingLabel.badgeClass}`}>{closingLabel.label}</span>}
+          <button className="btn btn-ghost no-print" onClick={() => navigate(`/event-detail?name=${encodeURIComponent(event.key)}`)}>Open Event Detail</button>
         </div>
       </div>
 
-      {/* KPIs */}
-      <div className="kpi-grid" style={{ marginBottom:22 }}>
+      <div className="kpi-grid rep-kpis">
         {kpis.map(k => (
-          <div key={k.label} className={`kpi-card ${k.accent}-accent`} style={k.style}>
+          <div key={k.label} className={`kpi-card ${k.accent}-accent`}>
             <div className="kpi-label">{k.label}</div>
-            <div className="kpi-value" style={k.valueStyle}>{k.value}</div>
+            <div className="kpi-value">{k.value}</div>
             <div className="kpi-sub">{k.sub}</div>
           </div>
         ))}
       </div>
 
-      {/* Progress */}
-      <div className="card" style={{ marginBottom:22 }}>
-        <div className="section-title">Completion Progress</div>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))', gap:16 }}>
-          {progressBars.map(b => {
-            const p = pct(b.value, b.total);
-            return (
-              <div key={b.label}>
-                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6 }}>
-                  <span style={{ fontSize:'12.5px', fontWeight:600, color:'var(--text-2)' }}>{b.label}</span>
-                  <span style={{ fontSize:'12.5px', fontWeight:700, color:'var(--text)' }}>{b.value} / {b.total} <span style={{ color:'var(--text-muted)', fontWeight:400 }}>({p}%)</span></span>
-                </div>
-                <div className="progress-bar-track">
-                  <div className="progress-bar-fill" style={{ width:`${p}%`, background:b.color }} />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Area Grid */}
-      <div className="section-title">Items by Area</div>
-      <div className="area-grid">
-        {Object.entries(areaMap).sort(([a],[b]) => a.localeCompare(b)).map(([name, a]) => {
-          const cp = pct(a.checked, a.total);
-          const sp = pct(a.scanIn, a.total);
-          return (
-            <div key={name} className="area-stat-card" style={{ background:'var(--white)', border:'1px solid var(--border)', borderRadius:'var(--r-lg)', padding:'14px 16px', boxShadow:'0 1px 4px rgba(0,0,0,.04)' }}>
-              <div className="area-stat-header">
-                <span className="area-stat-name">{name}</span>
-                <span className="area-stat-count">{a.total} item{a.total !== 1 ? 's' : ''}</span>
-              </div>
-              {[{ label:'Checked', color:'var(--brand)', val:cp }, { label:'Scan In', color:'var(--purple)', val:sp }].map(row => (
-                <div key={row.label} className="area-stat-row">
-                  <span className="area-dot" style={{ background:row.color, width:8, height:8, borderRadius:'50%', flexShrink:0 }} />
-                  {row.label}
-                  <div className="progress-bar-track" style={{ flex:1, height:5, margin:'0 6px' }}>
-                    <div className="progress-bar-fill" style={{ width:`${row.val}%`, background:row.color }} />
-                  </div>
-                  <span className="area-stat-pct">{row.val}%</span>
-                </div>
-              ))}
-              <div style={{ marginTop:8, display:'flex', flexWrap:'wrap', gap:4 }}>
-                {Object.entries(a.statuses).sort(([,a],[,b]) => b - a).map(([st, cnt]) => (
-                  <span key={st} className={`badge ${STATUS_BADGE[st] || 'badge-gray'}`} style={{ fontSize:'10.5px' }}>{st} · {cnt}</span>
+      <div className="rep-grid">
+        <div className="card rep-area-card">
+          <div className="rep-section-title">
+            Progress by Area <span className="rep-muted">{areaRows.length} areas · click a row to filter the item list</span>
+          </div>
+          <div className="table-wrap">
+            <table className="rep-area-table">
+              <thead>
+                <tr>
+                  {[['area', 'Area'], ['lines', 'Lines'], ['qty', 'Qty'], ['value', 'Value'], ['checkedPct', 'Checked'], ['scanInPct', 'Scan In'], ['scanOutPct', 'Scan Out'], ['broken', 'Broken']].map(([k, l]) => (
+                    <th key={k} className={`rep-sortable${k !== 'area' ? ' num' : ''}`} onClick={() => setAreaSort(s => ({ key: k, asc: s.key === k ? !s.asc : k === 'area' }))}>
+                      {l}{areaSort.key === k ? (areaSort.asc ? ' ↑' : ' ↓') : ''}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {areaRows.map(a => (
+                  <tr key={a.area} className={`row-clickable${areas.includes(a.area) ? ' rep-row-active' : ''}`} onClick={() => toggleArea(a.area)}>
+                    <td className="name-cell">{a.area}</td>
+                    <td className="num">{a.lines}</td>
+                    <td className="num">{a.qty}</td>
+                    <td className="num rep-nowrap">{formatIDR(a.value)}</td>
+                    <td><Bar value={a.checked} total={a.lines} color="var(--purple)" /></td>
+                    <td><Bar value={a.scanIn} total={a.lines} color="var(--brand)" /></td>
+                    <td><Bar value={a.scanOut} total={a.lines} color="var(--green)" /></td>
+                    <td className="num" style={{ color: a.broken ? 'var(--red)' : 'var(--text-muted)', fontWeight: a.broken ? 700 : 400 }}>{a.broken}</td>
+                  </tr>
                 ))}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Item Table */}
-      <div className="card">
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14, flexWrap:'wrap', gap:8 }}>
-          <div className="section-title" style={{ margin:0, flex:1 }}>Item Detail</div>
-          <div style={{ display:'flex', gap:7, alignItems:'center', flexWrap:'wrap' }}>
-            <div className="search-wrap" style={{ maxWidth:220 }}>
-              <IconSearch />
-              <input className="search-input" type="text" placeholder="Search items…" value={tableSearch} onChange={e => { setTableSearch(e.target.value); setTablePage(1); }} />
-            </div>
-            <SearchableSelect
-              inline
-              style={{ width:140 }}
-              value={statusFilter}
-              onChange={v => { setStatusFilter(v); setTablePage(1); }}
-              options={[
-                { value: '', label: 'All Status' },
-                { value: 'In Use', label: 'In Use' },
-                { value: 'Ready', label: 'Ready' },
-                { value: 'Missing', label: 'Missing' },
-                { value: 'Damaged', label: 'Damaged' },
-              ]}
-              placeholder="All Status"
-            />
-            <SearchableSelect
-              inline
-              style={{ width:160 }}
-              value={areaFilter}
-              onChange={v => { setAreaFilter(v); setTablePage(1); }}
-              options={[
-                { value: '', label: 'All Areas' },
-                ...areaNames.map(a => ({ value: a, label: a })),
-              ]}
-              placeholder="All Areas"
-            />
+              </tbody>
+            </table>
           </div>
         </div>
-        <div className="table-wrap">
-          <table>
+        <div className="rep-side">
+          <BreakdownCard title="Progress" total={stats.lines} color="var(--brand)"
+            rows={Object.keys(PROGRESS).map(k => ({ label: PROGRESS[k].label, value: progressCounts[k] || 0 }))} />
+          <BreakdownCard title="Ownership" total={stats.lines} color="var(--purple)"
+            rows={[...stats.owners.entries()].sort((a, b) => b[1] - a[1]).map(([label, value]) => ({ label, value }))} />
+          <BreakdownCard title="Category" total={stats.lines} color="var(--green)"
+            rows={[...stats.categories.entries()].sort((a, b) => b[1] - a[1]).map(([label, value]) => ({ label, value }))} />
+          <BreakdownCard title="Added at stage" total={stats.lines} color="var(--orange)"
+            rows={stages.filter(s => stats.stagesCount.get(s)).map(s => ({ label: s, value: stats.stagesCount.get(s) }))} />
+        </div>
+      </div>
+
+      <div className="card rep-items">
+        <div className="rep-section-title">
+          Items <span className="rep-muted">{isFiltered ? `${filtered.length} of ${items.length} lines match` : `${items.length} lines`} · {filteredQty.toLocaleString('id-ID')} pcs · {formatIDR(filteredValue)}</span>
+        </div>
+        <div className="rep-toolbar no-print">
+          <div className="search-wrap rep-search">
+            <IconSearch />
+            <input className="search-input" type="text" placeholder="Search item, SKU, area, PIC…" value={query} onChange={e => { setQuery(e.target.value); setPage(1); }} />
+          </div>
+          <SearchableSelect inline multiple value={areas} onChange={v => { setAreas(v); setPage(1); }} placeholder="All areas" searchPlaceholder="Search area…"
+            options={[...stats.areas.keys()].sort().map(a => ({ value: a, label: a, meta: String(stats.areas.get(a).lines) }))} />
+          <SearchableSelect inline value={progress} onChange={v => { setProgress(v); setPage(1); }} placeholder="All progress"
+            options={[{ value: '', label: 'All progress' }, ...Object.keys(PROGRESS).map(k => ({ value: k, label: PROGRESS[k].label, meta: String(progressCounts[k] || 0) }))]} />
+          <SearchableSelect inline value={ownership} onChange={v => { setOwnership(v); setPage(1); }} placeholder="All owners"
+            options={[{ value: '', label: 'All owners' }, ...[...stats.owners.keys()].map(o => ({ value: o, label: o }))]} />
+          <SearchableSelect inline value={category} onChange={v => { setCategory(v); setPage(1); }} placeholder="All categories"
+            options={[{ value: '', label: 'All categories' }, ...[...stats.categories.keys()].sort().map(c => ({ value: c, label: c }))]} />
+          {isFiltered && <button type="button" className="link-btn" onClick={resetFilters}>Clear filters</button>}
+          <label className="pp-check rep-group-toggle"><input type="checkbox" checked={groupByArea} onChange={() => setGroupByArea(g => !g)} /> Group by area</label>
+        </div>
+
+        <div className={`table-wrap rep-table-wrap${printing ? ' printing' : ''}`}>
+          <table className="rep-table">
             <thead>
               <tr>
-                <th>Item Name</th>
-                <th>Area</th>
-                <th style={{ width:80, textAlign:'center' }}>Qty</th>
-                <th style={{ width:100, textAlign:'center' }}>Status</th>
-                <th style={{ width:90, textAlign:'center' }}>Checking</th>
-                <th style={{ width:90, textAlign:'center' }}>Scan In</th>
-                <th style={{ width:90, textAlign:'center' }}>Scan Out</th>
-                <th>PIC</th>
+                <th style={{ width: 44 }}>#</th>
+                {COLUMNS.map(c => (
+                  <th key={c.key} className={`rep-sortable${c.num ? ' num' : ''}`} onClick={() => sortBy(c.key)}>
+                    {c.label}{sort.key === c.key ? (sort.asc ? ' ↑' : ' ↓') : ''}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {pageData.length === 0
-                ? <tr><td colSpan={8} style={{ textAlign:'center', padding:40, color:'var(--text-muted)' }}>No items found.</td></tr>
-                : pageData.map(it => (
-                  <tr key={it.id}>
-                    <td style={{ fontWeight:500 }}>{it.name}</td>
-                    <td><span className="badge badge-gray" style={{ fontSize:'10.5px', textTransform:'uppercase' }}>{it.area}</span></td>
-                    <td style={{ textAlign:'center' }}>{it.qty}</td>
-                    <td style={{ textAlign:'center' }}><span className={`badge ${STATUS_BADGE[it.status] || 'badge-gray'}`}>{it.status}</span></td>
-                    <td style={{ textAlign:'center' }}>{it.checking ? <DotOk /> : <DotNo />}</td>
-                    <td style={{ textAlign:'center' }}>{it.scanIn   ? <DotOk /> : <DotNo />}</td>
-                    <td style={{ textAlign:'center' }}>{it.scanOut  ? <DotOk /> : <DotNo />}</td>
-                    <td style={{ color:'var(--text-muted)', fontSize:'12.5px' }}>{it.pic || '—'}</td>
-                  </tr>
-                ))
-              }
+              {pageRows.length === 0 && <tr><td colSpan={colCount} className="rep-empty">No items match these filters.</td></tr>}
+              {pageRows.map((it, i) => {
+                const rowNo = (printing ? 0 : (safePage - 1) * size) + i + 1;
+                const header = groupByArea && (i === 0 || pageRows[i - 1].area !== it.area);
+                const g = groupTotals.get(it.area);
+                return [
+                  header && (
+                    <tr key={`g-${it.area}-${i}`} className="rep-group-row">
+                      <td colSpan={colCount}>
+                        <strong>{it.area}</strong>
+                        <span>{g.lines} lines · {g.qty} pcs · {formatIDR(g.value)}</span>
+                      </td>
+                    </tr>
+                  ),
+                  <tr key={`${it.id}-${i}`}>
+                    <td className="rep-muted">{rowNo}</td>
+                    <td className="rep-item">
+                      <strong>{it.name}</strong>
+                      <span>{[it.sku, it.category].filter(Boolean).join(' · ')}</span>
+                    </td>
+                    <td className="rep-area">{it.area}{it.subArea && <span>{it.subArea}</span>}</td>
+                    <td className="num rep-nowrap"><strong>{it.qty}</strong> <span className="rep-muted">{it.unit}</span></td>
+                    <td className="num rep-nowrap">{it.value ? formatIDR(it.value) : '—'}</td>
+                    <td>{it.ownership}</td>
+                    <td className="rep-muted rep-small">{it.stage}</td>
+                    <td>
+                      <span className={`badge ${PROGRESS[it.progress].badge}`} style={{ fontSize: 10.5 }}>
+                        {PROGRESS[it.progress].label}{it.progress === 'broken' ? ` · ${it.brokenQty}` : ''}
+                      </span>
+                      {it.checked && <span className="rep-cross" title="Cross-checked">✓</span>}
+                    </td>
+                    <td className="rep-small">{it.pic || '—'}</td>
+                  </tr>,
+                ];
+              })}
             </tbody>
           </table>
         </div>
-        <Pagination currentPage={safePage} total={tableFiltered.length} pageSize={TABLE_PAGE_SIZE} onPage={p => setTablePage(p)} label="items" />
+
+        {!printing && (
+          <div className="rep-pager no-print">
+            <div className="rep-pager-size">
+              Rows per page
+              {PAGE_SIZES.map(s => (
+                <button key={s} type="button" className={pageSize === s ? 'active' : ''} onClick={() => { setPageSize(s); setPage(1); }}>{s === 'all' ? 'All' : s}</button>
+              ))}
+            </div>
+            <div className="rep-pager-nav">
+              <span>{filtered.length === 0 ? 0 : (safePage - 1) * size + 1}–{Math.min(safePage * size, filtered.length)} of {filtered.length}</span>
+              <button type="button" disabled={safePage <= 1} onClick={() => setPage(1)} aria-label="First page">«</button>
+              <button type="button" disabled={safePage <= 1} onClick={() => setPage(safePage - 1)} aria-label="Previous page">‹</button>
+              <span className="rep-page-no">{safePage} / {pages}</span>
+              <button type="button" disabled={safePage >= pages} onClick={() => setPage(safePage + 1)} aria-label="Next page">›</button>
+              <button type="button" disabled={safePage >= pages} onClick={() => setPage(pages)} aria-label="Last page">»</button>
+            </div>
+          </div>
+        )}
       </div>
-    </>
+    </div>
   );
 }

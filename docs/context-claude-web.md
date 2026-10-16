@@ -28,11 +28,53 @@ Newest session first.
   `src/data/*.js` and mutated in module stores (`src/lib/*Store.js`) or `localStorage`.
 - **Mock today:** `TODAY = 2026-04-09` (`src/data/events.js`). Seed dates are written around it.
 - **Run:** `npm ci && npm run dev` (port 5173). Login `dewi@emi.id` / `Admin@123` (Admin).
-- **Lint baseline:** `npx eslint src` reports **18 problems (8 errors, 10 warnings)** that predate
-  these sessions. A change should not add to that number.
+- **Lint baseline:** `npx eslint src` reports **13 problems (6 errors, 7 warnings)**, all pre-existing
+  (it was 18 before the Event Report rewrite). A change should not add to that number.
 - **localStorage gotcha:** stores that are seeded only when nothing is saved (vendors, production
   requests) keep the old data in a browser that used the app before. Clear `emi_vendors`,
   `emi_production_requests` and `emi_production_log` (or all site data) to see the new seed.
+
+---
+
+## Session 2026-10-16 (3) — Borrow Item, Loan CMS, two-tab vendor menus, Event Report rewrite, event filters, PRD
+
+**Full spec: [prd/PRD-2026-10-16.md](prd/PRD-2026-10-16.md)** (written for other AI agents; covers the whole day).
+
+### Request (verbatim)
+> 1. di event setting sama juga tmbahkan option untuk meminjam barang
+> 2. kemudian tambahkan menu loan di menu untuk CMS nya,bisa add loan vendor, edit dan delete, ketika 1 vendor di klik bisa lihat detail nya termasuk barang apa yang dibuat
+> 3. di menu loan ada 2 tab nanti tab untuk melihat list vendor dan list melihat keseluruhan barang yang dipinjam. hal ini harus diterapkan juga di CMS. production vendor sama uga
+> 4. kemudian tolong rewrite dan perbaiki tampilan untuk event report, perlu di catat aktual case nya barang bisa mencapai ratusan jadi harus benar benar optimal dan bagus
+> 5. di event listing tambahkan juga fitur untuk melakukan filter
+>
+> dari semua yang sudah kita lakukan hari ini buatkan PRD per tanggal, isi dari PRD ini ditujukan agar bisa dipake oleh AI lain tanpa membuat bingung.
+
+### Decisions (details in the PRD; ⚠️ = assumption to confirm)
+- **#1** New Event Status flag **Borrow Item** (`loanItem`). At such a stage, Event Detail shows **Borrow Item**
+  (rent from a loan vendor) and a **Borrowed** tab: Requested → Mark Received (item joins the event as Outsource)
+  → Mark Returned. Overdue = Borrowed and past the due date. ⚠️ Read as "the event borrows from a vendor", the same
+  pattern as Production Item.
+- **#2** Master Data → **Loan** = a CMS for loan vendors (add / edit / delete). A row opens `/loan-vendor-detail`
+  with what we borrowed, for which event, quantities out now and rental cost.
+  ⚠️ **Clash flagged:** the existing **Item Loan** module is the opposite direction (we lend *our* items out).
+  It is kept as is. Its borrowers (vendors 1–4) are now tagged `loan`, so they appear in the Loan list with 0 loans.
+- **#3** Both vendor menus now have two tabs: **Vendors** | **Produced Items** (Vendor menu, same list as Warehouse
+  Inventory → Production) and **Vendors** | **Borrowed Items** (Loan menu). Vendors have `kinds` (production / loan),
+  and one vendor can be in both. Deleting from one menu only removes it from that list.
+- **#4** **Event Report rewritten** (`/event-summary`, now also in the sidebar under Report). It uses real events and the
+  same item list as Event Detail. Big events get a generated list of their real `itemCount` (up to 312 lines).
+  KPIs, a sortable per-area table, breakdowns, and an item table with search, multi-filters, group by area, sorting,
+  25/50/100/All rows, a sticky header, CSV export and full print. The old page used 4 fake events.
+- **#5** Event list **filter bar**: location, stage, size, start-date range. It applies to all tabs and the tab counts.
+- **PRD**: `docs/prd/PRD-YYYY-MM-DD.md`, one file per date.
+
+### Verified
+Build OK. Lint is now **13 problems** (it was 18; the old report page's issues went away with the rewrite). In Chromium:
+- The 312-line report loads in about 0.5 s, and "All" renders 326 rows (with group headers) in about 0.5 s.
+- Borrow flow: request → received adds the item (All 8 → 9).
+- The Loan list, Borrowed Items, loan vendor detail, Vendor → Produced Items, and Event filters (Bali → 3 of 27) all work.
+- Event Detail for a 211-item event renders in about 1.4 s.
+- No new console errors.
 
 ---
 
@@ -203,7 +245,7 @@ Inventory tabs, (5) the Event Detail item drawer for "Display Table Riser Set" s
 - **Vendors:** the 6 existing vendors got description, phone and address. 8 production vendors
   were added (ids 7–14): iron workshop, in-house carpentry, in-house florists, textile, acrylic,
   in-house lighting, rattan, candles.
-- **Production history:** 26 event productions across 11 events, past and upcoming, with a mix of
+- **Production history:** 23 event productions across 10 events, past and upcoming, with a mix of
   Done / In Production / Requested. Some are "Replaces broken". There are also 6 restock records.
   File: `src/data/productionSeed.js`. Event productions are keyed by the event key, so they also show
   in each event's **Production** tab on Event Detail.

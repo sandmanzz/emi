@@ -50,6 +50,42 @@ explains a few non-obvious conventions that the entries below assume you already
 
 ---
 
+## Round 30 — Borrow Item, Loan CMS, two-tab vendor menus, Event Report rewrite, event list filters
+
+Spec: [prd/PRD-2026-10-16.md](prd/PRD-2026-10-16.md) §4.2, §5, §6, §7, §8. Narrative: [context-claude-web.md](context-claude-web.md) session (3).
+
+**Files:** new `src/components/EventLoans.jsx`, `src/components/LoanLogTab.jsx`, `src/pages/LoanVendorDetailPage.jsx`,
+`src/lib/eventLoans.js`, `src/lib/eventItems.js`, `src/data/eventLoanSeed.js`, `src/data/genericEventItems.js`,
+`docs/prd/PRD-2026-10-16.md`. Rewritten: `src/pages/EventSummaryPage.jsx`, `src/pages/VendorPage.jsx`. Changed:
+`src/App.jsx`, `src/components/Sidebar.jsx`, `src/components/VendorFormModal.jsx`, `src/components/ProductionLogTab.jsx`,
+`src/pages/EventDetailPage.jsx`, `src/pages/EventStatusPage.jsx`, `src/pages/EventPage.jsx`, `src/pages/ItemLoanPage.jsx`,
+`src/lib/vendorStore.js`, `src/lib/eventStatuses.js`, `src/data/vendors.js`, `src/data/eventStatuses.js`,
+`src/data/events.js`, `src/style.css`.
+
+**How it works**
+- `loanItem` flag + `isLoanStage()`. Event Detail keeps `eventLoans` state persisted through `saveEventLoans(eventKey)`.
+  `advanceLoan()`: Requested→Borrowed pushes an Outsource item (`fromLoan`, `loanVendor`); Borrowed→Returned stamps `returnedAt`.
+  The tab id is `'loans'`.
+- Vendors have `kinds`. `getVendorsOfKind()` feeds the pickers: production pickers (Event Detail, ProductionLogTab) use
+  `'production'`, Borrow Item uses `'loan'`. Item Loan's quick-add creates `kinds: ['loan']`.
+- `VendorPage({ kind })` is mounted twice (`/vendor`, `/loan`, with distinct `key`s). The tab lives in `?tab=items`.
+  Delete drops just the kind when the vendor has two.
+- `initialItems` moved out of EventDetailPage to `data/genericEventItems.js`. `lib/eventItems.getEventSeedItems(key)`
+  picks the hand-written list, else a generated list (mulberry32 seeded by event id, cached per session) when
+  `itemCount >= 30`, else the generic list. Past events got `itemCount`.
+- Event Report: one memoised enrichment pass + one aggregate loop, a paged table (`size` = 25/50/100/All),
+  `useDeferredValue` search, group rows computed from the previous row. Print uses `flushSync(() => setPrinting(true))`
+  → `window.print()`, and `@media print` hides `.header/.sidebar/.no-print`. CSV via Blob.
+- Event list: `filteredEvents` (location / stage via `resolveEventStage` / size / date) feeds all raw tab buckets,
+  so the tab counts follow the filters. The constants `EMPTY_FILTERS` / `SIZE_FILTERS` are at module scope.
+
+**Gotchas**
+- The generated item lists depend on the event's stage and closing status **when first generated in the session**.
+  Moving the stepper and reloading can change which lines are scanned. Fine for a demo; a backend replaces it.
+- `getAllEventLoans()` imports `eventLabel` from productionRequests.js. Keep it there to avoid a second copy of the key→name logic.
+
+---
+
 ## Round 29 — One Add Item button, favicon, Print Plan, Event Status "Allow Delete", small mock events
 
 Full write-up: [context-claude-web.md](context-claude-web.md), session 2026-10-16 (2).
@@ -112,7 +148,7 @@ Full write-up (request, decisions, open questions): [context-claude-web.md](cont
 **Mock data**
 - Catalog ids 73–98 and Warehouse Inventory ids 81–106 are the 26 Event Detail demo item names, which used to be missing,
   so the drawer showed "—". Every warehouse row now has a valuation (= item value).
-- 8 new vendors (ids 7–14). Every vendor has description/phone/address. 26 event productions over 11 events and 6 restock records.
+- 8 new vendors (ids 7–14). Every vendor has description/phone/address. 23 event productions over 10 events and 6 restock records.
 
 **Gotchas**
 - Seeds only apply while nothing is stored: clear `emi_vendors`, `emi_production_requests` and `emi_production_log` to see them.

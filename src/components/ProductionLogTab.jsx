@@ -8,7 +8,7 @@ import {
   getAllProductions, getManualProductions, saveManualProductions,
   PRODUCTION_STATUSES, PRODUCTION_BADGE,
 } from '../lib/productionRequests';
-import { getVendors, VENDOR_ORIGINS } from '../lib/vendorStore';
+import { getVendorsOfKind, VENDOR_ORIGINS } from '../lib/vendorStore';
 import { getCatalog, addProducedItem } from '../lib/producedItems';
 import { getInventoryRows, addInventoryRow, applyStockMovement } from '../lib/stockOpnameStore';
 import { addActivityLog } from '../lib/activityLogStore';
@@ -38,7 +38,7 @@ export default function ProductionLogTab({ warehouseNames, onStockChanged }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
 
-  const vendors = useMemo(() => getVendors(), [modalOpen]); // eslint-disable-line react-hooks/exhaustive-deps -- re-read when the form opens
+  const vendors = useMemo(() => getVendorsOfKind('production'), [modalOpen]); // eslint-disable-line react-hooks/exhaustive-deps -- re-read when the form opens
   const catalog = useMemo(() => getCatalog(), [modalOpen]); // eslint-disable-line react-hooks/exhaustive-deps -- re-read when the form opens
   const deployWarehouses = warehouseNames.filter(w => w !== 'Buy'); // "Buy" is a placeholder, not a real place
 

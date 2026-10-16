@@ -126,6 +126,32 @@ whose status is still `on-going`.
 
 ---
 
+## Event loans (Borrow Item), vendor kinds, event report (2026-10-16)
+
+Spec: [prd/PRD-2026-10-16.md](prd/PRD-2026-10-16.md) §4.2, §5, §7.
+
+**Vendors** gain `kinds: ('production'|'loan')[]`. Lists and pickers filter by kind (`GET /vendors?kind=loan`).
+
+**Event loans** (we rent items from a loan vendor for an event):
+
+```
+GET   /events/{eventId}/loans            GET /loans?vendorId=&status=   (all events)
+POST  /events/{eventId}/loans            { itemName, qty, unit, area, subArea, vendorId, startDate, dueDate, rentalCost, note }
+PATCH /loans/{id}/status                 { status: 'Borrowed' | 'Returned' }
+DELETE /loans/{id}                       (only while Requested)
+```
+
+Rules: only allowed while the event's current stage has `loanItem: true` and the event is On Going. Moving to `Borrowed` must add
+the event item (ownership Outsource, not a warehouse item) in the same transaction. No warehouse stock change. Overdue is
+derived (`Borrowed` and `dueDate < today`). Rental total = qty × rentalCost.
+
+**Event report** must not ship hundreds of items to the client just to aggregate them. Suggested:
+`GET /events/{eventId}/report/summary` (KPIs, per-area, per-owner, per-category, per-stage counts) and
+`GET /events/{eventId}/items?area=&progress=&owner=&category=&q=&sort=&page=&size=` (paged, filtered server-side),
+plus `GET /events/{eventId}/items.csv`.
+
+**Event list filters**: `GET /events?location=&stage=&sizeMin=&sizeMax=&startFrom=&startTo=` with counts per status tab.
+
 ## Allow Delete per stage, print plan (2026-10-16)
 
 **Event Status `allowDelete`** (boolean, default true). While an event's current stage has `allowDelete: false`,

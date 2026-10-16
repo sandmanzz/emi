@@ -122,7 +122,7 @@ export default function ItemLoanPage() {
 
   function saveVendor() {
     if (!vendorForm.name.trim()) return;
-    const created = addVendor({ name: vendorForm.name.trim(), phone: vendorForm.phone.trim(), description: vendorForm.description.trim() });
+    const created = addVendor({ name: vendorForm.name.trim(), kinds: ['loan'], phone: vendorForm.phone.trim(), description: vendorForm.description.trim() });
     setVendors(getVendors());
     setHeaderForm(f => ({ ...f, vendorId: String(created.id) }));
     setVendorModalOpen(false);

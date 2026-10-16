@@ -54,6 +54,12 @@ export function isCheckOwnershipStage(statusName) {
   return record?.checkOwnership === true;
 }
 
+// While the event sits at a stage with this flag, Event Detail offers "Borrow Item".
+export function isLoanStage(statusName) {
+  const record = getEventStatuses().find(s => s.status === statusName);
+  return record?.loanItem === true;
+}
+
 // While the event is at this stage, items may be deleted. Missing field counts as true
 // (status lists saved before the flag existed keep the old behaviour).
 export function isDeleteAllowedStage(statusName) {

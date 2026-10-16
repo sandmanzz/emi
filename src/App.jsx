@@ -19,6 +19,7 @@ import CategoryDetailPage from './pages/CategoryDetailPage';
 import UnitPage from './pages/UnitPage';
 import VendorPage from './pages/VendorPage';
 import VendorDetailPage from './pages/VendorDetailPage';
+import LoanVendorDetailPage from './pages/LoanVendorDetailPage';
 import UnitDetailPage from './pages/UnitDetailPage';
 import PlaceholderPage from './pages/PlaceholderPage';
 import AIAnalyzerPage from './pages/AIAnalyzerPage';
@@ -92,7 +93,9 @@ export default function App() {
           <Route path="category" element={<CategoryPage />} />
           <Route path="category-detail" element={<CategoryDetailPage />} />
           <Route path="unit" element={<UnitPage />} />
-          <Route path="vendor" element={<VendorPage />} />
+          <Route path="vendor" element={<VendorPage key="production" kind="production" />} />
+          <Route path="loan" element={<VendorPage key="loan" kind="loan" />} />
+          <Route path="loan-vendor-detail" element={<LoanVendorDetailPage />} />
           <Route path="vendor-detail" element={<VendorDetailPage />} />
           <Route path="unit-detail" element={<UnitDetailPage />} />
           <Route path="ai-analyzer" element={<AIAnalyzerPage />} />

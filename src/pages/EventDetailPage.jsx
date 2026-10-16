@@ -9,12 +9,14 @@ import { initialAreas, SUB_AREAS } from '../data/areas';
 import { inventoryData, categories } from '../data/inventory';
 import { initialWarehouses } from '../data/warehouses';
 import { wiData } from '../data/warehouseInventory';
-import { getEventStageNames, isScanStage, isCuttingStockStage, isStockReturnStage, isProductionStage, isCheckOwnershipStage, isDeleteAllowedStage } from '../lib/eventStatuses';
+import { getEventStageNames, isScanStage, isCuttingStockStage, isStockReturnStage, isProductionStage, isCheckOwnershipStage, isDeleteAllowedStage, isLoanStage } from '../lib/eventStatuses';
 import { getInventoryRows, applyStockMovement, addInventoryRow } from '../lib/stockOpnameStore';
-import { getVendors, VENDOR_ORIGINS } from '../lib/vendorStore';
+import { getVendorsOfKind, VENDOR_ORIGINS } from '../lib/vendorStore';
 import { getCatalog, addProducedItem } from '../lib/producedItems';
 import PrintPlanModal from '../components/PrintPlanModal';
-import { SEED_EVENT_ITEMS } from '../data/eventItemsSeed';
+import { getEventSeedItems } from '../lib/eventItems';
+import { EventLoansPanel, BorrowItemModal } from '../components/EventLoans';
+import { getEventLoans, saveEventLoans, LOAN_STATUSES } from '../lib/eventLoans';
 import { getProductionRequests, saveProductionRequests, PRODUCTION_STATUSES, PRODUCTION_BADGE } from '../lib/productionRequests';
 import { resolveEventStage, saveEventProgress, getEventFurthestStage, saveEventFurthestStage } from '../lib/eventProgress';
 import { getEventClosing, setEventClosing, isOnGoingByItems } from '../lib/eventClosing';
@@ -23,7 +25,7 @@ import { markItemsAdded } from '../lib/eventItemsFlag';
 import { getIncomingItems, queueMovedItem, clearIncomingItems } from '../lib/movedItems';
 import { addActivityLog } from '../lib/activityLogStore';
 import { getCurrentTenantUser } from '../lib/tenantAuth';
-import { initialEvents } from '../data/events';
+import { initialEvents, TODAY } from '../data/events';
 
 // Matches the "<date> | <NAME>" key this page reads its own ?name= from, so a
 // candidate move-target event can be looked up in the same closing-status store.
@@ -62,34 +64,6 @@ function stockAtWarehouse(inv, warehouseName) {
   return row ? row.itemStock : 0;
 }
 
-const initialItems = [
-  { id:1, name:'Chiffon White 4-6×1,2m',        area:'CEREMONY',        subArea:'', stage:'On preparing items',  scanned:false, groupId:null, qty:2,   pic:'Anto',    checking:true,  warehouseItem:false, scanIn:'May 26, 2025 10:42 PM', scanOut:'May 26, 2025 9:33 PM',  note:"Please take care this item, it's luxury item", checked:false, ownership:'IHC' },
-  { id:2, name:'Hanging Rattan 1',               area:'PHOTOBOOTH',      subArea:'', stage:'On preparing items',  scanned:false, groupId:null, qty:2,   pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:"Please take care this item, it's luxury item", checked:false, ownership:'IHC' },
-  { id:3, name:'Hanging Rattan 2',               area:'RECEPTION',       subArea:'', stage:'On preparing items',  scanned:false, groupId:null, qty:10,  pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:"Please take care this item, it's luxury item", checked:false, ownership:'IHC' },
-  { id:4, name:'Hanging Rattan 3',               area:'RECEPTION',       subArea:'', stage:'On preparing items',  scanned:false, groupId:null, qty:10,  pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:"Please take care this item, it's luxury item", checked:false, ownership:'IHC' },
-  { id:5, name:'White Fabric 3m',                area:'ENTRANCE',        subArea:'', stage:'On preparing items',  scanned:false, groupId:null, qty:5,   pic:'Novi',    checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:'', checked:false, ownership:'IHP' },
-  { id:6, name:'Red Rose Flower',                area:'RECEPTION',       subArea:'', stage:'On preparing items',  scanned:false, groupId:null, qty:30,  pic:'Darmian', checking:true,  warehouseItem:false, scanIn:'Apr 9, 2026 08:00 AM',  scanOut:null,                    note:'', checked:true,  ownership:'IHC' },
-  { id:7, name:'Standing Flower Tall',           area:'ENTRANCE',        subArea:'', stage:'On preparing items',  scanned:false, groupId:null, qty:4,   pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:'', checked:false, ownership:'IHC' },
-  { id:8, name:'Tealight Holder 15cm',           area:'GUEST TABLE',     subArea:'', stage:'On preparing items',  scanned:false, groupId:null, qty:50,  pic:'Anto',    checking:false, warehouseItem:true,  scanIn:null,                    scanOut:null,                    note:'', checked:false, ownership:'IHC' },
-  { id:9, name:'Gold Ribbon 5m',                 area:'CEREMONY',        subArea:'', stage:'On preparing items',  scanned:false, groupId:null, qty:20,  pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:'', checked:false, ownership:'Outsource' },
-  { id:10,name:'White Candle 30cm',              area:'GUEST TABLE',     subArea:'', stage:'On preparing items',  scanned:false, groupId:null, qty:100, pic:'Novi',    checking:true,  warehouseItem:true,  scanIn:'Apr 9, 2026 07:30 AM',  scanOut:'Apr 9, 2026 09:00 AM', note:'', checked:true,  ownership:'IHC' },
-  { id:11,name:'Backdrop Floral 3×2m',           area:'PHOTOBOOTH',      subArea:'', stage:'On preparing items',  scanned:false, groupId:null, qty:1,   pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:'', checked:false, ownership:'IHP' },
-  { id:12,name:'Tiffany Chair',                  area:'RECEPTION',       subArea:'', stage:'On preparing items',  scanned:false, groupId:null, qty:60,  pic:'Darmian', checking:false, warehouseItem:true,  scanIn:null,                    scanOut:null,                    note:'', checked:false, ownership:'IHC' },
-  { id:13,name:'Fairy Light Curtain 3x3m',       area:'CHAMPAGNE WALL',  subArea:'', stage:'Created by admin up',  scanned:false, groupId:null, qty:2,   pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:'', checked:false, ownership:'IHC' },
-  { id:14,name:'Champagne Tower Glass Set',      area:'CHAMPAGNE WALL',  subArea:'', stage:'Finish setup',   scanned:false, groupId:null, qty:150, pic:'Novi',    checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:'', checked:false, ownership:'Outsource' },
-  { id:15,name:'Cocktail High Table',            area:'COCKTAIL',        subArea:'', stage:'Waiting scan in',scanned:false, groupId:null, qty:8,   pic:'Anto',    checking:true,  warehouseItem:true,  scanIn:null,                    scanOut:null,                    note:'', checked:false, ownership:'IHC' },
-  { id:16,name:'Gold Bar Stool',                 area:'COCKTAIL',        subArea:'', stage:'Waiting scan in',scanned:false, groupId:null, qty:16,  pic:'Anto',    checking:true,  warehouseItem:true,  scanIn:null,                    scanOut:null,                    note:'', checked:false, ownership:'IHC' },
-  { id:17,name:'Display Table Riser Set',        area:'DISPLAY TABLE',   subArea:'', stage:'Created by admin up',  scanned:false, groupId:null, qty:6,   pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:'', checked:false, ownership:'IHP' },
-  { id:18,name:'Fresh Flower Centerpiece',       area:'FLORIST',         subArea:'', stage:'Finish setup',   scanned:false, groupId:null, qty:12,  pic:'Dewi',    checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:'', checked:false, ownership:'IHC' },
-  { id:19,name:'Greenery Wall Panel',            area:'FLORIST',         subArea:'', stage:'Created by admin up',  scanned:false, groupId:null, qty:4,   pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:'', checked:false, ownership:'IHC' },
-  { id:20,name:'Labour Toolkit Bag',             area:'LABOUR',          subArea:'', stage:'On preparing items',  scanned:false, groupId:null, qty:3,   pic:'Hendra',  checking:true,  warehouseItem:true,  scanIn:null,                    scanOut:null,                    note:'', checked:false, ownership:'Outsource' },
-  { id:21,name:'Lounge Sofa Set',                area:'LOUNGE',          subArea:'', stage:'Waiting scan in',scanned:false, groupId:null, qty:2,   pic:'Agus',    checking:true,  warehouseItem:true,  scanIn:null,                    scanOut:null,                    note:'', checked:false, ownership:'IHC' },
-  { id:22,name:'Round Coffee Table',             area:'LOUNGE',          subArea:'', stage:'Waiting scan in',scanned:false, groupId:null, qty:2,   pic:'Agus',    checking:true,  warehouseItem:true,  scanIn:null,                    scanOut:null,                    note:'', checked:false, ownership:'IHC' },
-  { id:23,name:'Bridal Backdrop Floral Wall',    area:'BRIDAL BACKDROP', subArea:'', stage:'Event running', scanned:false, groupId:null, qty:1,   pic:'Lina',    checking:true,  warehouseItem:false, scanIn:'Apr 9, 2026 09:10 AM',  scanOut:null,                    note:'', checked:false, ownership:'IHP' },
-  { id:24,name:'Bridal Room Mirror Stand',       area:'BRIDAL ROOM',     subArea:'', stage:'On preparing items',  scanned:false, groupId:null, qty:1,   pic:'Siti',    checking:false, warehouseItem:true,  scanIn:null,                    scanOut:null,                    note:'', checked:false, ownership:'IHC' },
-  { id:25,name:'Bridal Table Linen Set',         area:'BRIDAL TABLE',    subArea:'', stage:'Finish setup',   scanned:false, groupId:null, qty:3,   pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:'', checked:false, ownership:'IHC' },
-  { id:26,name:'Car Decoration Ribbon Kit',      area:'CAR DECOR',       subArea:'', stage:'Created by admin up',  scanned:false, groupId:null, qty:2,   pic:'',        checking:false, warehouseItem:false, scanIn:null,                    scanOut:null,                    note:'', checked:false, ownership:'IHC' },
-];
 
 function CheckIcon() {
   return <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="2 6 5 9 10 3"/></svg>;
@@ -356,8 +330,9 @@ export default function EventDetailPage() {
 
   const currentUser = getCurrentTenantUser();
 
-  // Small demo events have their own item list; every other event shows the 26 generic items.
-  const baseItems = SEED_EVENT_ITEMS[eventName] || initialItems;
+  // Seed items for this event: its own list, a generated list sized to its item count, or
+  // the 26 generic items (see lib/eventItems.js — Event Report reads the same list).
+  const baseItems = getEventSeedItems(eventName);
   const baseNextId = Math.max(0, ...baseItems.map(i => i.id)) + 1;
   const [items, setItems] = useState(() => {
     const incoming = getIncomingItems(eventName);
@@ -442,11 +417,15 @@ export default function EventDetailPage() {
 
   // Production requests (only offered at stages with productionItem: true)
   const productionEnabled = isProductionStage(eventStatus);
+  // Borrow Item (rent from a loan vendor) — only offered at stages with loanItem: true.
+  const loanEnabled = isLoanStage(eventStatus);
+  const [eventLoans, setEventLoansState] = useState(() => getEventLoans(eventName));
+  const [borrowOpen, setBorrowOpen] = useState(false);
   const [productionRequests, setProductionRequestsState] = useState(() => getProductionRequests(eventName));
   const [productionOpen, setProductionOpen] = useState(false);
   const EMPTY_PRODUCTION_FORM = { name: '', qty: 1, area: '', subArea: '', warehouse: '', vendorOrigin: 'Internal', vendorId: '', note: '', replacesItemId: null };
   const [productionForm, setProductionForm] = useState(EMPTY_PRODUCTION_FORM);
-  const [vendors, setVendors] = useState(() => getVendors()); // re-read when the modal opens
+  const [vendors, setVendors] = useState(() => getVendorsOfKind('production')); // re-read when the modal opens
   const vendorOptions = vendors.filter(v => v.origin === productionForm.vendorOrigin);
   const [productionTab, setProductionTab] = useState('new'); // 'new' | 'convert'
   const [convertForm, setConvertForm] = useState({ fromRowId: '', fromQty: 1, toName: '', toQty: 1 });
@@ -984,7 +963,7 @@ export default function EventDetailPage() {
     });
     setConvertForm({ fromRowId: '', fromQty: 1, toName: '', toQty: 1 });
     setProductionTab('new');
-    setVendors(getVendors());
+    setVendors(getVendorsOfKind('production'));
     setDetailItemId(null);
     setProductionOpen(true);
   }
@@ -1002,7 +981,7 @@ export default function EventDetailPage() {
     setProductionForm(EMPTY_PRODUCTION_FORM);
     setConvertForm({ fromRowId: '', fromQty: 1, toName: '', toQty: 1 });
     setProductionTab('new');
-    setVendors(getVendors());
+    setVendors(getVendorsOfKind('production'));
     setProductionOpen(true);
   }
 
@@ -1056,6 +1035,60 @@ export default function EventDetailPage() {
       userName: currentUser?.name || 'Admin', action: 'Update', module: 'Event Detail',
       description: `Production request "${req.name}" on ${eventName} → ${nextStatus}`,
     });
+  }
+
+  // --- Borrow Item (event loans) ---
+  function setEventLoans(updater) {
+    setEventLoansState(current => {
+      const next = typeof updater === 'function' ? updater(current) : updater;
+      saveEventLoans(eventName, next);
+      return next;
+    });
+  }
+
+  function submitBorrow(data) {
+    const loan = {
+      ...data, id: Math.max(0, ...eventLoans.map(l => l.id)) + 1, status: 'Requested', stage: eventStatus,
+      requestedBy: currentUser?.name || 'Admin', requestedAt: new Date().toLocaleDateString('en-CA'), borrowedAt: null, returnedAt: null,
+    };
+    setEventLoans(ls => [loan, ...ls]);
+    addActivityLog({
+      userName: loan.requestedBy, action: 'Create', module: 'Event Detail',
+      description: `Borrow request: ${loan.qty} ${loan.unit} "${loan.itemName}" from ${loan.vendorName} for ${eventName} (${loan.startDate} → ${loan.dueDate})`,
+    });
+    setBorrowOpen(false);
+    setStageFilter('loans');
+  }
+
+  // Requested → Borrowed (the item joins the event as Outsource) → Returned.
+  function advanceLoan(loan) {
+    const nextStatus = LOAN_STATUSES[LOAN_STATUSES.indexOf(loan.status) + 1];
+    if (!nextStatus) return;
+    const today = new Date().toLocaleDateString('en-CA');
+    if (nextStatus === 'Borrowed') {
+      if (!window.confirm(`Mark "${loan.itemName}" as received? ${loan.qty} ${loan.unit} will be added to this event's items.`)) return;
+      setItems(is => [...is, {
+        id: nextId, name: loan.itemName, area: loan.area, subArea: loan.subArea || '', stage: eventStatus,
+        qty: loan.qty, pic: '', checking: false, scanned: false, groupId: null, warehouseItem: false,
+        scanIn: null, scanOut: null, note: loan.note || '', checked: false, ownership: 'Outsource',
+        fromLoan: true, loanVendor: loan.vendorName,
+      }]);
+      setNextId(n => n + 1);
+    } else if (!window.confirm(`Mark "${loan.itemName}" as returned to ${loan.vendorName}?`)) {
+      return;
+    }
+    setEventLoans(ls => ls.map(l => l.id !== loan.id ? l : {
+      ...l, status: nextStatus, ...(nextStatus === 'Borrowed' ? { borrowedAt: today } : { returnedAt: today }),
+    }));
+    addActivityLog({
+      userName: currentUser?.name || 'Admin', action: 'Update', module: 'Event Detail',
+      description: `Borrowed item "${loan.itemName}" on ${eventName} → ${nextStatus}`,
+    });
+  }
+
+  function cancelLoan(loan) {
+    if (!window.confirm(`Cancel the borrow request for "${loan.itemName}"?`)) return;
+    setEventLoans(ls => ls.filter(l => l.id !== loan.id));
   }
 
   function cancelProductionRequest(req) {
@@ -1220,6 +1253,12 @@ export default function EventDetailPage() {
           </div>
 
           <div className="event-actions-bar">
+            {loanEnabled && closingStatus === 'on-going' && !addLocked && (
+              <button className="btn btn-ghost btn-request-production" onClick={() => setBorrowOpen(true)}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 3h5v5"/><path d="M21 3l-7 7"/><path d="M8 21H3v-5"/><path d="M3 21l7-7"/></svg>
+                Borrow Item
+              </button>
+            )}
             {productionEnabled && closingStatus === 'on-going' && !addLocked && (
               <button className="btn btn-ghost btn-request-production" onClick={openProductionRequest}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
@@ -1381,6 +1420,11 @@ export default function EventDetailPage() {
               Production <span className="stage-tab-count">{productionRequests.length}</span>
             </button>
           )}
+          {(loanEnabled || eventLoans.length > 0) && (
+            <button type="button" className={`stage-tab${effectiveStageFilter === 'loans' ? ' active' : ''}`} onClick={() => setStageFilter('loans')}>
+              Borrowed <span className="stage-tab-count">{eventLoans.length}</span>
+            </button>
+          )}
         </div>
           <div className="view-toggle" role="group" aria-label="Item view">
             <button type="button" className={viewMode === 'card' ? 'active' : ''} aria-pressed={viewMode === 'card'} title="Card view" onClick={() => changeViewMode('card')}>
@@ -1392,7 +1436,16 @@ export default function EventDetailPage() {
           </div>
         </div>
 
-        {effectiveStageFilter === 'production' ? (
+        {effectiveStageFilter === 'loans' ? (
+          <EventLoansPanel
+            loans={eventLoans}
+            loanEnabled={loanEnabled}
+            locked={itemsLocked}
+            onAdvance={advanceLoan}
+            onCancel={cancelLoan}
+            onOpenVendor={id => navigate(`/loan-vendor-detail?id=${id}`)}
+          />
+        ) : effectiveStageFilter === 'production' ? (
           <>
             <p className="summary-text">
               <strong>{productionRequests.length}</strong> request{productionRequests.length === 1 ? '' : 's'}
@@ -1724,6 +1777,18 @@ export default function EventDetailPage() {
         </div>
       </Modal>
 
+      {borrowOpen && (
+        <BorrowItemModal
+          vendors={getVendorsOfKind('loan')}
+          areas={AREAS}
+          subAreas={SUB_AREAS}
+          catalogNames={getCatalog().map(i => i.name)}
+          defaultDate={TODAY.toISOString().slice(0, 10)}
+          onClose={() => setBorrowOpen(false)}
+          onSubmit={submitBorrow}
+        />
+      )}
+
       {printPlanOpen && (
         <PrintPlanModal
           eventName={eventName}
@@ -1822,7 +1887,7 @@ export default function EventDetailPage() {
             ['Sub Area', detailItem.subArea || '—'],
             ['Ownership', detailItem.ownership || '—'],
             ['Added at stage', detailItem.stage],
-            ['Source', detailItem.fromConvert ? 'Convert request' : detailItem.fromProduction ? 'Production request' : detailItem.warehouseItem ? 'Warehouse inventory' : 'Non-warehouse item'],
+            ['Source', detailItem.fromLoan ? `Borrowed from ${detailItem.loanVendor || 'loan vendor'}` : detailItem.fromConvert ? 'Convert request' : detailItem.fromProduction ? 'Production request' : detailItem.warehouseItem ? 'Warehouse inventory' : 'Non-warehouse item'],
             ['Group', group ? group.name : '—'],
             ['Checking', detailItem.checking ? 'Yes' : 'No'],
             ['Cross-checked', detailItem.checked ? 'Yes' : 'No'],

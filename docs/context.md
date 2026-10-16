@@ -899,6 +899,20 @@ clashes or seems off) — proceeding with the stated assumption unless corrected
 
 ## Raw instruction log
 
+### 2026-10-16 (3) — Borrow Item, Loan CMS, vendor tabs, Event Report rewrite, event filters, PRD (Claude Web)
+> 1. di event setting sama juga tmbahkan option untuk meminjam barang
+> 2. kemudian tambahkan menu loan di menu untuk CMS nya,bisa add loan vendor, edit dan delete, ketika 1 vendor di klik bisa lihat detail nya termasuk barang apa yang dibuat
+> 3. di menu loan ada 2 tab nanti tab untuk melihat list vendor dan list melihat keseluruhan barang yang dipinjam. hal ini harus diterapkan juga di CMS. production vendor sama uga
+> 4. kemudian tolong rewrite dan perbaiki tampilan untuk event report, perlu di catat aktual case nya barang bisa mencapai ratusan jadi harus benar benar optimal dan bagus
+> 5. di event listing tambahkan juga fitur untuk melakukan filter
+>
+> dari semua yang sudah kita lakukan hari ini buatkan PRD per tanggal, isi dari PRD ini ditujukan agar bisa dipake oleh AI lain tanpa membuat bingung.
+
+Spec: [prd/PRD-2026-10-16.md](prd/PRD-2026-10-16.md). Session notes: [context-claude-web.md](context-claude-web.md) (3).
+- **Standing:** one PRD per date in `docs/prd/`, written so another AI can continue without confusion.
+- ⚠️ **Clash:** "Loan" (we borrow from a vendor for an event) is the opposite of the existing **Item Loan** (we lend our
+  items). They are kept as two separate modules; see PRD §1 and open question Q8/Q9.
+
 ### 2026-10-16 — Standing rule: always merge straight to main (Claude Web)
 > selalu langsung merge ke main saja
 
@@ -937,7 +951,7 @@ All decisions, assumptions and open questions for this request are in
   When a restock is marked Done, its stock is added to the warehouse.
 - Vendor = name, Internal/External, description, phone, address. Clicking a row opens the vendor detail, with everything
   they produced and for which event.
-- Mock data: the 26 Event Detail demo items added to the catalog and warehouse, item values, 14 vendors and 32 production records.
+- Mock data: the 26 Event Detail demo items added to the catalog and warehouse, item values, 14 vendors and 29 production records (23 event + 6 restock).
 
 ### 2026-10-09 — Make the whole UI responsive
 > saya mau secara UI semuanya pastikan responsive

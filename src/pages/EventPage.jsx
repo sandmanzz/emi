@@ -11,7 +11,7 @@ import { initialEvents, TODAY } from '../data/events';
 import { getEventClosing, isReadyToClose, isOnGoingByItems } from '../lib/eventClosing';
 import { CLOSING_LABELS } from '../lib/eventClosingLabels';
 import { getEventStageNames } from '../lib/eventStatuses';
-import { saveEventProgress } from '../lib/eventProgress';
+import { saveEventProgress, resolveEventStage } from '../lib/eventProgress';
 
 const PAGE_SIZE = 8;
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -186,7 +186,7 @@ function EventCard({ r, onEdit, onDelete, navigate, readyToClose, onGoingByItems
           </span>
         </div>
         <button className="btn-icon" title="Summary" style={{ color:'var(--purple)' }}
-          onClick={() => navigate(`/event-summary?name=${encodeURIComponent(r.name.toUpperCase())}`)}>
+          onClick={() => navigate(`/event-summary?name=${encodeURIComponent(closingKeyFor(r))}`)}>
           <IconBarChart />
         </button>
         <div style={{ flex:1 }} />
@@ -250,7 +250,7 @@ function PastEventRow({ r, onEdit, onDelete, navigate, extraBadge, readOnly }) {
           <IconCart />
         </button>
         <button className="btn-icon" title="Summary" style={{ color:'var(--purple)' }}
-          onClick={() => navigate(`/event-summary?name=${encodeURIComponent(r.name.toUpperCase())}`)}>
+          onClick={() => navigate(`/event-summary?name=${encodeURIComponent(closingKeyFor(r))}`)}>
           <IconBarChart />
         </button>
         {!readOnly && (
@@ -264,6 +264,15 @@ function PastEventRow({ r, onEdit, onDelete, navigate, extraBadge, readOnly }) {
     </div>
   );
 }
+
+// Event listing filters (2026-10-16). Empty = no filter.
+const EMPTY_FILTERS = { locations: [], stages: [], from: '', to: '', size: '' };
+const SIZE_FILTERS = {
+  none:   { label: 'No items yet',        test: n => n === 0 },
+  small:  { label: 'Small (1–30 items)',   test: n => n > 0 && n <= 30 },
+  medium: { label: 'Medium (31–150)',      test: n => n > 30 && n <= 150 },
+  large:  { label: 'Large (150+ items)',   test: n => n > 150 },
+};
 
 export default function EventPage() {
   const navigate = useNavigate();
@@ -279,6 +288,25 @@ export default function EventPage() {
   // simpler than a separate pair per tab now that there are 6 of them.
   const [tabQuery, setTabQuery] = useState('');
   const [tabPage,  setTabPage]  = useState(1);
+
+  // Filters (2026-10-16) — apply to every tab, and the tab counts follow them.
+  // Empty = no filter. Dates compare against the event's start date (YYYY-MM-DD strings).
+  const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const setFilter = (k, v) => { setFilters(f => ({ ...f, [k]: v })); setTabPage(1); };
+  const activeFilterCount = filters.locations.length + filters.stages.length + (filters.from ? 1 : 0) + (filters.to ? 1 : 0) + (filters.size ? 1 : 0);
+  const stageNames = useMemo(() => getEventStageNames(), []);
+  const locationOptions = useMemo(() => {
+    const counts = new Map();
+    events.forEach(e => { if (e.location && e.location !== '-') counts.set(e.location, (counts.get(e.location) || 0) + 1); });
+    return [...counts.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([l, n]) => ({ value: l, label: l, meta: String(n) }));
+  }, [events]);
+  const filteredEvents = useMemo(() => events.filter(e =>
+    (filters.locations.length === 0 || filters.locations.includes(e.location)) &&
+    (filters.stages.length === 0 || filters.stages.includes(resolveEventStage(closingKeyFor(e)))) &&
+    (!filters.from || (e.start || '') >= filters.from) &&
+    (!filters.to || (e.start || '') <= filters.to) &&
+    (!filters.size || SIZE_FILTERS[filters.size].test(e.itemCount || 0))
+  ), [events, filters]);
 
   const [modalOpen,  setModalOpen]  = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -299,26 +327,26 @@ export default function EventPage() {
   // query-filtered, since tab badge counts should stay stable while typing in
   // the search box — only the rendered list below is.
   const rawUpcoming = useMemo(() =>
-    events.filter(e => e.type === 'upcoming' && closingOf(e) === 'on-going' && !readyToCloseOf(e) && !onGoingByItemsOf(e)),
-  [events]);
+    filteredEvents.filter(e => e.type === 'upcoming' && closingOf(e) === 'on-going' && !readyToCloseOf(e) && !onGoingByItemsOf(e)),
+  [filteredEvents]);
   const rawOnGoing = useMemo(() =>
-    events.filter(e => e.type === 'upcoming' && closingOf(e) === 'on-going' && !readyToCloseOf(e) && onGoingByItemsOf(e)),
-  [events]);
+    filteredEvents.filter(e => e.type === 'upcoming' && closingOf(e) === 'on-going' && !readyToCloseOf(e) && onGoingByItemsOf(e)),
+  [filteredEvents]);
   const rawReadyToClose = useMemo(() =>
-    events.filter(e => e.type === 'upcoming' && readyToCloseOf(e)),
-  [events]);
+    filteredEvents.filter(e => e.type === 'upcoming' && readyToCloseOf(e)),
+  [filteredEvents]);
   const rawChecking = useMemo(() =>
-    events.filter(e => closingOf(e) === 'checking-inventory'),
-  [events]);
+    filteredEvents.filter(e => closingOf(e) === 'checking-inventory'),
+  [filteredEvents]);
   // Legacy seed `type: 'past'` events (which predate the status flag entirely)
   // are folded into Returned & Completed — the closest equivalent, since both
   // mean "this event is done."
   const rawReturned = useMemo(() =>
-    events.filter(e => e.type === 'past' || closingOf(e) === 'returned-completed'),
-  [events]);
+    filteredEvents.filter(e => e.type === 'past' || closingOf(e) === 'returned-completed'),
+  [filteredEvents]);
   const rawTransferred = useMemo(() =>
-    events.filter(e => closingOf(e) === 'transferred'),
-  [events]);
+    filteredEvents.filter(e => closingOf(e) === 'transferred'),
+  [filteredEvents]);
 
   const upcomingEvents = useMemo(() =>
     applySearch(rawUpcoming, tabQuery).sort((a, b) => (a.start || '').localeCompare(b.start || '')),
@@ -477,6 +505,24 @@ export default function EventPage() {
             <span style={{ fontSize:13, color:'var(--text-muted)', fontWeight:500 }}>{s.label}</span>
           </div>
         ))}
+      </div>
+
+      {/* Filters — apply to all tabs */}
+      <div className="event-filters">
+        <SearchableSelect inline multiple value={filters.locations} onChange={v => setFilter('locations', v)}
+          placeholder="All locations" searchPlaceholder="Search location…" options={locationOptions} />
+        <SearchableSelect inline multiple value={filters.stages} onChange={v => setFilter('stages', v)}
+          placeholder="All stages" searchPlaceholder="Search stage…" options={stageNames.map(s => ({ value: s, label: s }))} />
+        <SearchableSelect inline value={filters.size} onChange={v => setFilter('size', v)} placeholder="Any size"
+          options={[{ value: '', label: 'Any size' }, ...Object.entries(SIZE_FILTERS).map(([k, f]) => ({ value: k, label: f.label }))]} />
+        <label className="event-filter-date">From <input type="date" value={filters.from} max={filters.to || undefined} onChange={e => setFilter('from', e.target.value)} /></label>
+        <label className="event-filter-date">To <input type="date" value={filters.to} min={filters.from || undefined} onChange={e => setFilter('to', e.target.value)} /></label>
+        {activeFilterCount > 0 && (
+          <>
+            <span className="event-filter-summary">{filteredEvents.length} of {events.length} events</span>
+            <button type="button" className="link-btn" onClick={() => { setFilters(EMPTY_FILTERS); setTabPage(1); }}>Clear filters ({activeFilterCount})</button>
+          </>
+        )}
       </div>
 
       {/* Tab bar — one tab per event status flag value */}
