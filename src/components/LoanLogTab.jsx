@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Pagination from './Pagination';
 import SearchableSelect from './SearchableSelect';
 import { IconSearch, IconPlus } from './icons';
-import { getAllEventLoans, getGeneralRentals, saveGeneralRentals, loanDisplayStatus, loanTotalCost, LOAN_BADGE, LOAN_STATUSES } from '../lib/eventLoans';
+import { getAllEventLoans, getGeneralRentals, saveGeneralRentals, loanDisplayStatus, loanTotalCost, LOAN_BADGE, LOAN_LABEL, LOAN_STATUSES } from '../lib/eventLoans';
 import { getVendorsOfKind } from '../lib/vendorStore';
 import { getCatalog } from '../lib/producedItems';
 import { initialWarehouses } from '../data/warehouses';
@@ -46,7 +46,7 @@ export default function LoanLogTab({ vendorId = null, allowCreate = false }) {
     setVersion(v => v + 1);
   }
   function log(description) {
-    addActivityLog({ userName: currentUser?.name || 'Admin', action: 'Update', module: 'Loan', description });
+    addActivityLog({ userName: currentUser?.name || 'Admin', action: 'Update', module: 'Rent', description });
   }
   function createRental(data) {
     const id = Math.max(0, ...getGeneralRentals().map(r => r.id)) + 1;
@@ -89,8 +89,8 @@ export default function LoanLogTab({ vendorId = null, allowCreate = false }) {
     <>
       <div className="stats-bar" style={{ gridTemplateColumns: 'repeat(4,1fr)', marginBottom: 18 }}>
         {[
-          { label: 'Loan Records', value: all.length, color: 'var(--brand)', bg: 'var(--brand-bg)' },
-          { label: 'Currently Borrowed', value: out.length, color: 'var(--purple)', bg: 'var(--purple-bg)' },
+          { label: 'Rent Records', value: all.length, color: 'var(--brand)', bg: 'var(--brand-bg)' },
+          { label: 'Rented Now', value: out.length, color: 'var(--purple)', bg: 'var(--purple-bg)' },
           { label: 'Overdue', value: overdue, color: 'var(--red)', bg: 'var(--red-bg)' },
           { label: 'Waiting to Arrive', value: all.filter(l => l.status === 'Requested').length, color: 'var(--orange)', bg: 'var(--orange-bg)' },
         ].map(s => (
@@ -110,7 +110,7 @@ export default function LoanLogTab({ vendorId = null, allowCreate = false }) {
                 onChange={e => { setQuery(e.target.value); setPage(1); }} />
             </div>
             <SearchableSelect inline value={statusFilter} onChange={v => { setStatusFilter(v); setPage(1); }} placeholder="All Status"
-              options={[{ value: '', label: 'All Status' }, ...STATUSES.map(s => ({ value: s, label: s }))]} />
+              options={[{ value: '', label: 'All Status' }, ...STATUSES.map(s => ({ value: s, label: LOAN_LABEL[s] }))]} />
             {vendorId == null && (
               <SearchableSelect inline value={vendorFilter} onChange={v => { setVendorFilter(v); setPage(1); }} placeholder="All Vendors"
                 options={[{ value: '', label: 'All Vendors' }, ...vendorOptions]} />
@@ -122,8 +122,8 @@ export default function LoanLogTab({ vendorId = null, allowCreate = false }) {
           </div>
         </div>
         <p style={{ fontSize: 12.5, color: 'var(--text-muted)', margin: '0 0 14px' }}>
-          Items we borrow (rent) from loan vendors. Rentals <strong>for an event</strong> are requested and moved forward on
-          Event Detail &rarr; Borrow Item. Rentals <strong>kept in a warehouse</strong> (not for one event) are managed here.
+          Items we rent from rent vendors. Rentals <strong>for an event</strong> are requested and moved forward on
+          Event Detail &rarr; Rent Item. Rentals <strong>kept in a warehouse</strong> (not for one event) are managed here.
           Rented items are not our assets: they never change our stock or asset value.
         </p>
         <div className="table-wrap">
@@ -142,7 +142,7 @@ export default function LoanLogTab({ vendorId = null, allowCreate = false }) {
             </thead>
             <tbody>
               {pageData.length === 0
-                ? <tr><td colSpan={8} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 32 }}>No borrowed items found.</td></tr>
+                ? <tr><td colSpan={8} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 32 }}>No rented items found.</td></tr>
                 : pageData.map(l => (
                   <tr key={l.uid}>
                     <td className="name-cell">
@@ -151,7 +151,7 @@ export default function LoanLogTab({ vendorId = null, allowCreate = false }) {
                     </td>
                     <td style={{ textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap' }}>{fmtNum(l.qty)} <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: 12 }}>{l.unit}</span></td>
                     {vendorId == null && (
-                      <td><button type="button" className="link-btn" onClick={() => navigate(`/loan-vendor-detail?id=${l.vendorId}`)}>{l.vendorName}</button></td>
+                      <td><button type="button" className="link-btn" onClick={() => navigate(`/rent-vendor-detail?id=${l.vendorId}`)}>{l.vendorName}</button></td>
                     )}
                     <td>
                       {l.eventKey ? (
@@ -174,7 +174,7 @@ export default function LoanLogTab({ vendorId = null, allowCreate = false }) {
                       {l.total ? formatIDR(l.total) : '—'}
                       {l.rentalCost > 0 && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{formatIDR(l.rentalCost)} / {l.unit}</div>}
                     </td>
-                    <td><span className={`badge ${LOAN_BADGE[l.displayStatus]}`} style={{ fontSize: 11 }}>{l.displayStatus}</span></td>
+                    <td><span className={`badge ${LOAN_BADGE[l.displayStatus]}`} style={{ fontSize: 11 }}>{LOAN_LABEL[l.displayStatus]}</span></td>
                     <td>
                       <div className="action-btns" style={{ justifyContent: 'center', gap: 6 }}>
                         {l.source === 'event' && <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{l.status === 'Returned' ? 'Done' : 'Update in Event Detail'}</span>}

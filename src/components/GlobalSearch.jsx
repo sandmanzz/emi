@@ -62,7 +62,7 @@ function search(query) {
   const loans = getAllRentals()
     .filter(l => l.itemName.toLowerCase().includes(q) || l.vendorName.toLowerCase().includes(q))
     .slice(0, MAX_PER_GROUP)
-    .map(l => ({ label: l.itemName, sub: `Rented from ${l.vendorName} · ${l.eventName || l.warehouse} · ${l.status}`, to: '/loan?tab=items' }));
+    .map(l => ({ label: l.itemName, sub: `Rented from ${l.vendorName} · ${l.eventName || l.warehouse} · ${l.status === 'Borrowed' ? 'Rented' : l.status}`, to: '/rent?tab=items' }));
   if (loans.length) groups.push({ type: 'Rental', items: loans });
 
   return groups;

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import Modal from './Modal';
 import SearchableSelect from './SearchableSelect';
 import { IconClose, IconCheck } from './icons';
-import { LOAN_STATUSES, LOAN_BADGE, loanDisplayStatus, loanTotalCost } from '../lib/eventLoans';
+import { LOAN_STATUSES, LOAN_BADGE, LOAN_LABEL, loanDisplayStatus, loanTotalCost } from '../lib/eventLoans';
 import { formatIDR } from '../lib/superAdminUtils';
 import { TODAY } from '../data/events';
 import { fmtNum } from '../lib/format';
@@ -21,12 +21,12 @@ export function EventLoansPanel({ loans, loanEnabled, locked, onAdvance, onCance
   return (
     <>
       <p className="summary-text">
-        <strong>{loans.length}</strong> borrowed item{loans.length === 1 ? '' : 's'}
+        <strong>{loans.length}</strong> rented item{loans.length === 1 ? '' : 's'}
         {totalCost > 0 && <> · rental cost <strong>{formatIDR(totalCost)}</strong></>}
-        {loanEnabled ? '' : ' · new loans can only be made at a stage with Borrow Item enabled'}
+        {loanEnabled ? '' : ' · new rentals can only be made at a stage with Rent Item enabled'}
       </p>
       {loans.length === 0
-        ? <div className="no-data">Nothing borrowed yet. Use &ldquo;Borrow Item&rdquo; above to rent items from a loan vendor.</div>
+        ? <div className="no-data">Nothing rented yet. Use &ldquo;Rent Item&rdquo; above to rent items from a rent vendor.</div>
         : (
           <div className="production-list">
             {loans.map(l => {
@@ -36,9 +36,9 @@ export function EventLoansPanel({ loans, loanEnabled, locked, onAdvance, onCance
                 <div key={l.id} className="production-card">
                   <div className="production-card-main">
                     <div className="production-card-title">
-                      <span className="badge badge-blue" style={{ fontSize: 10.5 }}>Loan</span>
+                      <span className="badge badge-blue" style={{ fontSize: 10.5 }}>Rent</span>
                       {l.itemName}
-                      <span className={`badge ${LOAN_BADGE[status]}`} style={{ fontSize: 10.5 }}>{status}</span>
+                      <span className={`badge ${LOAN_BADGE[status]}`} style={{ fontSize: 10.5 }}>{LOAN_LABEL[status]}</span>
                     </div>
                     <div className="production-card-meta">
                       <span>Qty {fmtNum(l.qty)} {l.unit}</span>
@@ -105,7 +105,7 @@ export function BorrowItemModal({ target = 'event', vendors, areas = [], subArea
   return (
     <Modal
       open
-      title={forEvent ? 'Borrow Item' : 'New Rental'}
+      title={forEvent ? 'Rent Item' : 'New Rental'}
       onClose={onClose}
       footer={
         <>
@@ -116,8 +116,8 @@ export function BorrowItemModal({ target = 'event', vendors, areas = [], subArea
     >
       <p style={{ fontSize: 12.5, color: 'var(--text-muted)', margin: '0 0 14px' }}>
         {forEvent
-          ? <>Rent an item we don&rsquo;t have (enough of) from a loan vendor. It is added to this event when you mark it received.</>
-          : <>Rent items from a loan vendor and keep them in one of our warehouses (not for a specific event). Rented items are not our assets, so our stock and asset value don&rsquo;t change.</>}
+          ? <>Rent an item we don&rsquo;t have (enough of) from a rent vendor. It is added to this event when you mark it received.</>
+          : <>Rent items from a rent vendor and keep them in one of our warehouses (not for a specific event). Rented items are not our assets, so our stock and asset value don&rsquo;t change.</>}
       </p>
       <div className="form-group">
         <label>Item <span style={{ color: 'var(--red)' }}>*</span></label>
@@ -162,14 +162,14 @@ export function BorrowItemModal({ target = 'event', vendors, areas = [], subArea
       </div>
       )}
       <div className="form-group">
-        <label>Loan Vendor <span style={{ color: 'var(--red)' }}>*</span></label>
-        <SearchableSelect value={form.vendorId} onChange={v => set('vendorId', v)} placeholder="Who do we borrow from?"
+        <label>Rent Vendor <span style={{ color: 'var(--red)' }}>*</span></label>
+        <SearchableSelect value={form.vendorId} onChange={v => set('vendorId', v)} placeholder="Who do we rent from?"
           options={vendors.map(v => ({ value: String(v.id), label: v.name, meta: v.phone || '' }))} />
-        {vendors.length === 0 && <p style={{ fontSize: 11.5, color: 'var(--orange)', margin: '5px 0 0' }}>No loan vendors yet. Add one in Master Data &rarr; Loan.</p>}
+        {vendors.length === 0 && <p style={{ fontSize: 11.5, color: 'var(--orange)', margin: '5px 0 0' }}>No rent vendors yet. Add one in Master Data &rarr; Rent.</p>}
       </div>
       <div className="form-row">
         <div className="form-group">
-          <label>Borrow from <span style={{ color: 'var(--red)' }}>*</span></label>
+          <label>Rent from <span style={{ color: 'var(--red)' }}>*</span></label>
           <input type="date" value={form.startDate} onChange={e => set('startDate', e.target.value)} />
         </div>
         <div className="form-group">

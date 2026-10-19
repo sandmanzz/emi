@@ -17,7 +17,7 @@ import { fmtNum } from '../lib/format';
 const PAGE_SIZE = 10;
 const EMPTY_FORM = { itemMode: 'existing', name: '', newName: '', qty: 1, warehouse: '', vendorOrigin: 'Internal', vendorId: '', note: '' };
 
-// Warehouse Inventory → Production: one list of every item that was produced (or is
+// Production → Produced Items (moved out of Warehouse Inventory 2026-10-19): one list of every item that was produced (or is
 // being produced), from two sources:
 //  - event  — requests made in Event Detail → Request Production. Read-only here;
 //             their status moves on Event Detail, because "Done" also adds the item

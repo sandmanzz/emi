@@ -50,6 +50,22 @@ explains a few non-obvious conventions that the entries below assume you already
 
 ---
 
+## Round 34 — Loan → Rent, vendor form/delete guard, Warehouse Inventory source filter + Total Asset Value (2026-10-19)
+
+**Why:** owner request 2026-10-19 (see `docs/context.md`, spec `docs/prd/PRD-2026-10-19.md`).
+- **Rename:** all UI "Loan/Borrow" → "Rent/Rented". New `LOAN_LABEL` in `lib/eventLoans.js` maps the stored status
+  `Borrowed` → "Rented". Routes `/rent`, `/rent-vendor-detail` (old `/loan*` redirect). Sidebar: Vendor → **Production**, Loan → **Rent**.
+- **VendorFormModal:** Vendor type checkboxes removed (kind = menu; edit keeps kinds). Internal/External hidden for rent.
+- **VendorPage:** rent list has no Type column / origin filter; stats = Total Vendors / Rentals / Active Rentals.
+  Delete (and "remove from list") blocked while the vendor has active records; list shows "N active".
+- **LoanVendorDetailPage:** no origin badge / Type row.
+- **WarehouseInventoryPage:** Production tab removed; source filter (Normal / Produced / Rent) with Produced badge and
+  read-only rent rows from warehouse rentals; Total Asset Value card (+ current-filter value).
+- PRDPage section "Rent & Production Vendors".
+**Verified:** lint 11 (baseline), build OK, Chromium checks listed in the PRD §7.
+
+---
+
 ## Round 33 — Dot as thousands separator for every displayed number
 
 **Files:** new `src/lib/format.js` (`fmtNum`, `formatIDR`). A codemod wrapped raw numeric JSX (`{r.valuation}`, `{it.qty}`,

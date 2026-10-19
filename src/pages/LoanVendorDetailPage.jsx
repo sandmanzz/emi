@@ -19,9 +19,9 @@ function InfoRow({ label, children }) {
   );
 }
 
-// Loan vendor detail (/loan-vendor-detail?id=): the vendor's profile plus everything we
-// borrowed from them — which item, how many, for which event, when, and what it cost.
-// Records = every rental from this vendor: event rentals (Borrow Item) and warehouse rentals.
+// Rent vendor detail (/rent-vendor-detail?id=; "Loan" renamed "Rent" 2026-10-19): the vendor's
+// profile (no Internal / External for rent vendors) plus everything we rented from them — which item, how many, for which event, when, and what it cost.
+// Records = every rental from this vendor: event rentals (Rent Item) and warehouse rentals.
 export default function LoanVendorDetailPage() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
@@ -36,7 +36,7 @@ export default function LoanVendorDetailPage() {
     return (
       <div style={{ padding: 40, textAlign: 'center' }}>
         <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>Vendor not found.</p>
-        <button className="btn-new" style={{ marginTop: 12 }} onClick={() => navigate('/loan')}>Back to Loan</button>
+        <button className="btn-new" style={{ marginTop: 12 }} onClick={() => navigate('/rent')}>Back to Rent</button>
       </div>
     );
   }
@@ -44,7 +44,7 @@ export default function LoanVendorDetailPage() {
   const events = new Set(loans.filter(l => l.eventKey).map(l => l.eventKey));
   const totalCost = loans.reduce((s, l) => s + loanTotalCost(l), 0);
 
-  // Per item: total borrowed, how much is out right now, and for which events.
+  // Per item: total rented, how much is out right now, and for which events.
   const byItem = [...loans.reduce((m, l) => {
     const row = m.get(l.itemName) || { name: l.itemName, unit: l.unit, qty: 0, out: 0, events: new Set() };
     row.qty += Number(l.qty || 0);
@@ -56,7 +56,7 @@ export default function LoanVendorDetailPage() {
 
   function save(data) {
     updateVendor(vendor.id, data);
-    addActivityLog({ userName: currentUser?.name || 'Admin', action: 'Update', module: 'Loan', description: `Updated vendor "${data.name}"` });
+    addActivityLog({ userName: currentUser?.name || 'Admin', action: 'Update', module: 'Rent', description: `Updated vendor "${data.name}"` });
     setVendor(getVendor(vendor.id));
     setEditOpen(false);
   }
@@ -65,7 +65,7 @@ export default function LoanVendorDetailPage() {
     <>
       <div className="detail-header">
         <button
-          onClick={() => navigate('/loan')}
+          onClick={() => navigate('/rent')}
           style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 13, color: 'var(--text-muted)', fontWeight: 500 }}
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 14, height: 14 }}><polyline points="15 18 9 12 15 6" /></svg>
@@ -73,8 +73,7 @@ export default function LoanVendorDetailPage() {
         </button>
         <h1 className="page-title" style={{ margin: 0, flex: 1, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           {vendor.name}
-          <span className={`badge ${vendor.origin === 'Internal' ? 'badge-green' : 'badge-orange'}`} style={{ fontSize: 11 }}>{vendor.origin}</span>
-          <span className="badge badge-blue" style={{ fontSize: 11 }}>Loan vendor</span>
+          <span className="badge badge-blue" style={{ fontSize: 11 }}>Rent vendor</span>
         </h1>
         <button className="btn btn-ghost" onClick={() => setEditOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <IconEdit /> Edit
@@ -84,7 +83,6 @@ export default function LoanVendorDetailPage() {
       <div className="grid-2col" style={{ gap: 16, marginBottom: 16 }}>
         <div className="card" style={{ padding: 22 }}>
           <div className="section-dot-label"><span style={{ background: 'var(--brand)' }} />Vendor Info</div>
-          <InfoRow label="Type">{vendor.origin === 'Internal' ? 'Internal (our own team)' : 'External (outside vendor)'}</InfoRow>
           <InfoRow label="Phone">{vendor.phone}</InfoRow>
           <InfoRow label="Address">{vendor.address}</InfoRow>
           <InfoRow label="Description">{vendor.description}</InfoRow>
@@ -92,9 +90,9 @@ export default function LoanVendorDetailPage() {
           <InfoRow label="Rental cost">{totalCost ? formatIDR(totalCost) : null}</InfoRow>
         </div>
         <div className="card" style={{ padding: 22 }}>
-          <div className="section-dot-label"><span style={{ background: 'var(--green)' }} />Items Borrowed</div>
+          <div className="section-dot-label"><span style={{ background: 'var(--green)' }} />Items Rented</div>
           {byItem.length === 0
-            ? <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>Nothing borrowed from this vendor yet.</p>
+            ? <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>Nothing rented from this vendor yet.</p>
             : (
               <ul className="vendor-item-list">
                 {byItem.map(r => (
@@ -114,7 +112,7 @@ export default function LoanVendorDetailPage() {
         </div>
       </div>
 
-      <div className="section-dot-label"><span style={{ background: 'var(--orange)' }} />Loan History</div>
+      <div className="section-dot-label"><span style={{ background: 'var(--orange)' }} />Rent History</div>
       <LoanLogTab vendorId={id} />
 
 

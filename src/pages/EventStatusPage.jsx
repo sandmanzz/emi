@@ -172,8 +172,8 @@ export default function EventStatusPage() {
         before the event moves on from that stage. A status with Production Item set
         to &ldquo;True&rdquo; lets users request new items to be produced while an
         event is at that stage. A status with Allow Delete set to &ldquo;False&rdquo; stops
-        items from being deleted from an event while it is at that stage. A status with Borrow Item set to
-        &ldquo;True&rdquo; lets users borrow (rent) items from a loan vendor while an event is at that stage.
+        items from being deleted from an event while it is at that stage. A status with Rent Item set to
+        &ldquo;True&rdquo; lets users rent items from a rent vendor while an event is at that stage.
       </p>
 
       <div className="stats-bar" style={{ gridTemplateColumns:'repeat(7,1fr)' }}>
@@ -183,7 +183,7 @@ export default function EventStatusPage() {
           { label:'Check Ownership', value:ownershipEnabled, color:'var(--green)',  bg:'var(--green-bg)' },
           { label:'Production Item', value:productionEnabled, color:'var(--purple)', bg:'var(--purple-bg)' },
           { label:'Allow Delete',    value:deleteAllowed,   color:'var(--red)',    bg:'var(--red-bg)' },
-          { label:'Borrow Item',     value:loanEnabled,     color:'var(--brand)',  bg:'var(--brand-bg)' },
+          { label:'Rent Item',       value:loanEnabled,     color:'var(--brand)',  bg:'var(--brand-bg)' },
           { label:'Events Running',  value:runningTotal,    color:'var(--orange)', bg:'var(--orange-bg)' },
         ].map(s => (
           <div key={s.label} className="stat-card">
@@ -243,7 +243,7 @@ export default function EventStatusPage() {
                 <th style={{ width:96, textAlign:'center', whiteSpace:'normal', lineHeight:1.3 }}>Production Item</th>
                 <th style={{ width:96, textAlign:'center', whiteSpace:'normal', lineHeight:1.3 }}>Check Ownership</th>
                 <th style={{ width:96, textAlign:'center', whiteSpace:'normal', lineHeight:1.3 }}>Allow Delete</th>
-                <th style={{ width:96, textAlign:'center', whiteSpace:'normal', lineHeight:1.3 }}>Borrow Item</th>
+                <th style={{ width:96, textAlign:'center', whiteSpace:'normal', lineHeight:1.3 }}>Rent Item</th>
                 <SortTh label="Event Running" colIndex={4} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width:120, textAlign:'right' }} />
                 <SortTh label="Updated At"    colIndex={5} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width:120 }} />
                 <th style={{ width:100, textAlign:'center' }}>Action</th>
@@ -394,7 +394,7 @@ export default function EventStatusPage() {
           </p>
         </div>
         <div className="form-group">
-          <label>Borrow Item</label>
+          <label>Rent Item</label>
           <SearchableSelect
             value={form.loanItem ? 'true' : 'false'}
             onChange={v => setForm(f => ({ ...f, loanItem: v === 'true' }))}
@@ -405,7 +405,7 @@ export default function EventStatusPage() {
             placeholder="False"
           />
           <p style={{ fontSize: 11.5, color: 'var(--text-muted)', margin: '5px 0 0' }}>
-            When True, users can borrow (rent) items from a loan vendor while an event is at this status.
+            When True, users can rent items from a rent vendor while an event is at this status.
           </p>
         </div>
       </Modal>

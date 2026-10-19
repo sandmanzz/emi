@@ -899,6 +899,21 @@ clashes or seems off) — proceeding with the stated assumption unless corrected
 
 ## Raw instruction log
 
+### 2026-10-19 — Loan → Rent, vendor form, delete guard, inventory source filter + asset value (Claude Web)
+> 1. ss 1 : instead of loan ganti nama jadi rent saja. 2. ss 2 : hilangkan vendor type 3. ss 2 : hilangkan internal / external
+> 4. tidak bisa hapus vendor jika masih ada barang yang requested 5. ss 3 : ganti label menu vendor menjadi production
+> 6. ss 4 : put out production dari chip, didalam inventory tambahkan filter apakah dia produced, rent atau normal
+> 7. di menu warehouse inventory di higlight atas harusnya ada total asset value nya berapa
+
+- "Loan" is renamed **Rent** in all UI (menu `/rent`, Rented Items, Rent Item, status "Rented"). Code names stay `loan`.
+- Vendor form: no Vendor type (menu decides). Internal / External removed for **rent** vendors only
+  (**assumption**: production vendors keep it — ask the owner).
+- Vendor delete is blocked while it has active records (rent: Requested / Rented; production: not Done).
+- Master Data "Vendor" menu label → **Production**.
+- Warehouse Inventory: Production tab removed (lives in Production → Produced Items); source filter
+  Normal / Produced / Rent (rented items = read-only rows, not assets); Total Asset Value card at the top.
+- Spec: `docs/prd/PRD-2026-10-19.md`. Owner's screenshots again showed an old sidebar (Item Loan) → pull `main`.
+
 ### 2026-10-16 (6) — Dot thousands separator everywhere; "menu not updated" (Claude Web)
 > 1. untuk semua angka gunakan . ya pemisahnya
 > 2. kemudian saya lihat menu belum terupdate, kan sebelumnya saya minta ada untuk tambahan cms kok tidak ada disini

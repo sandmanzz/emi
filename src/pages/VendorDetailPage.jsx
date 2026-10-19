@@ -23,7 +23,7 @@ function InfoRow({ label, children }) {
 // Vendor detail (/vendor-detail?id=): the vendor's profile plus everything they
 // produced for us — which item, how many, for which event, and where it went.
 // Productions come from every event's Request Production list and from Warehouse
-// Inventory → Production (see getAllProductions in lib/productionRequests.js).
+// Produced Items (see getAllProductions in lib/productionRequests.js).
 export default function VendorDetailPage() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
@@ -40,7 +40,7 @@ export default function VendorDetailPage() {
     return (
       <div style={{ padding: 40, textAlign: 'center' }}>
         <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>Vendor not found.</p>
-        <button className="btn-new" style={{ marginTop: 12 }} onClick={() => navigate('/vendor')}>Back to Vendor</button>
+        <button className="btn-new" style={{ marginTop: 12 }} onClick={() => navigate('/vendor')}>Back to Production</button>
       </div>
     );
   }

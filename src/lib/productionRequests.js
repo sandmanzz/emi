@@ -8,7 +8,7 @@ import { initialEvents } from '../data/events';
 // the first save for that event replaces the seed for good.
 const KEY = 'emi_production_requests'; // { [eventName]: Request[] }
 
-// Productions recorded straight from Warehouse Inventory → Production, not tied to
+// Productions recorded straight from Production → Produced Items, not tied to
 // an event (e.g. restocking). Same lifecycle; stored as one list.
 const LOG_KEY = 'emi_production_log';
 
@@ -57,7 +57,7 @@ export function saveManualProductions(list) {
 }
 
 // --- All productions, across every event + manual records -------------------------
-// Read-only view used by Warehouse Inventory → Production, Vendor detail and
+// Read-only view used by Production → Produced Items, Vendor detail and
 // Inventory detail. Convert requests are left out: they swap existing stock, they
 // don't produce anything.
 

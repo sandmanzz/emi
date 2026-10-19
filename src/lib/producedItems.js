@@ -2,7 +2,7 @@ import { getCatalog, addCatalogItem, isNeedsSetup, markItemSetUp } from './catal
 import { stockInto } from './stockOpnameStore';
 
 // Items created by a finished "New Production" (Event Detail → Request Production, or
-// Warehouse Inventory → Production → Record Production).
+// Production → Produced Items → Record Production).
 //
 // A production only knows a name, a quantity and which warehouse it goes to — not SKU,
 // category, unit or value. So when one is marked Done for an item that isn't in the

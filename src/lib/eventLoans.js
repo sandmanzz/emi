@@ -17,6 +17,9 @@ const KEY = 'emi_event_loans'; // { [eventKey]: Loan[] }
 // Requested → Borrowed (received; the item is added to the event) → Returned (sent back).
 export const LOAN_STATUSES = ['Requested', 'Borrowed', 'Returned'];
 
+// What users see. Internally the received state is still 'Borrowed' (stored data); the UI says Rented.
+export const LOAN_LABEL = { Requested: 'Requested', Borrowed: 'Rented', Returned: 'Returned', Overdue: 'Overdue' };
+
 export const LOAN_BADGE = {
   'Requested': 'badge-orange',
   'Borrowed':  'badge-blue',

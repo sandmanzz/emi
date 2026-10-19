@@ -86,9 +86,9 @@ export default function App() {
           <Route path="inventory" element={<InventoryPage />} />
           <Route path="inventory-detail" element={<InventoryDetailPage />} />
           <Route path="sync-inventory" element={<SyncInventoryPage />} />
-          {/* Item Loan (we lent our items out) was removed 2026-10-16: a loan always means WE rent. Old links land on Loan. */}
-          <Route path="item-loan" element={<Navigate to="/loan?tab=items" replace />} />
-          <Route path="item-loan-detail" element={<Navigate to="/loan?tab=items" replace />} />
+          {/* Item Loan (we lent our items out) was removed 2026-10-16: a loan always means WE rent. Old links land on Rent. */}
+          <Route path="item-loan" element={<Navigate to="/rent?tab=items" replace />} />
+          <Route path="item-loan-detail" element={<Navigate to="/rent?tab=items" replace />} />
           <Route path="area" element={<AreaPage />} />
           <Route path="area-detail" element={<AreaDetailPage />} />
           <Route path="sub-area" element={<SubAreaPage />} />
@@ -97,7 +97,10 @@ export default function App() {
           <Route path="category-detail" element={<CategoryDetailPage />} />
           <Route path="unit" element={<UnitPage />} />
           <Route path="vendor" element={<VendorPage key="production" kind="production" />} />
-          <Route path="loan" element={<VendorPage key="loan" kind="loan" />} />
+          {/* "Loan" was renamed "Rent" on 2026-10-19 (owner). Code keeps kind 'loan'; old URLs still work. */}
+          <Route path="rent" element={<VendorPage key="loan" kind="loan" />} />
+          <Route path="rent-vendor-detail" element={<LoanVendorDetailPage />} />
+          <Route path="loan" element={<Navigate to="/rent" replace />} />
           <Route path="loan-vendor-detail" element={<LoanVendorDetailPage />} />
           <Route path="vendor-detail" element={<VendorDetailPage />} />
           <Route path="unit-detail" element={<UnitDetailPage />} />

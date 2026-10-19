@@ -13,7 +13,7 @@ const SECTIONS = [
   { id: 'event-inventory-link', label: 'Event Inventory Link' },
   { id: 'searchable-dropdown', label: 'Searchable Dropdown' },
   { id: 'activity-log', label: 'Activity Log' },
-  { id: 'item-loan', label: 'Loan (Rental) & Vendors' },
+  { id: 'item-loan', label: 'Rent & Production Vendors' },
   { id: 'data', label: 'Mock Data' },
   { id: 'assumptions', label: 'Open Assumptions' },
 ];
@@ -355,20 +355,21 @@ export default function PRDPage() {
         </P>
       </Section>
 
-      <Section id="item-loan" title="Loan (Rental) & Vendors">
+      <Section id="item-loan" title="Rent & Production Vendors">
         <P>
-          In EMI a <strong>loan always means we borrow / rent</strong> items from a loan vendor &mdash;
-          never that we lend our own items out (the old outbound &ldquo;Item Loan&rdquo; module was removed on
-          2026-10-16 because its direction was wrong). Master Data &rarr; <strong>Loan</strong> has two tabs:
-          <strong> Vendors</strong> (the rental vendors, with a detail page each) and <strong>Borrowed Items</strong>
-          (every rental).
+          In EMI a <strong>rental always means we rent</strong> items from a rent vendor &mdash; never that we lend our
+          own items out. The menu was called &ldquo;Loan&rdquo; until 2026-10-19 and is now <strong>Rent</strong>
+          (Master Data &rarr; Rent, <code>/rent</code>; the code value stays <code>loan</code>). It has two tabs:
+          <strong> Vendors</strong> (rent vendors, with a detail page each, no Internal / External) and
+          <strong> Rented Items</strong> (every rental).
         </P>
         <P>
-          There are two kinds of rental with the same lifecycle (Requested &rarr; Received &rarr; Returned, Overdue when
-          past the return date): <strong>for an event</strong> (Event Detail &rarr; Borrow Item, at stages with
-          Borrow Item enabled; the item joins the event as Outsource when received) and <strong>kept in a warehouse</strong>
-          (Loan &rarr; Borrowed Items &rarr; New Rental). Rented items are not our assets, so they never change our stock or
-          asset value. Production vendors live in Master Data &rarr; Vendor.
+          Two kinds of rental share one lifecycle (Requested &rarr; Rented &rarr; Returned, Overdue when past the return
+          date): <strong>for an event</strong> (Event Detail &rarr; Rent Item, at stages with Rent Item enabled; the item
+          joins the event as Outsource when received) and <strong>kept in a warehouse</strong> (Rent &rarr; Rented Items
+          &rarr; New Rental; shown in Warehouse Inventory with the Rent filter). Rented items are not our assets, so they
+          never change our stock or asset value. Production vendors live in Master Data &rarr; <strong>Production</strong>
+          (<code>/vendor</code>). A vendor with an active rental (Requested / Rented) or an unfinished production cannot be deleted.
         </P>
       </Section>
 

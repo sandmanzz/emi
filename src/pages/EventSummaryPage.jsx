@@ -11,7 +11,7 @@ import { resolveEventStage } from '../lib/eventProgress';
 import { getEventClosing } from '../lib/eventClosing';
 import { CLOSING_LABELS } from '../lib/eventClosingLabels';
 import { formatIDR } from '../lib/superAdminUtils';
-import { getEventLoans, loanDisplayStatus, loanTotalCost, LOAN_BADGE } from '../lib/eventLoans';
+import { getEventLoans, loanDisplayStatus, loanTotalCost, LOAN_BADGE, LOAN_LABEL } from '../lib/eventLoans';
 import { getProductionRequests, PRODUCTION_BADGE } from '../lib/productionRequests';
 import { clashesForEvent } from '../lib/eventClashes';
 import { TODAY } from '../data/events';
@@ -517,7 +517,7 @@ export default function EventSummaryPage() {
       {showTab('supply') && (
         <div className="rep-stack">
           <div className="card">
-            <div className="rep-section-title">Rentals <span className="rep-muted">items borrowed from loan vendors for this event · {formatIDR(rentalCost)}</span></div>
+            <div className="rep-section-title">Rentals <span className="rep-muted">items rented from rent vendors for this event · {formatIDR(rentalCost)}</span></div>
             {loans.length === 0 ? <p className="rep-muted" style={{ margin: 0 }}>Nothing rented for this event.</p> : (
               <div className="table-wrap">
                 <table>
@@ -527,11 +527,11 @@ export default function EventSummaryPage() {
                       <tr key={l.id}>
                         <td className="name-cell">{l.itemName}</td>
                         <td className="num">{fmtNum(l.qty)} <span className="rep-muted">{l.unit}</span></td>
-                        <td><button type="button" className="link-btn" onClick={() => navigate(`/loan-vendor-detail?id=${l.vendorId}`)}>{l.vendorName}</button></td>
+                        <td><button type="button" className="link-btn" onClick={() => navigate(`/rent-vendor-detail?id=${l.vendorId}`)}>{l.vendorName}</button></td>
                         <td className="rep-small">{l.area}{l.subArea ? ` · ${l.subArea}` : ''}</td>
                         <td className="rep-small rep-nowrap">{fmtDate(l.startDate)} → {fmtDate(l.dueDate)}</td>
                         <td className="num rep-nowrap">{l.total ? formatIDR(l.total) : '—'}</td>
-                        <td><span className={`badge ${LOAN_BADGE[l.display]}`} style={{ fontSize: 11 }}>{l.display}</span></td>
+                        <td><span className={`badge ${LOAN_BADGE[l.display]}`} style={{ fontSize: 11 }}>{LOAN_LABEL[l.display]}</span></td>
                       </tr>
                     ))}
                   </tbody>

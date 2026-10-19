@@ -1,4 +1,4 @@
-// Demo production history, so Warehouse Inventory → Production, Vendor detail and
+// Demo production history, so Production → Produced Items, Vendor detail and
 // each event's Production tab have something to show without walking the whole
 // Request Production flow first.
 //

@@ -1052,7 +1052,7 @@ export default function EventDetailPage() {
     setEventLoans(ls => [loan, ...ls]);
     addActivityLog({
       userName: loan.requestedBy, action: 'Create', module: 'Event Detail',
-      description: `Borrow request: ${loan.qty} ${loan.unit} "${loan.itemName}" from ${loan.vendorName} for ${eventName} (${loan.startDate} → ${loan.dueDate})`,
+      description: `Rent request: ${loan.qty} ${loan.unit} "${loan.itemName}" from ${loan.vendorName} for ${eventName} (${loan.startDate} → ${loan.dueDate})`,
     });
     setBorrowOpen(false);
     setStageFilter('loans');
@@ -1080,12 +1080,12 @@ export default function EventDetailPage() {
     }));
     addActivityLog({
       userName: currentUser?.name || 'Admin', action: 'Update', module: 'Event Detail',
-      description: `Borrowed item "${loan.itemName}" on ${eventName} → ${nextStatus}`,
+      description: `Rented item "${loan.itemName}" on ${eventName} → ${nextStatus === 'Borrowed' ? 'Rented' : nextStatus}`,
     });
   }
 
   function cancelLoan(loan) {
-    if (!window.confirm(`Cancel the borrow request for "${loan.itemName}"?`)) return;
+    if (!window.confirm(`Cancel the rent request for "${loan.itemName}"?`)) return;
     setEventLoans(ls => ls.filter(l => l.id !== loan.id));
   }
 
@@ -1254,7 +1254,7 @@ export default function EventDetailPage() {
             {loanEnabled && closingStatus === 'on-going' && !addLocked && (
               <button className="btn btn-ghost btn-request-production" onClick={() => setBorrowOpen(true)}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 3h5v5"/><path d="M21 3l-7 7"/><path d="M8 21H3v-5"/><path d="M3 21l7-7"/></svg>
-                Borrow Item
+                Rent Item
               </button>
             )}
             {productionEnabled && closingStatus === 'on-going' && !addLocked && (
@@ -1420,7 +1420,7 @@ export default function EventDetailPage() {
           )}
           {(loanEnabled || eventLoans.length > 0) && (
             <button type="button" className={`stage-tab${effectiveStageFilter === 'loans' ? ' active' : ''}`} onClick={() => setStageFilter('loans')}>
-              Borrowed <span className="stage-tab-count">{eventLoans.length}</span>
+              Rented <span className="stage-tab-count">{eventLoans.length}</span>
             </button>
           )}
         </div>
@@ -1441,7 +1441,7 @@ export default function EventDetailPage() {
             locked={itemsLocked}
             onAdvance={advanceLoan}
             onCancel={cancelLoan}
-            onOpenVendor={id => navigate(`/loan-vendor-detail?id=${id}`)}
+            onOpenVendor={id => navigate(`/rent-vendor-detail?id=${id}`)}
           />
         ) : effectiveStageFilter === 'production' ? (
           <>
@@ -1885,7 +1885,7 @@ export default function EventDetailPage() {
             ['Sub Area', detailItem.subArea || '—'],
             ['Ownership', detailItem.ownership || '—'],
             ['Added at stage', detailItem.stage],
-            ['Source', detailItem.fromLoan ? `Borrowed from ${detailItem.loanVendor || 'loan vendor'}` : detailItem.fromConvert ? 'Convert request' : detailItem.fromProduction ? 'Production request' : detailItem.warehouseItem ? 'Warehouse inventory' : 'Non-warehouse item'],
+            ['Source', detailItem.fromLoan ? `Rented from ${detailItem.loanVendor || 'rent vendor'}` : detailItem.fromConvert ? 'Convert request' : detailItem.fromProduction ? 'Production request' : detailItem.warehouseItem ? 'Warehouse inventory' : 'Non-warehouse item'],
             ['Group', group ? group.name : '—'],
             ['Checking', detailItem.checking ? 'Yes' : 'No'],
             ['Cross-checked', detailItem.checked ? 'Yes' : 'No'],

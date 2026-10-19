@@ -9,8 +9,10 @@ import { initialWarehouses } from '../data/warehouses';
 import { getInventoryRows, setInventoryRows as saveInventoryRows, getOpnameHistory, hasPendingOpname, resolveOpname, getStockMovements, nextRowId } from '../lib/stockOpnameStore';
 import { isTenantAdmin, getCurrentTenantUser } from '../lib/tenantAuth';
 import { isNeedsSetup, markItemSetUp, getCatalog } from '../lib/producedItems';
-import ProductionLogTab from '../components/ProductionLogTab';
-import { fmtNum } from '../lib/format';
+import { getAllProductions } from '../lib/productionRequests';
+import { getGeneralRentals, loanDisplayStatus, LOAN_LABEL, LOAN_BADGE } from '../lib/eventLoans';
+import { TODAY } from '../data/events';
+import { fmtNum, formatIDR } from '../lib/format';
 
 const PAGE_SIZE = 10;
 const sortKeys = ['name','warehouseStock','warehouseName','itemStock','stokMin','stokUsed','valuation','totalValuation','minStatus','flag1','flag2','asile','rack','level','lantai','lorong','updatedAt'];
@@ -132,6 +134,8 @@ export default function WarehouseInventoryPage() {
   const [query,            setQuery]            = useState('');
   const [warehouseFilter,  setWarehouseFilter]  = useState('');
   const [statusFilter,     setStatusFilter]     = useState('');
+  // Source filter (2026-10-19): '' all · normal · produced (made by a production vendor) · rent (rented, not ours).
+  const [sourceFilter,     setSourceFilter]     = useState('');
   const [page,             setPage]             = useState(1);
   const [sortCol,          setSortCol]          = useState(0);
   const [sortAsc,          setSortAsc]          = useState(true);
@@ -195,24 +199,42 @@ export default function WarehouseInventoryPage() {
   }, [itemSearchTokens, itemCatalog]);
   const hasActiveItemSearch = itemSearchTokens.length > 0;
 
+  // Items we produced: a finished production request, or a catalog item created by one.
+  const producedNames = useMemo(() => new Set([
+    ...getAllProductions().filter(p => p.status === 'Done').map(p => p.name),
+    ...getCatalog().filter(i => i.source === 'production').map(i => i.name),
+  ]), []);
+  // Rented items currently kept in a warehouse (Rent → Rented Items, status Rented). Read-only rows:
+  // not our assets, so they never count in stock, status or asset value.
+  const rentRows = useMemo(() => getGeneralRentals()
+    .filter(l => l.status === 'Borrowed' && l.warehouse)
+    .map(l => ({
+      id: `rent-${l.id}`, isRent: true, name: l.itemName, unit: l.unit, warehouseName: l.warehouse,
+      warehouseStock: l.qty, itemStock: l.qty, vendorName: l.vendorName, dueDate: l.dueDate,
+      rentStatus: loanDisplayStatus(l, TODAY), updatedAt: l.borrowedAt || '',
+    })), []);
+  const sourceOf = r => (r.isRent ? 'rent' : producedNames.has(r.name) ? 'produced' : 'normal');
+
   const filtered = useMemo(() => {
     const q = query.toLowerCase();
     const key = sortKeys[sortCol] || 'name';
     // "Show only these" turns itself off once nothing needs setup any more.
     const onlySetup = setupOnly && inventoryRows.some(r => isNeedsSetup(r.name));
-    return inventoryRows
+    const rows = !sourceFilter || sourceFilter === 'rent' ? [...inventoryRows, ...rentRows] : inventoryRows;
+    return rows
       .filter(r => {
         const mQ = !q || r.name.toLowerCase().includes(q) || r.warehouseName.toLowerCase().includes(q);
         const mW = !warehouseFilter || r.warehouseName === warehouseFilter;
         const mS = !statusFilter    || r.minStatus     === statusFilter;
         const mU = !onlySetup || isNeedsSetup(r.name);
-        return mQ && mW && mS && mU;
+        const mF = !sourceFilter || sourceOf(r) === sourceFilter;
+        return mQ && mW && mS && mU && mF;
       })
       .sort((a, b) => {
         const va = String(a[key] ?? ''), vb = String(b[key] ?? '');
         return sortAsc ? va.localeCompare(vb, undefined, { numeric:true }) : vb.localeCompare(va, undefined, { numeric:true });
       });
-  }, [inventoryRows, query, warehouseFilter, statusFilter, setupOnly, setupTick, sortCol, sortAsc]); // eslint-disable-line react-hooks/exhaustive-deps -- setupTick re-runs the isNeedsSetup filter after Edit
+  }, [inventoryRows, rentRows, query, warehouseFilter, statusFilter, sourceFilter, setupOnly, setupTick, sortCol, sortAsc]); // eslint-disable-line react-hooks/exhaustive-deps -- setupTick re-runs the isNeedsSetup filter after Edit; sourceOf only reads producedNames
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage   = Math.min(page, totalPages);
@@ -352,6 +374,11 @@ export default function WarehouseInventoryPage() {
   const safeCount     = inventoryRows.filter(r => r.minStatus === 'Safe').length;
   const warningCount  = inventoryRows.filter(r => r.minStatus === 'Warning').length;
   const criticalCount = inventoryRows.filter(r => r.minStatus === 'Critical').length;
+  // Total Asset Value = Σ Total Valuation (valuation × stock) of our own rows; rented rows never count.
+  const totalAssetValue = inventoryRows.reduce((s, r) => s + Number(r.totalValuation || 0), 0);
+  const noValueRows     = inventoryRows.filter(r => !Number(r.valuation)).length;
+  const filteredAssetValue = filtered.reduce((s, r) => s + (r.isRent ? 0 : Number(r.totalValuation || 0)), 0);
+  const isFiltered = !!(query || warehouseFilter || statusFilter || sourceFilter || setupOnly);
 
   // --- Stock Opname History ---
   const filteredHistory = useMemo(
@@ -494,6 +521,25 @@ export default function WarehouseInventoryPage() {
         <h1 className="page-title" style={{ margin:0 }}>Warehouse Inventory</h1>
       </div>
 
+      {/* Total Asset Value (our own stock only) */}
+      <div className="asset-value-card">
+        <div>
+          <div className="asset-value-label">Total Asset Value</div>
+          <div className="asset-value-amount">{formatIDR(totalAssetValue)}</div>
+          <div className="asset-value-sub">
+            Sum of Valuation &times; Wh. Stock across {fmtNum(inventoryRows.length)} warehouse rows &middot; rented items not included
+            {noValueRows > 0 && <> &middot; <span style={{ color:'var(--orange)' }}>{fmtNum(noValueRows)} row{noValueRows === 1 ? '' : 's'} without a valuation</span></>}
+          </div>
+        </div>
+        {tab === 'inventory' && isFiltered && (
+          <div className="asset-value-filtered">
+            <div className="asset-value-label">Current filter</div>
+            <div className="asset-value-amount small">{formatIDR(filteredAssetValue)}</div>
+            <div className="asset-value-sub">{fmtNum(filtered.length)} row{filtered.length === 1 ? '' : 's'}</div>
+          </div>
+        )}
+      </div>
+
       {/* Stats */}
       <div className="stats-bar" style={{ gridTemplateColumns:'repeat(4,1fr)' }}>
         {[
@@ -504,21 +550,20 @@ export default function WarehouseInventoryPage() {
         ].map(s => (
           <div key={s.label} className="stat-card">
             <div className="stat-icon" style={{ background:s.bg }}>
-              <span className="stat-value" style={{ color:s.color }}>{s.value}</span>
+              <span className="stat-value" style={{ color:s.color }}>{fmtNum(s.value)}</span>
             </div>
             <span className="stat-label">{s.label}</span>
           </div>
         ))}
       </div>
 
-      {/* Pill tabs */}
+      {/* Pill tabs (the Production tab moved out on 2026-10-19: production lives in Master Data → Production → Produced Items) */}
       <div className="wi-tabs">
         {[
           { id:'inventory',      label:'Inventory' },
           { id:'movingorder',    label:'Moving Order' },
           { id:'opnamehistory',  label:'Opname History' },
           { id:'stockhistory',   label:'Stock History' },
-          { id:'production',     label:'Production' },
         ].map(t => (
           <button key={t.id} className={`wi-tab-btn${tab === t.id ? ' active' : ''}`} onClick={() => setTab(t.id)}>
             {t.label}
@@ -565,6 +610,18 @@ export default function WarehouseInventoryPage() {
                   { value:'Critical', label:'Critical' },
                 ]}
               />
+              <SearchableSelect
+                inline
+                value={sourceFilter}
+                onChange={v => { setSourceFilter(v); setPage(1); }}
+                placeholder="All Sources"
+                options={[
+                  { value:'', label:'All Sources' },
+                  { value:'normal', label:'Normal' },
+                  { value:'produced', label:'Produced' },
+                  { value:'rent', label:'Rent' },
+                ]}
+              />
               <button className="btn-search">Search</button>
             </div>
             <div className="toolbar-right">
@@ -600,10 +657,29 @@ export default function WarehouseInventoryPage() {
               <tbody>
                 {pageData.length === 0
                   ? <tr><td colSpan={19} style={{ textAlign:'center', color:'var(--text-muted)', padding:32 }}>No results found.</td></tr>
-                  : pageData.map(r => (
+                  : pageData.map(r => r.isRent ? (
+                    <tr key={r.id} className="row-rent">
+                      <td className="name-cell">
+                        {r.name}
+                        <span className="badge badge-purple needs-setup-chip" title="Rented — not our asset, not counted in stock or asset value">Rent</span>
+                        <div style={{ fontSize:11.5, color:'var(--text-muted)', fontWeight:400 }}>from {r.vendorName}</div>
+                      </td>
+                      <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{fmtNum(r.warehouseStock)}</td>
+                      <td>{r.warehouseName}</td>
+                      <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{fmtNum(r.itemStock)}</td>
+                      <td colSpan={4} style={{ color:'var(--text-muted)', fontSize:'12px' }}>Not our asset &middot; due back {r.dueDate || '—'}</td>
+                      <td><span className={`badge ${LOAN_BADGE[r.rentStatus] || 'badge-gray'}`}>{LOAN_LABEL[r.rentStatus] || r.rentStatus}</span></td>
+                      <td colSpan={8} />
+                      <td style={{ color:'var(--text-muted)', fontSize:'12.5px' }}>{r.updatedAt}</td>
+                      <td style={{ textAlign:'center' }}>
+                        <button type="button" className="link-btn" style={{ fontSize:12 }} onClick={() => navigate('/rent?tab=items')}>Rentals</button>
+                      </td>
+                    </tr>
+                  ) : (
                     <tr key={r.id} className={isNeedsSetup(r.name) ? 'row-needs-setup' : undefined}>
                       <td className="name-cell">
                         {r.name}
+                        {producedNames.has(r.name) && <span className="badge badge-green needs-setup-chip" title="Made by a production vendor">Produced</span>}
                         {isNeedsSetup(r.name) && <span className="badge badge-orange needs-setup-chip" title="Created from a production request — complete its information">Needs setup</span>}
                       </td>
                       <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{fmtNum(r.warehouseStock)}</td>
@@ -963,13 +1039,6 @@ export default function WarehouseInventoryPage() {
           </div>
         )}
       </Modal>
-
-      {tab === 'production' && (
-        <ProductionLogTab
-          warehouseNames={warehouseNames}
-          onStockChanged={() => setInventoryRows([...getInventoryRows()])}
-        />
-      )}
 
       {tab === 'stockhistory' && (
         <div className="card">

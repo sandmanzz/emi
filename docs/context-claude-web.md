@@ -36,6 +36,15 @@ Newest session first.
 
 ---
 
+## Session 2026-10-19 — Loan → Rent, vendor form, delete guard, inventory source filter + asset value
+
+- Renamed Loan to **Rent** in every UI string (code keeps `loan`; `LOAN_LABEL` shows `Borrowed` as "Rented"); routes `/rent`, `/rent-vendor-detail`.
+- Sidebar Master Data: **Production** (was Vendor) and **Rent** (was Loan).
+- Vendor form: no Vendor type; rent vendors have no Internal / External (production vendors keep it — assumption).
+- Vendors with active rentals / unfinished productions can't be deleted.
+- Warehouse Inventory: Production tab removed; source filter Normal / Produced / Rent; Total Asset Value card.
+- New PRD file `docs/prd/PRD-2026-10-19.md`. Owner's screenshots still showed an old build → told to pull `main`.
+
 ## Session 2026-10-16 (5) — Event Calendar with item clashes, Event Report v2, Stock Opname Report
 
 Spec: [prd/PRD-2026-10-16.md](prd/PRD-2026-10-16.md) **§12**.

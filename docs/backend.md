@@ -126,6 +126,20 @@ whose status is still `on-going`.
 
 ---
 
+## Rent rename, vendor delete guard, inventory source (2026-10-19, R34)
+
+Spec: [prd/PRD-2026-10-19.md](prd/PRD-2026-10-19.md).
+
+- **Naming:** UI says "Rent" / "Rented". The API can keep `kind: 'loan'` and status `BORROWED`, or rename to
+  `rent` / `RENTED` — if renamed, migrate stored rows and keep the frontend mapping in `LOAN_LABEL` in sync.
+- **Vendor kind** comes from the endpoint/menu used to create it (`POST /vendors` with `kind`), not from a form field.
+  Rent vendors have no `origin` (store `EXTERNAL` or null).
+- **Delete guard:** `DELETE /vendors/{id}` (and removing a kind) must return `409` with
+  `{ activeCount, kind }` while the vendor has rentals in `REQUESTED`/`RENTED` (rent) or productions not `DONE` (production).
+- **Warehouse inventory:** `GET /warehouse-inventory` should return `source: 'normal'|'produced'` per row and a
+  `totalAssetValue` (Σ valuation × stock) for the current filter and overall. Rented items come from
+  `GET /rentals?warehouseId=&status=RENTED` and are never part of stock or asset value.
+
 ## Event calendar clashes, opname report (2026-10-16, R32)
 
 Spec: [prd/PRD-2026-10-16.md](prd/PRD-2026-10-16.md) §12.
