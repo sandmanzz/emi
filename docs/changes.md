@@ -50,6 +50,19 @@ explains a few non-obvious conventions that the entries below assume you already
 
 ---
 
+## Round 36 — Multi-event rental seed, rent vs production wording, past-event lock, date rule, Modify Item (2026-11-02)
+
+- `data/eventLoanSeed.js`: Gold Charger Plate on 5 events, new lists for Corporate Gala Bali, Grand Gala Night, Baby Shower Mila.
+  `data/events.js`: "Test rendy up" finish fixed (was before start).
+- `EventDetailPage.jsx`: Rented / Outsourced badges on event lines; production notice says the item becomes our asset;
+  Modify Item = location always, qty only for current-stage items (`editQtyAllowed`), ownership/PIC/note read-only.
+- `EventLoans.jsx`: Rent Item text — temporary, returned to vendor, never our asset.
+- `EventPage.jsx`: `isEventPast()` disables Edit (and `openEdit`) for past events; `dateError` blocks Finish < Start.
+- `style.css`: `.btn-icon:disabled`.
+**Verified:** lint 11, build OK, Chromium checks in PRD-2026-11-02 §9.
+
+---
+
 ## Round 35 — Quick-add items/vendors from request forms; Outsource module (2026-11-02)
 
 **Why:** owner request 2026-11-02 (`docs/context.md`, spec `docs/prd/PRD-2026-11-02.md`).

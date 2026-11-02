@@ -124,8 +124,10 @@ export function BorrowItemModal({ kind = 'loan', target = 'event', areas = [], s
         {forEvent
           ? (kind === 'outsource'
             ? <>Order an item or work from an outsource vendor for this event. It is added to this event&rsquo;s items (as Outsource) when you mark it received.</>
-            : <>Rent an item we don&rsquo;t have (enough of) from a rent vendor. It is added to this event when you mark it received.</>)
-          : <>Rent items from a rent vendor and keep them in one of our warehouses (not for a specific event). Rented items are not our assets, so our stock and asset value don&rsquo;t change.</>}
+            : <>Rent an item we don&rsquo;t have (enough of) from a rent vendor. It is added to this event when you mark it received.
+              A rental is <strong>temporary</strong>: when the event is done it goes <strong>back to the vendor</strong> (Mark Returned).
+              It never becomes our asset &mdash; to own an item, use Request Production instead.</>)
+          : <>Rent items from a rent vendor and keep them in one of our warehouses (not for a specific event). Rented items are not our assets and go back to the vendor by the return date, so our stock and asset value don&rsquo;t change.</>}
       </p>
       <div className="form-group">
         <label>Item <span style={{ color: 'var(--red)' }}>*</span></label>

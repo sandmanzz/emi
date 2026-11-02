@@ -114,6 +114,17 @@ function CountdownChip({ days }) {
   );
 }
 
+// An event whose last day (finish, else start / event date) is before today can no longer be edited
+// (2026-11-02, owner: "editing event tidak bisa dilakukan jika tanggal sudah lewat"). Today = mock TODAY.
+function lastDayOf(r) {
+  return [r.finish, r.start, r.date].filter(d => d && d !== '-').sort().pop() || '';
+}
+function isEventPast(r) {
+  const last = lastDayOf(r);
+  return !!last && new Date(last) < new Date(TODAY.toISOString().slice(0, 10));
+}
+const PAST_EDIT_TITLE = 'The event date has passed, so it can no longer be edited';
+
 function EventCard({ r, onEdit, onDelete, navigate, readyToClose, onGoingByItems }) {
   const days = daysUntil(r.start);
   const accent = days !== null && days <= 7 ? 'var(--red)'
@@ -190,7 +201,7 @@ function EventCard({ r, onEdit, onDelete, navigate, readyToClose, onGoingByItems
           <IconBarChart />
         </button>
         <div style={{ flex:1 }} />
-        <button className="btn-icon edit"    title="Edit"    onClick={() => onEdit(r.id)}><IconEdit /></button>
+        <button className="btn-icon edit"    title={isEventPast(r) ? PAST_EDIT_TITLE : 'Edit'} disabled={isEventPast(r)} onClick={() => onEdit(r.id)}><IconEdit /></button>
         <button className="btn-icon delete"  title="Delete"  onClick={() => onDelete(r.id)}><IconDelete /></button>
         <button className="btn-icon history" title="History"><IconHistory /></button>
       </div>
@@ -255,7 +266,7 @@ function PastEventRow({ r, onEdit, onDelete, navigate, extraBadge, readOnly }) {
         </button>
         {!readOnly && (
           <>
-            <button className="btn-icon edit"    title="Edit"    onClick={() => onEdit(r.id)}><IconEdit /></button>
+            <button className="btn-icon edit"    title={isEventPast(r) ? PAST_EDIT_TITLE : 'Edit'} disabled={isEventPast(r)} onClick={() => onEdit(r.id)}><IconEdit /></button>
             <button className="btn-icon delete"  title="Delete"  onClick={() => onDelete(r.id)}><IconDelete /></button>
             <button className="btn-icon history" title="History"><IconHistory /></button>
           </>
@@ -393,13 +404,15 @@ export default function EventPage() {
   }
   function openEdit(id) {
     const r = events.find(e => e.id === id);
-    if (!r) return;
+    if (!r || isEventPast(r)) return;
     setEditingId(id);
     setForm({ name:r.name, code:r.code, desc:r.desc, start:r.start, finish:r.finish, date:r.date, location:r.location, pic:r.pic||'', status:r.status||'', address:r.address||'', qrType:r.qrType||'', note:r.note||'', image:r.image||'' });
     setModalOpen(true);
   }
+  // Finish Date can't be before Start Date (2026-11-02).
+  const dateError = form.start && form.finish && form.finish < form.start ? 'Finish Date can’t be before Start Date' : '';
   function saveEvent() {
-    if (!form.name.trim()) return;
+    if (!form.name.trim() || dateError) return;
     const updatedAt = todayIsoDate();
     if (editingId) {
       setEvents(es => es.map(e => e.id === editingId ? { ...e, ...form, updatedAt } : e));
@@ -641,7 +654,7 @@ export default function EventPage() {
         footer={
           <>
             <button className="btn-cancel-modal" onClick={() => setModalOpen(false)}><IconClose /> Cancel</button>
-            <button className="btn-save-modal"   onClick={saveEvent}><IconCheck /> Save Event</button>
+            <button className="btn-save-modal"   onClick={saveEvent} disabled={!form.name.trim() || !!dateError}><IconCheck /> Save Event</button>
           </>
         }
       >
@@ -667,7 +680,8 @@ export default function EventPage() {
           </div>
           <div className="form-group">
             <label>Finish Date</label>
-            <input type="date" value={form.finish} onChange={setF('finish')} />
+            <input type="date" min={form.start || undefined} value={form.finish} onChange={setF('finish')} />
+            {dateError && <p className="field-error">{dateError}</p>}
           </div>
         </div>
         <div className="form-row">

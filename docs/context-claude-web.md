@@ -36,6 +36,11 @@ Newest session first.
 
 ---
 
+## Session 2026-11-02 (2) — Multi-event rentals, rent vs production, past events locked, Modify Item
+
+- Gold Charger Plate rented for 5 events in the seed; rent = returned to vendor, production = our asset (badges + texts).
+- Past events can't be edited; Finish Date ≥ Start Date; Modify Item only changes location (qty only for current-stage items).
+
 ## Session 2026-11-02 — Quick-add items/vendors from request forms, Outsource module
 
 - Rent Item / Outsource Item / Request Production / New Rental: item comes from master data or is added there on the spot

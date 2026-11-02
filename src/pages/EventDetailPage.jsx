@@ -153,7 +153,13 @@ function ItemCard({ item, group, showScanButton, onScanClick, onDelete, onCycleO
             <span className="badge badge-blue" style={{ fontSize: 10 }} title="Converted from another inventory item">Converted</span>
           )}
           {item.fromProduction && (
-            <span className="badge badge-purple" style={{ fontSize: 10 }} title="Produced via a production request">Production</span>
+            <span className="badge badge-purple" style={{ fontSize: 10 }} title="Produced via a production request — now our own asset">Production</span>
+          )}
+          {item.fromLoan && (
+            <span className="badge badge-blue" style={{ fontSize: 10 }} title={`Rented from ${item.loanVendor || 'a rent vendor'} — goes back to the vendor after the event, never our asset`}>Rented</span>
+          )}
+          {item.fromOutsource && (
+            <span className="badge badge-purple" style={{ fontSize: 10 }} title={`Outsourced to ${item.loanVendor || 'an outsource vendor'} — not our asset`}>Outsourced</span>
           )}
           {item.resolution === 'returned' && (
             <span className="badge badge-green" style={{ fontSize: 10 }}>Returned</span>
@@ -261,6 +267,8 @@ function ItemTable({ items, packages, showScanButton, onScanClick, onDelete, onC
                     <BrokenChip item={item} />
                     <StockBadge item={item} />
                     {item.fromProduction && <span className="badge badge-purple" style={{ fontSize: 10 }}>Production</span>}
+                    {item.fromLoan && <span className="badge badge-blue" style={{ fontSize: 10 }}>Rented</span>}
+                    {item.fromOutsource && <span className="badge badge-purple" style={{ fontSize: 10 }}>Outsourced</span>}
                     {item.resolution === 'returned' && <span className="badge badge-green" style={{ fontSize: 10 }}>Returned</span>}
                   </div>
                   {item.note && <div className="item-table-note">{item.note}</div>}
@@ -899,6 +907,10 @@ export default function EventDetailPage() {
   // --- Item detail drawer & Modify ---
   const detailItem = detailItemId != null ? items.find(it => it.id === detailItemId) : null;
   const editItem = editItemId != null ? items.find(it => it.id === editItemId) : null;
+  // Modify Item (2026-11-02, owner): only the location (Area / Sub Area) can change. The quantity can
+  // change only for an item added at the CURRENT stage; an item from an earlier stage keeps its qty.
+  // Ownership, PIC and note are shown read-only (ownership has its own flow: badge / Check Ownership).
+  const editQtyAllowed = !!editItem && stages.indexOf(editItem.stage) === stageIndex;
 
   function openModifyItem(item) {
     setEditForm({ qty: item.qty, area: item.area, subArea: item.subArea || '', pic: item.pic || '', ownership: item.ownership || 'IHC', note: item.note || '' });
@@ -907,9 +919,9 @@ export default function EventDetailPage() {
 
   function saveModifyItem() {
     if (!editItem || !editForm.area || !(Number(editForm.qty) >= 1)) return;
-    const qty = Math.floor(Number(editForm.qty));
+    const qty = editQtyAllowed ? Math.floor(Number(editForm.qty)) : editItem.qty;
     setItems(is => is.map(it => it.id === editItem.id
-      ? { ...it, qty, area: editForm.area, subArea: editForm.subArea, pic: editForm.pic.trim(), ownership: editForm.ownership, note: editForm.note.trim() }
+      ? { ...it, qty, area: editForm.area, subArea: editForm.subArea }
       : it));
     addActivityLog({
       userName: currentUser?.name || 'Admin', action: 'Update', module: 'Event Detail',
@@ -1969,16 +1981,17 @@ export default function EventDetailPage() {
             </div>
             <div className="form-row">
               <div className="form-group">
-                <label>Quantity <span style={{ color: 'var(--red)' }}>*</span></label>
-                <input type="number" min="1" value={editForm.qty} onChange={e => setEditForm(f => ({ ...f, qty: e.target.value }))} />
+                <label>Quantity {editQtyAllowed && <span style={{ color: 'var(--red)' }}>*</span>}</label>
+                <input type="number" min="1" value={editForm.qty} disabled={!editQtyAllowed} onChange={e => setEditForm(f => ({ ...f, qty: e.target.value }))} />
+                <p className="field-hint">
+                  {editQtyAllowed
+                    ? <>Added at this stage (&ldquo;{eventStatus}&rdquo;), so the quantity can still change.</>
+                    : <>Added at &ldquo;{editItem.stage}&rdquo; (an earlier stage): only the location can change.</>}
+                </p>
               </div>
               <div className="form-group">
                 <label>Ownership</label>
-                <SearchableSelect
-                  value={editForm.ownership}
-                  onChange={v => setEditForm(f => ({ ...f, ownership: v }))}
-                  options={OWNERSHIP_CYCLE.map(o => ({ value: o, label: o }))}
-                />
+                <input type="text" value={editForm.ownership} disabled />
               </div>
             </div>
             <div className="form-row">
@@ -2003,11 +2016,11 @@ export default function EventDetailPage() {
             </div>
             <div className="form-group">
               <label>PIC</label>
-              <input type="text" placeholder="Person in charge" value={editForm.pic} onChange={e => setEditForm(f => ({ ...f, pic: e.target.value }))} />
+              <input type="text" placeholder="—" value={editForm.pic} disabled />
             </div>
             <div className="form-group">
               <label>Note</label>
-              <textarea placeholder="e.g. Handle with care" value={editForm.note} onChange={e => setEditForm(f => ({ ...f, note: e.target.value }))} />
+              <textarea placeholder="—" value={editForm.note} disabled />
             </div>
           </>
         )}
@@ -2041,7 +2054,7 @@ export default function EventDetailPage() {
             </p>
             <div className="prod-notice prod-notice-info">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-              <div>Not in the list? Choose <strong>+ Add &hellip; as new item</strong>: it is saved to <strong>Inventory</strong> master data right away (no need to open Master Data first). When the production is done, its stock goes into the deploy-to warehouse.</div>
+              <div>Not in the list? Choose <strong>+ Add &hellip; as new item</strong>: it is saved to <strong>Inventory</strong> master data right away (no need to open Master Data first). When the production is done, the item <strong>becomes our asset</strong>: its stock goes into the deploy-to warehouse and counts in the asset value (unlike a rental, which goes back to the vendor).</div>
             </div>
             <div className="form-group">
               <label>Item Name <span style={{ color: 'var(--red)' }}>*</span></label>

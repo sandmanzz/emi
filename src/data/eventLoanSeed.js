@@ -20,6 +20,7 @@ export const SEED_EVENT_LOANS = {
     loan(1, { itemName: 'Champagne Glass Coupe', qty: 300, unit: 'pcs', area: 'CHAMPAGNE WALL', vendorId: 17, vendorName: 'Glassware Pro Rental', startDate: '2026-01-19', dueDate: '2026-01-21', rentalCost: 4000, status: 'Returned', stage: 'Finish setup', requestedAt: '2026-01-05', borrowedAt: '2026-01-19', returnedAt: '2026-01-22', note: '6 broken, charged Rp 35.000 each.' }),
   ],
   [ev('2026-02-14', 'Grand Wedding Surabaya')]: [
+    loan(4, { itemName: 'Gold Charger Plate', qty: 250, unit: 'pcs', area: 'GUEST TABLE', vendorId: 5, vendorName: 'Wedding Organizer Mitra', startDate: '2026-02-13', dueDate: '2026-02-16', rentalCost: 8000, status: 'Returned', stage: 'On preparing items', requestedAt: '2026-01-25', borrowedAt: '2026-02-13', returnedAt: '2026-02-16', note: 'Same plates later booked for Wedding Spring Garden, Corporate Gala Bali, Wedding Bali Season and Grand Gala Night.' }),
     loan(3, { itemName: 'Round Banquet Table', qty: 30, unit: 'unit', area: 'GUEST TABLE', vendorId: 16, vendorName: 'Bali Party Rental', startDate: '2026-02-13', dueDate: '2026-02-16', rentalCost: 75000, status: 'Returned', stage: 'On preparing items', requestedAt: '2026-01-25', borrowedAt: '2026-02-13', returnedAt: '2026-02-16' }),
     loan(2, { itemName: 'Tiffany Chair', qty: 250, unit: 'unit', area: 'GUEST TABLE', vendorId: 15, vendorName: 'Sewa Kursi Jaya Rental', startDate: '2026-02-13', dueDate: '2026-02-16', rentalCost: 20000, status: 'Returned', stage: 'On preparing items', requestedAt: '2026-01-25', borrowedAt: '2026-02-13', returnedAt: '2026-02-16' }),
     loan(1, { itemName: 'Wireless Handheld Microphone', qty: 4, unit: 'unit', area: 'Area Hall', vendorId: 18, vendorName: 'Nusantara Sound & Light', startDate: '2026-02-13', dueDate: '2026-02-15', rentalCost: 150000, status: 'Returned', stage: 'Finish setup', requestedAt: '2026-02-01', borrowedAt: '2026-02-13', returnedAt: '2026-02-15' }),
@@ -29,6 +30,7 @@ export const SEED_EVENT_LOANS = {
     loan(1, { itemName: 'Lounge Sofa Set', qty: 3, unit: 'set', area: 'LOUNGE', vendorId: 16, vendorName: 'Bali Party Rental', startDate: '2026-04-19', dueDate: '2026-04-22', rentalCost: 850000, status: 'Borrowed', stage: 'On preparing items', requestedAt: '2026-04-01', borrowedAt: '2026-04-19' }),
   ],
   [ev('2026-05-08', 'Wedding Spring Garden')]: [
+    loan(4, { itemName: 'Gold Charger Plate', qty: 120, unit: 'pcs', area: 'GUEST TABLE', vendorId: 5, vendorName: 'Wedding Organizer Mitra', startDate: '2026-05-09', dueDate: '2026-05-12', rentalCost: 8000, status: 'Requested', stage: 'On preparing items', requestedAt: '2026-04-06' }),
     loan(3, { itemName: 'Champagne Glass Coupe', qty: 200, unit: 'pcs', area: 'CHAMPAGNE WALL', vendorId: 17, vendorName: 'Glassware Pro Rental', startDate: '2026-05-09', dueDate: '2026-05-12', rentalCost: 4000, status: 'Requested', stage: 'On preparing items', requestedAt: '2026-04-06' }),
     loan(2, { itemName: 'Cross-Back Chair', qty: 120, unit: 'unit', area: 'GUEST TABLE', vendorId: 15, vendorName: 'Sewa Kursi Jaya Rental', startDate: '2026-05-09', dueDate: '2026-05-12', rentalCost: 25000, status: 'Requested', stage: 'On preparing items', requestedAt: '2026-04-06', note: 'Our own 120 are booked for Corporate Summit.' }),
     loan(1, { itemName: 'Tent 10x10m Clear Top', qty: 1, unit: 'unit', area: 'CEREMONY', vendorId: 19, vendorName: 'Tenda Megah Rental', startDate: '2026-05-09', dueDate: '2026-05-12', rentalCost: 3500000, status: 'Requested', stage: 'Created by admin up', requestedAt: '2026-04-02', note: 'Rain backup.' }),
@@ -43,6 +45,21 @@ export const SEED_EVENT_LOANS = {
   [ev('2026-07-10', 'Wedding Bali Season')]: [
     loan(2, { itemName: 'Tiffany Chair', qty: 150, unit: 'unit', area: 'GUEST TABLE', vendorId: 15, vendorName: 'Sewa Kursi Jaya Rental', startDate: '2026-07-13', dueDate: '2026-07-16', rentalCost: 20000, status: 'Requested', stage: 'Created by admin up', requestedAt: '2026-04-07' }),
     loan(1, { itemName: 'Gold Charger Plate', qty: 200, unit: 'pcs', area: 'GUEST TABLE', vendorId: 5, vendorName: 'Wedding Organizer Mitra', startDate: '2026-07-13', dueDate: '2026-07-16', rentalCost: 8000, status: 'Requested', stage: 'Created by admin up', requestedAt: '2026-04-07' }),
+  ],
+  // Same items rented for several events (owner 2026-11-02): Gold Charger Plate from Wedding Organizer Mitra
+  // is on 5 events; Corporate Gala Bali overlaps Wedding Bali Season (both rent plates and Tiffany Chairs the
+  // same week); Hanging Rattan 1 from Toko Dekorasi Rina goes to Baby Shower Mila and Engagement Rina & Bayu.
+  [ev('2026-07-12', 'Corporate Gala Bali')]: [
+    loan(3, { itemName: 'Gold Rim Cutlery Set', qty: 100, unit: 'set', area: 'GUEST TABLE', vendorId: 5, vendorName: 'Wedding Organizer Mitra', startDate: '2026-07-12', dueDate: '2026-07-15', rentalCost: 12000, status: 'Requested', stage: 'Created by admin up', requestedAt: '2026-04-08' }),
+    loan(2, { itemName: 'Gold Charger Plate', qty: 100, unit: 'pcs', area: 'GUEST TABLE', vendorId: 5, vendorName: 'Wedding Organizer Mitra', startDate: '2026-07-12', dueDate: '2026-07-15', rentalCost: 8000, status: 'Requested', stage: 'Created by admin up', requestedAt: '2026-04-08', note: 'Vendor has 400 pcs; Wedding Bali Season takes 200 the same week.' }),
+    loan(1, { itemName: 'Tiffany Chair', qty: 120, unit: 'unit', area: 'GUEST TABLE', vendorId: 15, vendorName: 'Sewa Kursi Jaya Rental', startDate: '2026-07-12', dueDate: '2026-07-15', rentalCost: 20000, status: 'Requested', stage: 'Created by admin up', requestedAt: '2026-04-08' }),
+  ],
+  [ev('2026-09-03', 'Grand Gala Night')]: [
+    loan(2, { itemName: 'Gold Charger Plate', qty: 150, unit: 'pcs', area: 'GUEST TABLE', vendorId: 5, vendorName: 'Wedding Organizer Mitra', startDate: '2026-09-04', dueDate: '2026-09-06', rentalCost: 8000, status: 'Requested', stage: 'Created by admin up', requestedAt: '2026-04-09' }),
+    loan(1, { itemName: 'Champagne Glass Coupe', qty: 250, unit: 'pcs', area: 'CHAMPAGNE WALL', vendorId: 17, vendorName: 'Glassware Pro Rental', startDate: '2026-09-04', dueDate: '2026-09-06', rentalCost: 4000, status: 'Requested', stage: 'Created by admin up', requestedAt: '2026-04-09' }),
+  ],
+  [ev('2026-04-28', 'Baby Shower Mila')]: [
+    loan(1, { itemName: 'Hanging Rattan 1', qty: 4, unit: 'pcs', area: 'CEREMONY', vendorId: 6, vendorName: 'Toko Dekorasi Rina', startDate: '2026-04-30', dueDate: '2026-05-03', rentalCost: 60000, status: 'Requested', stage: 'Created by admin up', requestedAt: '2026-04-09', note: 'Same rattan as Engagement Rina & Bayu; back to the vendor before 16 May.' }),
   ],
   [ev('2026-04-22', 'Intimate Dinner Ubud')]: [
     loan(1, { itemName: 'Crystal Wine Glass Set', qty: 24, unit: 'pcs', area: 'GUEST TABLE', vendorId: 17, vendorName: 'Glassware Pro Rental', startDate: '2026-04-24', dueDate: '2026-04-26', rentalCost: 6000, status: 'Requested', stage: 'On preparing items', requestedAt: '2026-04-08' }),

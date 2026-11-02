@@ -899,6 +899,20 @@ clashes or seems off) — proceeding with the stated assumption unless corrected
 
 ## Raw instruction log
 
+### 2026-11-02 (2) — Multi-event sample data, rent vs production, past events locked, date logic, Modify Item (Claude Web)
+> 1. tambahkan juga sample data apabila barang tersebut dipakai di multiple event.
+> 2. perlu dicatat bahwa rent adalah sifatnya ketika barang sudah selesai akan dikembalikan beda dengan production ya kalau production barang selesai maka akan menjadi asset kita
+> 3. editing event tidak bisa dilakukan jika tanggal sudah lewat
+> 4. finish data dan start date harus ada logic nya ya, finish date tidak boleh < start date
+> 5. modify item hanya bisa mengganti lokasi saja dan jumlah hanya jika memang baru saja di add di state tersebut, tp klo dari state sebelumnya cuman bisa ganti lokasi masih oke
+
+- **Decision (concept):** Rent = temporary, returned to the vendor, never our asset. Production = Done → stock in a
+  warehouse → our asset. Outsource = like rent. Shown as badges (Rented / Outsourced / Production) and form texts.
+- Seed: Gold Charger Plate (Wedding Organizer Mitra) on 5 events, overlapping weeks; Hanging Rattan on 2 events.
+- Event edit locked when the event's last day < today (mock TODAY). Finish Date ≥ Start Date enforced.
+- Modify Item: location always; qty only for items added at the current stage; ownership/PIC/note read-only.
+- Spec: `docs/prd/PRD-2026-11-02.md` §5–§9.
+
 ### 2026-11-02 — Add items/vendors from the request forms; Outsource like Rent (Claude Web)
 > 1. ketika di event detail, dan ketika user mau meminjam atau memproduksi user bisa langsung menambahkan barang dari situ (cek dulu sudah ada belum) jadi kalau belum fitur itu tolong tambahkan. jadi user tidak perlu mengisi dulu di master data
 > 2. kemudian untuk pemilihan vendor data diambil dari yang sesuai

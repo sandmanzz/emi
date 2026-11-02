@@ -126,6 +126,14 @@ whose status is still `on-going`.
 
 ---
 
+## Event edit rules, Modify Item (2026-11-02, R36)
+
+- `PUT /events/{id}` → `409` when the event's last day (max of finish/start/date) is before today (server date).
+- Validate `finishDate >= startDate` on create/update (`422`).
+- `PATCH /events/{id}/items/{itemId}`: `area`, `subArea` always; `qty` only when the item's `addedAtStage` equals the
+  event's current stage (else `422`). Ownership changes go through the ownership endpoint, not this one.
+- Rentals / outsource orders never create stock; a finished production does (`POST /productions/{id}/done` → stock movement).
+
 ## Quick-add from request forms, outsource orders (2026-11-02, R35)
 
 Spec: [prd/PRD-2026-11-02.md](prd/PRD-2026-11-02.md).
