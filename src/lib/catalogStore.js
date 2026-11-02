@@ -77,6 +77,16 @@ export function isNameTaken(name, exceptId = null) {
   return items.some(i => i.id !== exceptId && i.name.toLowerCase() === n);
 }
 
+// A free SKU for a new item: initials of the name + a running number ("Fresh Flower Centerpiece" → FFC-001).
+export function suggestSku(name) {
+  const letters = name.trim().split(/\s+/).filter(Boolean).slice(0, 3).map(w => w[0].toUpperCase()).join('') || 'ITM';
+  for (let n = 1; n < 1000; n++) {
+    const sku = `${letters}-${String(n).padStart(3, '0')}`;
+    if (!isSkuTaken(sku)) return sku;
+  }
+  return '';
+}
+
 // Creates an item. `opening` = { warehouse, qty } puts its first stock in a warehouse (logged).
 export function addCatalogItem(data, opening = null, by = '') {
   const id = Math.max(0, ...items.map(i => i.id)) + 1;

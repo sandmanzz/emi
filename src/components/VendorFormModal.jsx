@@ -11,11 +11,13 @@ const EMPTY_FORM = { name: '', origin: 'External', description: '', phone: '', a
 // `defaultKind` = the CMS the form was opened from ('production' | 'loan' = Rent); a new vendor starts in it.
 // There is no "Vendor type" choice (removed 2026-10-19): the menu decides the kind, and an edit keeps the
 // vendor's kinds. Rent vendors have no Internal / External choice either (we always rent from outside).
-export default function VendorFormModal({ vendor, defaultKind = 'production', onClose, onSave }) {
+export default function VendorFormModal({ vendor, defaultKind = 'production', initialName = '', initialOrigin, onClose, onSave }) {
   const [form, setForm] = useState(() => vendor
     ? { name: vendor.name, origin: vendor.origin, description: vendor.description || '', phone: vendor.phone || '', address: vendor.address || '', kinds: vendor.kinds || [defaultKind] }
-    : { ...EMPTY_FORM, kinds: [defaultKind] });
-  const isRent = defaultKind === 'loan';
+    : { ...EMPTY_FORM, name: initialName, origin: initialOrigin || EMPTY_FORM.origin, kinds: [defaultKind] });
+  // Rent and Outsource vendors are always outside companies: no Internal / External choice.
+  const isRent = defaultKind === 'loan' || defaultKind === 'outsource';
+  const kindTitle = { production: 'Production', loan: 'Rent', outsource: 'Outsource' }[defaultKind] || 'Production';
 
   const set = (key, value) => setForm(f => ({ ...f, [key]: value }));
 
@@ -30,7 +32,7 @@ export default function VendorFormModal({ vendor, defaultKind = 'production', on
   return (
     <Modal
       open
-      title={`${vendor ? 'Edit' : 'New'} ${isRent ? 'Rent' : 'Production'} Vendor`}
+      title={`${vendor ? 'Edit' : 'New'} ${kindTitle} Vendor`}
       onClose={onClose}
       footer={
         <>

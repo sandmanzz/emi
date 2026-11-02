@@ -99,9 +99,11 @@ export default function App() {
           <Route path="vendor" element={<VendorPage key="production" kind="production" />} />
           {/* "Loan" was renamed "Rent" on 2026-10-19 (owner). Code keeps kind 'loan'; old URLs still work. */}
           <Route path="rent" element={<VendorPage key="loan" kind="loan" />} />
-          <Route path="rent-vendor-detail" element={<LoanVendorDetailPage />} />
+          <Route path="rent-vendor-detail" element={<LoanVendorDetailPage key="loan" />} />
+          <Route path="outsource" element={<VendorPage key="outsource" kind="outsource" />} />
+          <Route path="outsource-vendor-detail" element={<LoanVendorDetailPage key="outsource" kind="outsource" />} />
           <Route path="loan" element={<Navigate to="/rent" replace />} />
-          <Route path="loan-vendor-detail" element={<LoanVendorDetailPage />} />
+          <Route path="loan-vendor-detail" element={<LoanVendorDetailPage key="loan" />} />
           <Route path="vendor-detail" element={<VendorDetailPage />} />
           <Route path="unit-detail" element={<UnitDetailPage />} />
           <Route path="ai-analyzer" element={<AIAnalyzerPage />} />

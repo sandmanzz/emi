@@ -70,3 +70,23 @@ export const SEED_GENERAL_RENTALS = [
     vendorId: 19, vendorName: 'Tenda Megah Rental', startDate: '2026-02-10', dueDate: '2026-02-12', rentalCost: 1500000, status: 'Returned',
     requestedBy: 'Anto', requestedAt: '2026-02-03', borrowedAt: '2026-02-10', returnedAt: '2026-02-12', note: '' },
 ];
+
+// Demo "Outsource Item" records (2026-11-02): work an event hands to an outsource vendor
+// (Master Data → Outsource) — same fields and lifecycle as a rental, shown as
+// Requested → Received → Completed. `rentalCost` = cost per unit. Outsource vendors are ids 101+.
+export const SEED_EVENT_OUTSOURCE = {
+  [ev('2026-01-18', 'Gala Dinner BCA')]: [
+    loan(2, { itemName: 'LED Videotron 4x3m', qty: 1, unit: 'unit', area: 'Area Hall', subArea: 'Main Stage', vendorId: 102, vendorName: 'Videotron Nusantara', startDate: '2026-01-19', dueDate: '2026-01-21', rentalCost: 18000000, status: 'Returned', stage: 'Finish setup', requestedAt: '2026-01-04', borrowedAt: '2026-01-19', returnedAt: '2026-01-21', note: 'Includes operator and rigging.' }),
+    loan(1, { itemName: 'Fresh Flower Centerpiece', qty: 40, unit: 'pcs', area: 'GUEST TABLE', vendorId: 101, vendorName: 'Bali Florist Collective', startDate: '2026-01-19', dueDate: '2026-01-19', rentalCost: 450000, status: 'Returned', stage: 'Finish setup', requestedAt: '2026-01-04', borrowedAt: '2026-01-19', returnedAt: '2026-01-19' }),
+  ],
+  [ev('2026-04-18', 'Beachside Anniversary')]: [
+    loan(1, { itemName: 'Floral Arch Installation', qty: 1, unit: 'set', area: 'CEREMONY', vendorId: 101, vendorName: 'Bali Florist Collective', startDate: '2026-04-19', dueDate: '2026-04-19', rentalCost: 12500000, status: 'Borrowed', stage: 'On preparing items', requestedAt: '2026-04-02', borrowedAt: '2026-04-08', note: 'Fresh white roses and baby breath.' }),
+  ],
+  [ev('2026-05-08', 'Wedding Spring Garden')]: [
+    loan(2, { itemName: 'Hanging Flower Ceiling', qty: 1, unit: 'set', area: 'CEREMONY', vendorId: 103, vendorName: 'Kru Rigging Profesional', startDate: '2026-05-08', dueDate: '2026-05-10', rentalCost: 9000000, status: 'Requested', stage: 'On preparing items', requestedAt: '2026-04-06' }),
+    loan(1, { itemName: 'Fresh Flower Centerpiece', qty: 25, unit: 'pcs', area: 'GUEST TABLE', vendorId: 101, vendorName: 'Bali Florist Collective', startDate: '2026-05-09', dueDate: '2026-05-09', rentalCost: 450000, status: 'Requested', stage: 'On preparing items', requestedAt: '2026-04-06' }),
+  ],
+  [ev('2026-05-28', 'Corporate Summit 2026')]: [
+    loan(1, { itemName: 'LED Videotron 4x3m', qty: 2, unit: 'unit', area: 'Area Hall', subArea: 'Main Stage', vendorId: 102, vendorName: 'Videotron Nusantara', startDate: '2026-05-31', dueDate: '2026-06-03', rentalCost: 18000000, status: 'Requested', stage: 'Created by admin up', requestedAt: '2026-04-08' }),
+  ],
+};

@@ -899,6 +899,20 @@ clashes or seems off) — proceeding with the stated assumption unless corrected
 
 ## Raw instruction log
 
+### 2026-11-02 — Add items/vendors from the request forms; Outsource like Rent (Claude Web)
+> 1. ketika di event detail, dan ketika user mau meminjam atau memproduksi user bisa langsung menambahkan barang dari situ (cek dulu sudah ada belum) jadi kalau belum fitur itu tolong tambahkan. jadi user tidak perlu mengisi dulu di master data
+> 2. kemudian untuk pemilihan vendor data diambil dari yang sesuai
+> 3. tambahkan juga event setting untuk outsource, dan buatkan menunya juga di nav kiri. outsource sama seperti rent juga konsep nya
+> setelah selesai tolong push
+
+- Checked first: Rent Item had only a free-text item (not saved to master data); Request Production had a free-text
+  name (reached master data only when Done). Now both pick from Inventory master data or "+ Add … as new item"
+  (saved immediately via the normal New Item form). Vendors can be added the same way.
+- Vendor pickers: Production → production vendors, Rent → rent vendors, Outsource → outsource vendors.
+- Outsource: Event Status flag "Outsource Item", Event Detail button + "Outsourced" tab, Master Data → Outsource
+  menu (Vendors | Outsourced Items), Received → Completed. Same concept and code as Rent (`kind: 'outsource'`).
+- Spec: `docs/prd/PRD-2026-11-02.md`.
+
 ### 2026-10-19 — Loan → Rent, vendor form, delete guard, inventory source filter + asset value (Claude Web)
 > 1. ss 1 : instead of loan ganti nama jadi rent saja. 2. ss 2 : hilangkan vendor type 3. ss 2 : hilangkan internal / external
 > 4. tidak bisa hapus vendor jika masih ada barang yang requested 5. ss 3 : ganti label menu vendor menjadi production

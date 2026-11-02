@@ -12,6 +12,8 @@ export default function SearchableSelect({
   disabled = false,
   inline = false,
   multiple = false, // value is an array; picking toggles and keeps the menu open
+  onCreate,         // optional (query) => void: adds a "+ Add …" row at the bottom of the list
+  createLabel = q => (q ? `Add “${q}” as new` : 'Add new'),
   style,
 }) {
   const [open, setOpen] = useState(false);
@@ -144,6 +146,11 @@ export default function SearchableSelect({
               ))
             }
           </div>
+          {onCreate && (
+            <button type="button" className="ss-create" onClick={() => { const q = query.trim(); setOpen(false); onCreate(q); }}>
+              + {createLabel(query.trim())}
+            </button>
+          )}
         </div>,
         document.body
       )}

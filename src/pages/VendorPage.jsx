@@ -7,7 +7,7 @@ import VendorFormModal from '../components/VendorFormModal';
 import ProductionLogTab from '../components/ProductionLogTab';
 import LoanLogTab from '../components/LoanLogTab';
 import { IconSearch, IconPlus, IconEdit, IconDelete } from '../components/icons';
-import { getVendorsOfKind, addVendor, updateVendor, deleteVendor, VENDOR_ORIGINS } from '../lib/vendorStore';
+import { getVendorsOfKind, addVendor, updateVendor, deleteVendor, VENDOR_ORIGINS, VENDOR_KIND_LABELS } from '../lib/vendorStore';
 import { getAllProductions } from '../lib/productionRequests';
 import { getAllEventLoans } from '../lib/eventLoans';
 import { initialWarehouses } from '../data/warehouses';
@@ -17,16 +17,18 @@ import { fmtNum } from '../lib/format';
 
 const PAGE_SIZE = 10;
 
-// One CMS page, two menus:
+// One CMS page, three menus:
 //  kind="production" — Master Data → Production (/vendor): vendors who make items for us.
 //                      Tabs: Vendors | Produced Items (every production request).
 //  kind="loan"       — Master Data → Rent (/rent): vendors we rent items from. ("Loan" was
 //                      renamed "Rent" on 2026-10-19; the code value stays 'loan'.)
 //                      Tabs: Vendors | Rented Items (every event + warehouse rental).
-// A vendor can be in both (its `kinds`). Rows open /vendor-detail or /rent-vendor-detail.
-// Rent vendors show no Internal / External (we always rent from outside).
+//  kind="outsource"  — Master Data → Outsource (/outsource, 2026-11-02): vendors we order items / work
+//                      from for an event. Works exactly like Rent. Tabs: Vendors | Outsourced Items.
+// A vendor can be in several lists (its `kinds`). Rows open /vendor-detail, /rent-vendor-detail or
+// /outsource-vendor-detail. Rent and Outsource vendors show no Internal / External (always outside).
 // A vendor with ACTIVE records cannot be deleted (or removed from this list):
-//  rent = a rental still Requested or Rented; production = a production not Done yet.
+//  rent / outsource = a record still Requested or Rented / Received; production = a production not Done yet.
 // Data lives in lib/vendorStore.js (localStorage), so changes show up everywhere.
 const CONFIG = {
   production: {
@@ -38,6 +40,11 @@ const CONFIG = {
     title: 'Rent', newLabel: 'New Rent Vendor', itemsTab: 'Rented Items', countLabel: 'Rentals', detail: '/rent-vendor-detail',
     activeNoun: 'rental', activeStates: 'Requested or Rented',
     intro: <>Vendors we <strong>rent</strong> items from (Event Detail &rarr; Rent Item). Click a vendor to see what we rented from them and for which event. Rentals not tied to an event are made in Rented Items &rarr; New Rental.</>,
+  },
+  outsource: {
+    title: 'Outsource', newLabel: 'New Outsource Vendor', itemsTab: 'Outsourced Items', countLabel: 'Orders', detail: '/outsource-vendor-detail',
+    activeNoun: 'outsource order', activeStates: 'Requested or Received',
+    intro: <>Vendors we <strong>outsource</strong> items or work to for events (Event Detail &rarr; Outsource Item), e.g. fresh flowers, videotron, rigging crew. Works like Rent: received items join the event as Outsource and are never our stock. Click a vendor to see what we ordered and for which event.</>,
   },
 };
 
@@ -55,19 +62,19 @@ export default function VendorPage({ kind = 'production' }) {
   const [editing, setEditing] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
 
-  const isRent = kind === 'loan';
+  const isRent = kind === 'loan' || kind === 'outsource'; // rent-like: no Internal / External
   // Productions / rentals per vendor id (list column), and how many are still active (delete guard).
   const { recordCount, activeCount } = useMemo(() => {
     const counts = new Map();
     const active = new Map();
     const isActive = isRent ? r => r.status === 'Requested' || r.status === 'Borrowed' : r => r.status !== 'Done';
-    (isRent ? getAllEventLoans() : getAllProductions()).forEach(r => {
+    (isRent ? getAllEventLoans(kind) : getAllProductions()).forEach(r => {
       if (!r.vendorId) return;
       counts.set(r.vendorId, (counts.get(r.vendorId) || 0) + 1);
       if (isActive(r)) active.set(r.vendorId, (active.get(r.vendorId) || 0) + 1);
     });
     return { recordCount: counts, activeCount: active };
-  }, [isRent]);
+  }, [isRent, kind]);
   const deleteBlocked = deleteTarget ? activeCount.get(deleteTarget.id) || 0 : 0;
 
   const filtered = useMemo(() => {
@@ -97,7 +104,7 @@ export default function VendorPage({ kind = 'production' }) {
       log('Update', `Updated vendor "${data.name}"`);
     } else {
       addVendor(data);
-      log('Create', isRent ? `Added rent vendor "${data.name}"` : `Added vendor "${data.name}" (${data.origin})`);
+      log('Create', isRent ? `Added ${cfg.title.toLowerCase()} vendor "${data.name}"` : `Added vendor "${data.name}" (${data.origin})`);
     }
     setVendors(getVendorsOfKind(kind));
     setModalOpen(false);
@@ -133,8 +140,8 @@ export default function VendorPage({ kind = 'production' }) {
         ))}
       </div>
 
-      {tab === 'items' && (kind === 'loan'
-        ? <LoanLogTab allowCreate />
+      {tab === 'items' && (isRent
+        ? <LoanLogTab kind={kind} allowCreate={kind === 'loan'} />
         : <ProductionLogTab warehouseNames={warehouseNames} />)}
 
       {tab === 'vendors' && (
@@ -142,8 +149,8 @@ export default function VendorPage({ kind = 'production' }) {
           <div className="stats-bar" style={{ gridTemplateColumns: 'repeat(3,1fr)' }}>
             {(isRent ? [
               { label: 'Total Vendors', value: vendors.length, color: 'var(--brand)', bg: 'var(--brand-bg)' },
-              { label: 'Rentals', value: [...recordCount.values()].reduce((a, b) => a + b, 0), color: 'var(--purple)', bg: 'var(--purple-bg)' },
-              { label: 'Active Rentals', value: [...activeCount.values()].reduce((a, b) => a + b, 0), color: 'var(--orange)', bg: 'var(--orange-bg)' },
+              { label: cfg.countLabel, value: [...recordCount.values()].reduce((a, b) => a + b, 0), color: 'var(--purple)', bg: 'var(--purple-bg)' },
+              { label: `Active ${cfg.countLabel}`, value: [...activeCount.values()].reduce((a, b) => a + b, 0), color: 'var(--orange)', bg: 'var(--orange-bg)' },
             ] : [
               { label: 'Total Vendors', value: vendors.length, color: 'var(--brand)', bg: 'var(--brand-bg)' },
               { label: 'Internal', value: internalCount, color: 'var(--green)', bg: 'var(--green-bg)' },
@@ -195,7 +202,7 @@ export default function VendorPage({ kind = 'production' }) {
                       <tr key={v.id} className="row-clickable" onClick={() => navigate(`${cfg.detail}?id=${v.id}`)} title="View vendor detail">
                         <td className="name-cell">
                           {v.name}
-                          {v.kinds.length > 1 && <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400 }}>Production &amp; Rent vendor</div>}
+                          {v.kinds.length > 1 && <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400 }}>{v.kinds.map(k => VENDOR_KIND_LABELS[k]).join(' & ')} vendor</div>}
                         </td>
                         {!isRent && <td><span className={`badge ${v.origin === 'Internal' ? 'badge-green' : 'badge-orange'}`} style={{ fontSize: 11 }}>{v.origin}</span></td>}
                         <td className="cell-clamp">{v.description || <span style={{ color: 'var(--text-muted)' }}>—</span>}</td>

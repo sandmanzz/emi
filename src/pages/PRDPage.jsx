@@ -13,7 +13,7 @@ const SECTIONS = [
   { id: 'event-inventory-link', label: 'Event Inventory Link' },
   { id: 'searchable-dropdown', label: 'Searchable Dropdown' },
   { id: 'activity-log', label: 'Activity Log' },
-  { id: 'item-loan', label: 'Rent & Production Vendors' },
+  { id: 'item-loan', label: 'Rent, Outsource & Production' },
   { id: 'data', label: 'Mock Data' },
   { id: 'assumptions', label: 'Open Assumptions' },
 ];
@@ -355,7 +355,7 @@ export default function PRDPage() {
         </P>
       </Section>
 
-      <Section id="item-loan" title="Rent & Production Vendors">
+      <Section id="item-loan" title="Rent, Outsource & Production">
         <P>
           In EMI a <strong>rental always means we rent</strong> items from a rent vendor &mdash; never that we lend our
           own items out. The menu was called &ldquo;Loan&rdquo; until 2026-10-19 and is now <strong>Rent</strong>
@@ -370,6 +370,13 @@ export default function PRDPage() {
           &rarr; New Rental; shown in Warehouse Inventory with the Rent filter). Rented items are not our assets, so they
           never change our stock or asset value. Production vendors live in Master Data &rarr; <strong>Production</strong>
           (<code>/vendor</code>). A vendor with an active rental (Requested / Rented) or an unfinished production cannot be deleted.
+        </P>
+        <P>
+          <strong>Outsource</strong> (2026-11-02) works exactly like Rent: Master Data &rarr; Outsource (<code>/outsource</code>,
+          tabs Vendors | Outsourced Items), Event Status flag <strong>Outsource Item</strong>, and Event Detail &rarr;
+          Outsource Item (Requested &rarr; Received &rarr; Completed). In Rent Item, Outsource Item and Request Production the
+          item is picked from Inventory master data or added to it on the spot (&ldquo;+ Add &hellip; as new item&rdquo;), and the
+          vendor list only shows vendors of that menu (with &ldquo;+ Add &hellip; as new vendor&rdquo;).
         </P>
       </Section>
 

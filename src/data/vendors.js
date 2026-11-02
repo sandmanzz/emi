@@ -4,7 +4,9 @@
 // on 2026-10-16 (a loan in EMI always means WE rent), so those 4 are gone; see vendorStore.
 // Fields: { id, name, origin: 'Internal' | 'External', kinds, description, phone, address }
 //   kinds — which CMS lists the vendor: 'production' (Master Data → Vendor) and/or
-//           'loan' (Master Data → Loan, vendors we borrow/rent items from).
+//           'loan' (Master Data → Rent, vendors we rent items from) and/or
+//           'outsource' (Master Data → Outsource, vendors we hand work to for an event; 2026-11-02).
+// ids 101+ are the outsource seed vendors (kept apart so they never clash with ids users created).
 export const initialVendors = [
   { id: 5,  name: 'Wedding Organizer Mitra', origin: 'External', kinds: ['loan'], phone: '0819-4567-8901', address: 'Jl. Kemang Raya No. 7, South Jakarta',
     description: 'Partner wedding organizer. Rents out tableware, charger plates and décor to us.' },
@@ -36,4 +38,10 @@ export const initialVendors = [
     description: 'Sound system, microphones, moving heads and stage lighting rental with operator.' },
   { id: 19, name: 'Tenda Megah Rental',      origin: 'External', kinds: ['loan'], phone: '0813-1122-3344', address: 'Jl. Soekarno-Hatta No. 9, Malang',
     description: 'Tents, flooring and generator rental for outdoor events.' },
+  { id: 101, name: 'Bali Florist Collective',  origin: 'External', kinds: ['outsource'], phone: '0812-3800-4411', address: 'Jl. Raya Kerobokan No. 45, Badung, Bali',
+    description: 'Fresh-flower arrangements and installations, made and set up on site.' },
+  { id: 102, name: 'Videotron Nusantara',      origin: 'External', kinds: ['outsource'], phone: '0811-9090-2233', address: 'Jl. TB Simatupang No. 18, South Jakarta',
+    description: 'LED videotron screens with operator, delivered and rigged for the event.' },
+  { id: 103, name: 'Kru Rigging Profesional',  origin: 'External', kinds: ['outsource'], phone: '0857-4100-6677', address: 'Jl. Ahmad Yani No. 210, Surabaya',
+    description: 'Stage rigging, truss and hanging-decor crew with their own equipment.' },
 ];

@@ -126,6 +126,20 @@ whose status is still `on-going`.
 
 ---
 
+## Quick-add from request forms, outsource orders (2026-11-02, R35)
+
+Spec: [prd/PRD-2026-11-02.md](prd/PRD-2026-11-02.md).
+
+- **Quick add:** the request forms call the normal create endpoints: `POST /items` (same validation: unique name + SKU;
+  `source: rent|outsource|production`, no opening stock) and `POST /vendors` with the menu's `kind`. Return the created
+  record so the form can select it.
+- **Outsource orders:** same shape and lifecycle as rentals; either a separate resource
+  (`/events/{id}/outsource-orders`, `/outsource-orders?vendorId=`) or one `/rentals` resource with `type: RENT|OUTSOURCE`.
+  Statuses `REQUESTED → RECEIVED → COMPLETED` (frontend stores `Requested/Borrowed/Returned` and maps labels).
+  Receiving adds an event item with ownership `OUTSOURCE`; never touches stock.
+- **Event status flag** `outsourceItem: boolean` (default = `loanItem` for existing rows).
+- **Vendor delete guard** also covers outsource orders in `REQUESTED` / `RECEIVED` (409).
+
 ## Rent rename, vendor delete guard, inventory source (2026-10-19, R34)
 
 Spec: [prd/PRD-2026-10-19.md](prd/PRD-2026-10-19.md).

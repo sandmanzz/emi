@@ -60,6 +60,14 @@ export function isLoanStage(statusName) {
   return record?.loanItem === true;
 }
 
+// While the event sits at a stage with this flag, Event Detail offers "Outsource Item".
+// Status lists saved before the flag existed (2026-11-02) follow the stage's Rent Item flag.
+export function isOutsourceStage(statusName) {
+  const record = getEventStatuses().find(s => s.status === statusName);
+  if (!record) return false;
+  return record.outsourceItem === undefined ? record.loanItem === true : record.outsourceItem === true;
+}
+
 // While the event is at this stage, items may be deleted. Missing field counts as true
 // (status lists saved before the flag existed keep the old behaviour).
 export function isDeleteAllowedStage(statusName) {

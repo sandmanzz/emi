@@ -50,6 +50,25 @@ explains a few non-obvious conventions that the entries below assume you already
 
 ---
 
+## Round 35 — Quick-add items/vendors from request forms; Outsource module (2026-11-02)
+
+**Why:** owner request 2026-11-02 (`docs/context.md`, spec `docs/prd/PRD-2026-11-02.md`).
+- New `src/components/QuickPickers.jsx`: `CatalogItemPicker` (master-data items + "+ Add as new item" → `ItemFormModal`)
+  and `VendorPicker` (vendors of one kind + "+ Add as new vendor" → `VendorFormModal`).
+- `SearchableSelect`: `onCreate` / `createLabel` (+ `.ss-create` CSS). `Modal`: Escape closes only the top-most modal and
+  never while a dropdown is open. `ItemFormModal`: `initialName`, `extra`, `hideStock`, `title`. `catalogStore.suggestSku()`.
+  `VendorFormModal`: `initialName`, `initialOrigin`, outsource kind (no Internal / External).
+- Outsource: `lib/eventLoans.js` takes `kind` everywhere (`KIND_TEXT`, `kindText`, `statusLabels`, stores
+  `emi_event_outsource` / `emi_outsource_general`); `SEED_EVENT_OUTSOURCE`; vendors 101–103 (+ one-time append
+  for saved lists); `isOutsourceStage` + `outsourceItem` in Event Status (page column/KPI/form + seed);
+  Event Detail button/tab/flow (`setRentLike`, `submitBorrow(kind)`, `advanceLoan(kind)`, `cancelLoan(kind)`);
+  `VendorPage` `CONFIG.outsource`; `LoanLogTab` / `LoanVendorDetailPage` `kind` prop; routes `/outsource`,
+  `/outsource-vendor-detail`; sidebar item Outsource.
+- Event Detail Request Production uses the pickers (form keeps `vendorName`; the old `vendors` state is gone).
+**Verified:** lint 11 (baseline), build OK, Chromium checks in the PRD §4.
+
+---
+
 ## Round 34 — Loan → Rent, vendor form/delete guard, Warehouse Inventory source filter + Total Asset Value (2026-10-19)
 
 **Why:** owner request 2026-10-19 (see `docs/context.md`, spec `docs/prd/PRD-2026-10-19.md`).

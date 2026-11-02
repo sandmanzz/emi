@@ -36,6 +36,14 @@ Newest session first.
 
 ---
 
+## Session 2026-11-02 — Quick-add items/vendors from request forms, Outsource module
+
+- Rent Item / Outsource Item / Request Production / New Rental: item comes from master data or is added there on the spot
+  ("+ Add … as new item" opens the normal New Item form); vendor list matches the form's kind, with "+ Add … as new vendor".
+- Outsource = Rent with other words: Event Status flag, Event Detail button + tab, Master Data → Outsource menu.
+- Fixed: Escape in a dropdown no longer closes the whole form.
+- Spec `docs/prd/PRD-2026-11-02.md`.
+
 ## Session 2026-10-19 — Loan → Rent, vendor form, delete guard, inventory source filter + asset value
 
 - Renamed Loan to **Rent** in every UI string (code keeps `loan`; `LOAN_LABEL` shows `Borrowed` as "Rented"); routes `/rent`, `/rent-vendor-detail`.

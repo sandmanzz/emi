@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { IconClose } from './icons';
 
 const sizeStyles = {
@@ -21,9 +21,17 @@ export default function Modal({
   bodyClassName = '',
   footerClassName = '',
 }) {
+  const overlayRef = useRef(null);
   useEffect(() => {
     if (!open) return;
-    const handler = (e) => { if (e.key === 'Escape') onClose(); };
+    // Escape closes only the top-most modal (a form can open another form on top of it),
+    // and never while a SearchableSelect dropdown is open.
+    const handler = (e) => {
+      if (e.key !== 'Escape') return;
+      if (document.querySelector('.ss-menu')) return; // Escape closes an open dropdown first
+      const overlays = document.querySelectorAll('.modal-overlay.open');
+      if (overlays[overlays.length - 1] === overlayRef.current) onClose();
+    };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
   }, [open, onClose]);
@@ -32,6 +40,7 @@ export default function Modal({
 
   return (
     <div
+      ref={overlayRef}
       className="modal-overlay open"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >

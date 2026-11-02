@@ -2,31 +2,36 @@ import { useState } from 'react';
 import Modal from './Modal';
 import SearchableSelect from './SearchableSelect';
 import { IconClose, IconCheck } from './icons';
-import { LOAN_STATUSES, LOAN_BADGE, LOAN_LABEL, loanDisplayStatus, loanTotalCost } from '../lib/eventLoans';
+import { CatalogItemPicker, VendorPicker } from './QuickPickers';
+import { LOAN_STATUSES, LOAN_BADGE, loanDisplayStatus, loanTotalCost, kindText, statusLabels } from '../lib/eventLoans';
 import { formatIDR } from '../lib/superAdminUtils';
 import { TODAY } from '../data/events';
 import { fmtNum } from '../lib/format';
+import { initialUnits } from '../data/units';
 
-const UNITS = ['pcs', 'unit', 'set', 'roll', 'meter'];
+const UNITS = initialUnits.map(u => u.abbr);
 
 function fmt(d) {
   if (!d) return '—';
   return new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-// Event Detail → "Borrowed" tab: the event's Borrow Item records with their actions.
-// Requested → Mark Received (adds the item to the event) → Mark Returned.
-export function EventLoansPanel({ loans, loanEnabled, locked, onAdvance, onCancel, onOpenVendor }) {
+// Event Detail → "Rented" / "Outsourced" tab: the event's Rent Item or Outsource Item records.
+// Requested → Mark Received (adds the item to the event as Outsource) → Mark Returned / Completed.
+// kind = 'loan' (Rent) | 'outsource' — only the words differ (lib/eventLoans.js KIND_TEXT).
+export function EventLoansPanel({ kind = 'loan', loans, loanEnabled, locked, onAdvance, onCancel, onOpenVendor }) {
+  const t = kindText(kind);
+  const LABEL = statusLabels(kind);
   const totalCost = loans.reduce((s, l) => s + loanTotalCost(l), 0);
   return (
     <>
       <p className="summary-text">
-        <strong>{loans.length}</strong> rented item{loans.length === 1 ? '' : 's'}
-        {totalCost > 0 && <> · rental cost <strong>{formatIDR(totalCost)}</strong></>}
-        {loanEnabled ? '' : ' · new rentals can only be made at a stage with Rent Item enabled'}
+        <strong>{loans.length}</strong> {t.tab.toLowerCase()} item{loans.length === 1 ? '' : 's'}
+        {totalCost > 0 && <> · {t.cost.toLowerCase()} <strong>{formatIDR(totalCost)}</strong></>}
+        {loanEnabled ? '' : ` · new requests can only be made at a stage with ${t.action} enabled`}
       </p>
       {loans.length === 0
-        ? <div className="no-data">Nothing rented yet. Use &ldquo;Rent Item&rdquo; above to rent items from a rent vendor.</div>
+        ? <div className="no-data">Nothing {t.tab.toLowerCase()} yet. Use &ldquo;{t.action}&rdquo; above to order items from a {t.vendor.toLowerCase()}.</div>
         : (
           <div className="production-list">
             {loans.map(l => {
@@ -36,9 +41,9 @@ export function EventLoansPanel({ loans, loanEnabled, locked, onAdvance, onCance
                 <div key={l.id} className="production-card">
                   <div className="production-card-main">
                     <div className="production-card-title">
-                      <span className="badge badge-blue" style={{ fontSize: 10.5 }}>Rent</span>
+                      <span className={`badge ${kind === 'outsource' ? 'badge-purple' : 'badge-blue'}`} style={{ fontSize: 10.5 }}>{t.badge}</span>
                       {l.itemName}
-                      <span className={`badge ${LOAN_BADGE[status]}`} style={{ fontSize: 10.5 }}>{LOAN_LABEL[status]}</span>
+                      <span className={`badge ${LOAN_BADGE[status]}`} style={{ fontSize: 10.5 }}>{LABEL[status]}</span>
                     </div>
                     <div className="production-card-meta">
                       <span>Qty {fmtNum(l.qty)} {l.unit}</span>
@@ -51,8 +56,8 @@ export function EventLoansPanel({ loans, loanEnabled, locked, onAdvance, onCance
                     {l.note && <div className="production-card-note">{l.note}</div>}
                     <div className={`production-card-note ${status === 'Overdue' ? 'warn' : 'info'}`}>
                       {l.status === 'Requested' && 'When the item arrives, mark it received: it is added to this event’s items as Outsource.'}
-                      {l.status === 'Borrowed' && (status === 'Overdue' ? `Past due (${fmt(l.dueDate)}). Return it to the vendor.` : `Received ${fmt(l.borrowedAt)}. Return it by ${fmt(l.dueDate)}.`)}
-                      {l.status === 'Returned' && `Returned to the vendor on ${fmt(l.returnedAt)}.`}
+                      {l.status === 'Borrowed' && (status === 'Overdue' ? `Past due (${fmt(l.dueDate)}). ${kind === 'outsource' ? 'Mark it completed.' : 'Return it to the vendor.'}` : `Received ${fmt(l.borrowedAt)}. ${kind === 'outsource' ? 'Ends' : 'Return it by'} ${fmt(l.dueDate)}.`)}
+                      {l.status === 'Returned' && `${t.done} on ${fmt(l.returnedAt)}.`}
                     </div>
                   </div>
                   <div className="production-card-actions">
@@ -61,10 +66,10 @@ export function EventLoansPanel({ loans, loanEnabled, locked, onAdvance, onCance
                     )}
                     {next && (
                       <button type="button" className="btn-save-modal" onClick={() => onAdvance(l)} disabled={locked && next === 'Borrowed'}>
-                        {next === 'Borrowed' ? 'Mark Received' : 'Mark Returned'}
+                        {next === 'Borrowed' ? 'Mark Received' : t.markDone}
                       </button>
                     )}
-                    {!next && <span className="production-done-note">Returned</span>}
+                    {!next && <span className="production-done-note">{t.done}</span>}
                   </div>
                 </div>
               );
@@ -75,14 +80,16 @@ export function EventLoansPanel({ loans, loanEnabled, locked, onAdvance, onCance
   );
 }
 
-// Borrow Item form. `vendors` = loan vendors; `areas` / `subAreas` from Area master data;
-// `catalogNames` = suggestions (a borrowed item doesn't have to be in our catalog).
-// target = 'event' (Event Detail → Borrow Item: Area / Sub Area) or 'warehouse'
-// (Loan → New Rental: which of our warehouses keeps it + purpose; `warehouses` required).
-export function BorrowItemModal({ target = 'event', vendors, areas = [], subAreas = {}, warehouses = [], catalogNames, defaultDate, onClose, onSubmit }) {
+// Rent Item / Outsource Item form (kind = 'loan' | 'outsource'). `areas` / `subAreas` from Area master data.
+// target = 'event' (Event Detail: Area / Sub Area) or 'warehouse' (Rent → New Rental: which of
+// our warehouses keeps it + purpose; `warehouses` required).
+// Item: picked from Inventory master data, or added to it right here (CatalogItemPicker).
+// Vendor: only vendors of this kind (Master Data → Rent / Outsource), or added right here (VendorPicker).
+export function BorrowItemModal({ kind = 'loan', target = 'event', areas = [], subAreas = {}, warehouses = [], by = 'Admin', defaultDate, onClose, onSubmit }) {
   const forEvent = target === 'event';
+  const t = kindText(kind);
   const [form, setForm] = useState({
-    itemName: '', qty: 1, unit: 'pcs', area: '', subArea: '', warehouse: '', purpose: '', vendorId: '',
+    itemName: '', qty: 1, unit: 'pcs', area: '', vendorName: '', subArea: '', warehouse: '', purpose: '', vendorId: '',
     startDate: defaultDate, dueDate: '', rentalCost: '', note: '',
   });
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -92,11 +99,10 @@ export function BorrowItemModal({ target = 'event', vendors, areas = [], subArea
 
   function submit() {
     if (!valid) return;
-    const vendor = vendors.find(v => String(v.id) === String(form.vendorId));
     onSubmit({
       itemName: form.itemName.trim(), qty: Math.floor(Number(form.qty)), unit: form.unit,
       ...(forEvent ? { area: form.area, subArea: form.subArea } : { warehouse: form.warehouse, purpose: form.purpose.trim() }),
-      vendorId: vendor?.id ?? null, vendorName: vendor?.name || '',
+      vendorId: Number(form.vendorId), vendorName: form.vendorName,
       startDate: form.startDate, dueDate: form.dueDate, rentalCost: Math.max(0, Math.floor(Number(form.rentalCost) || 0)),
       note: form.note.trim(),
     });
@@ -105,7 +111,7 @@ export function BorrowItemModal({ target = 'event', vendors, areas = [], subArea
   return (
     <Modal
       open
-      title={forEvent ? 'Rent Item' : 'New Rental'}
+      title={forEvent ? t.action : `New ${t.name === 'Rent' ? 'Rental' : t.name}`}
       onClose={onClose}
       footer={
         <>
@@ -116,13 +122,19 @@ export function BorrowItemModal({ target = 'event', vendors, areas = [], subArea
     >
       <p style={{ fontSize: 12.5, color: 'var(--text-muted)', margin: '0 0 14px' }}>
         {forEvent
-          ? <>Rent an item we don&rsquo;t have (enough of) from a rent vendor. It is added to this event when you mark it received.</>
+          ? (kind === 'outsource'
+            ? <>Order an item or work from an outsource vendor for this event. It is added to this event&rsquo;s items (as Outsource) when you mark it received.</>
+            : <>Rent an item we don&rsquo;t have (enough of) from a rent vendor. It is added to this event when you mark it received.</>)
           : <>Rent items from a rent vendor and keep them in one of our warehouses (not for a specific event). Rented items are not our assets, so our stock and asset value don&rsquo;t change.</>}
       </p>
       <div className="form-group">
         <label>Item <span style={{ color: 'var(--red)' }}>*</span></label>
-        <input type="text" list="borrow-item-names" placeholder="e.g. Champagne Glass Coupe" value={form.itemName} onChange={e => set('itemName', e.target.value)} />
-        <datalist id="borrow-item-names">{catalogNames.map(n => <option key={n} value={n} />)}</datalist>
+        <CatalogItemPicker
+          value={form.itemName}
+          by={by}
+          extra={{ source: kind === 'outsource' ? 'outsource' : 'rent' }}
+          onChange={(name, item) => setForm(f => ({ ...f, itemName: name, unit: item?.unit || f.unit }))}
+        />
       </div>
       <div className="form-row">
         <div className="form-group">
@@ -162,23 +174,22 @@ export function BorrowItemModal({ target = 'event', vendors, areas = [], subArea
       </div>
       )}
       <div className="form-group">
-        <label>Rent Vendor <span style={{ color: 'var(--red)' }}>*</span></label>
-        <SearchableSelect value={form.vendorId} onChange={v => set('vendorId', v)} placeholder="Who do we rent from?"
-          options={vendors.map(v => ({ value: String(v.id), label: v.name, meta: v.phone || '' }))} />
-        {vendors.length === 0 && <p style={{ fontSize: 11.5, color: 'var(--orange)', margin: '5px 0 0' }}>No rent vendors yet. Add one in Master Data &rarr; Rent.</p>}
+        <label>{t.vendor.replace(' vendor', ' Vendor')} <span style={{ color: 'var(--red)' }}>*</span></label>
+        <VendorPicker kind={kind} value={form.vendorId} by={by}
+          onChange={(id, v) => setForm(f => ({ ...f, vendorId: id, vendorName: v?.name || '' }))} />
       </div>
       <div className="form-row">
         <div className="form-group">
-          <label>Rent from <span style={{ color: 'var(--red)' }}>*</span></label>
+          <label>{t.from} <span style={{ color: 'var(--red)' }}>*</span></label>
           <input type="date" value={form.startDate} onChange={e => set('startDate', e.target.value)} />
         </div>
         <div className="form-group">
-          <label>Return by <span style={{ color: 'var(--red)' }}>*</span></label>
+          <label>{t.until} <span style={{ color: 'var(--red)' }}>*</span></label>
           <input type="date" min={form.startDate} value={form.dueDate} onChange={e => set('dueDate', e.target.value)} />
         </div>
       </div>
       <div className="form-group">
-        <label>Rental cost per unit (Rp)</label>
+        <label>{t.cost} per unit (Rp)</label>
         <input type="number" min="0" placeholder="Optional" value={form.rentalCost} onChange={e => set('rentalCost', e.target.value)} />
         {total > 0 && <p style={{ fontSize: 11.5, color: 'var(--text-muted)', margin: '5px 0 0' }}>Total: {formatIDR(total)}</p>}
       </div>

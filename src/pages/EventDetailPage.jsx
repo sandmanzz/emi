@@ -9,14 +9,15 @@ import { initialAreas, SUB_AREAS } from '../data/areas';
 import { inventoryData, categories } from '../data/inventory';
 import { initialWarehouses } from '../data/warehouses';
 import { wiData } from '../data/warehouseInventory';
-import { getEventStageNames, isScanStage, isCuttingStockStage, isStockReturnStage, isProductionStage, isCheckOwnershipStage, isDeleteAllowedStage, isLoanStage } from '../lib/eventStatuses';
+import { getEventStageNames, isScanStage, isCuttingStockStage, isStockReturnStage, isProductionStage, isCheckOwnershipStage, isDeleteAllowedStage, isLoanStage, isOutsourceStage } from '../lib/eventStatuses';
 import { getInventoryRows, applyStockMovement } from '../lib/stockOpnameStore';
-import { getVendorsOfKind, VENDOR_ORIGINS } from '../lib/vendorStore';
+import { VENDOR_ORIGINS } from '../lib/vendorStore';
+import { CatalogItemPicker, VendorPicker } from '../components/QuickPickers';
 import { getCatalog, stockInProduced } from '../lib/producedItems';
 import PrintPlanModal from '../components/PrintPlanModal';
 import { getEventSeedItems } from '../lib/eventItems';
 import { EventLoansPanel, BorrowItemModal } from '../components/EventLoans';
-import { getEventLoans, saveEventLoans, LOAN_STATUSES } from '../lib/eventLoans';
+import { getEventLoans, saveEventLoans, LOAN_STATUSES, kindText, statusLabels } from '../lib/eventLoans';
 import { getProductionRequests, saveProductionRequests, PRODUCTION_STATUSES, PRODUCTION_BADGE } from '../lib/productionRequests';
 import { resolveEventStage, saveEventProgress, getEventFurthestStage, saveEventFurthestStage } from '../lib/eventProgress';
 import { getEventClosing, setEventClosing, isOnGoingByItems } from '../lib/eventClosing';
@@ -418,16 +419,18 @@ export default function EventDetailPage() {
 
   // Production requests (only offered at stages with productionItem: true)
   const productionEnabled = isProductionStage(eventStatus);
-  // Borrow Item (rent from a loan vendor) — only offered at stages with loanItem: true.
+  // Rent Item (rent from a rent vendor) — only offered at stages with loanItem: true.
+  // Outsource Item (order from an outsource vendor, 2026-11-02) — stages with outsourceItem: true.
+  // Both use the same records/flow (lib/eventLoans.js, kind 'loan' | 'outsource').
   const loanEnabled = isLoanStage(eventStatus);
+  const outsourceEnabled = isOutsourceStage(eventStatus);
   const [eventLoans, setEventLoansState] = useState(() => getEventLoans(eventName));
-  const [borrowOpen, setBorrowOpen] = useState(false);
+  const [eventOutsource, setEventOutsourceState] = useState(() => getEventLoans(eventName, 'outsource'));
+  const [borrowOpen, setBorrowOpen] = useState(null); // null | 'loan' | 'outsource'
   const [productionRequests, setProductionRequestsState] = useState(() => getProductionRequests(eventName));
   const [productionOpen, setProductionOpen] = useState(false);
-  const EMPTY_PRODUCTION_FORM = { name: '', qty: 1, area: '', subArea: '', warehouse: '', vendorOrigin: 'Internal', vendorId: '', note: '', replacesItemId: null };
+  const EMPTY_PRODUCTION_FORM = { name: '', qty: 1, area: '', subArea: '', warehouse: '', vendorOrigin: 'Internal', vendorId: '', vendorName: '', note: '', replacesItemId: null };
   const [productionForm, setProductionForm] = useState(EMPTY_PRODUCTION_FORM);
-  const [vendors, setVendors] = useState(() => getVendorsOfKind('production')); // re-read when the modal opens
-  const vendorOptions = vendors.filter(v => v.origin === productionForm.vendorOrigin);
   const [productionTab, setProductionTab] = useState('new'); // 'new' | 'convert'
   const [convertForm, setConvertForm] = useState({ fromRowId: '', fromQty: 1, toName: '', toQty: 1 });
 
@@ -958,13 +961,12 @@ export default function EventDetailPage() {
     if (!canRequestProduction) return;
     setProductionForm({
       name: item.name, qty: item.brokenQty || 1, area: item.area, subArea: item.subArea || '',
-      warehouse: '', vendorOrigin: 'Internal', vendorId: '',
+      warehouse: '', vendorOrigin: 'Internal', vendorId: '', vendorName: '',
       note: `Replacement for ${item.brokenQty} broken unit(s) of "${item.name}"${item.brokenNote ? ` — ${item.brokenNote}` : ''}`,
       replacesItemId: item.id,
     });
     setConvertForm({ fromRowId: '', fromQty: 1, toName: '', toQty: 1 });
     setProductionTab('new');
-    setVendors(getVendorsOfKind('production'));
     setDetailItemId(null);
     setProductionOpen(true);
   }
@@ -982,7 +984,6 @@ export default function EventDetailPage() {
     setProductionForm(EMPTY_PRODUCTION_FORM);
     setConvertForm({ fromRowId: '', fromQty: 1, toName: '', toQty: 1 });
     setProductionTab('new');
-    setVendors(getVendorsOfKind('production'));
     setProductionOpen(true);
   }
 
@@ -996,7 +997,7 @@ export default function EventDetailPage() {
       id, name: productionForm.name.trim(), qty: Math.floor(Number(productionForm.qty)),
       area: productionForm.area, subArea: productionForm.subArea, type: 'production',
       warehouse: productionForm.warehouse, vendorOrigin: productionForm.vendorOrigin,
-      vendorId: Number(productionForm.vendorId), vendorName: vendors.find(v => String(v.id) === String(productionForm.vendorId))?.name || '',
+      vendorId: Number(productionForm.vendorId), vendorName: productionForm.vendorName,
       replacesItemId: productionForm.replacesItemId,
       note: productionForm.note.trim(), status: 'Requested', stage: eventStatus,
       requestedBy: currentUser?.name || 'Admin', requestedAt: new Date().toLocaleDateString('en-CA'), // local YYYY-MM-DD
@@ -1035,31 +1036,35 @@ export default function EventDetailPage() {
     });
   }
 
-  // --- Borrow Item (event loans) ---
-  function setEventLoans(updater) {
-    setEventLoansState(current => {
+  // --- Rent Item / Outsource Item (lib/eventLoans.js; kind 'loan' | 'outsource') ---
+  function setRentLike(kind, updater) {
+    const setState = kind === 'outsource' ? setEventOutsourceState : setEventLoansState;
+    setState(current => {
       const next = typeof updater === 'function' ? updater(current) : updater;
-      saveEventLoans(eventName, next);
+      saveEventLoans(eventName, next, kind);
       return next;
     });
   }
 
-  function submitBorrow(data) {
+  function submitBorrow(kind, data) {
+    const list = kind === 'outsource' ? eventOutsource : eventLoans;
+    const t = kindText(kind);
     const loan = {
-      ...data, id: Math.max(0, ...eventLoans.map(l => l.id)) + 1, status: 'Requested', stage: eventStatus,
+      ...data, id: Math.max(0, ...list.map(l => l.id)) + 1, status: 'Requested', stage: eventStatus,
       requestedBy: currentUser?.name || 'Admin', requestedAt: new Date().toLocaleDateString('en-CA'), borrowedAt: null, returnedAt: null,
     };
-    setEventLoans(ls => [loan, ...ls]);
+    setRentLike(kind, ls => [loan, ...ls]);
     addActivityLog({
       userName: loan.requestedBy, action: 'Create', module: 'Event Detail',
-      description: `Rent request: ${loan.qty} ${loan.unit} "${loan.itemName}" from ${loan.vendorName} for ${eventName} (${loan.startDate} → ${loan.dueDate})`,
+      description: `${t.name} request: ${loan.qty} ${loan.unit} "${loan.itemName}" from ${loan.vendorName} for ${eventName} (${loan.startDate} → ${loan.dueDate})`,
     });
-    setBorrowOpen(false);
-    setStageFilter('loans');
+    setBorrowOpen(null);
+    setStageFilter(kind === 'outsource' ? 'outsource' : 'loans');
   }
 
-  // Requested → Borrowed (the item joins the event as Outsource) → Returned.
-  function advanceLoan(loan) {
+  // Requested → Borrowed (received: the item joins the event as Outsource) → Returned / Completed.
+  function advanceLoan(kind, loan) {
+    const t = kindText(kind);
     const nextStatus = LOAN_STATUSES[LOAN_STATUSES.indexOf(loan.status) + 1];
     if (!nextStatus) return;
     const today = new Date().toLocaleDateString('en-CA');
@@ -1069,24 +1074,24 @@ export default function EventDetailPage() {
         id: nextId, name: loan.itemName, area: loan.area, subArea: loan.subArea || '', stage: eventStatus,
         qty: loan.qty, pic: '', checking: false, scanned: false, groupId: null, warehouseItem: false,
         scanIn: null, scanOut: null, note: loan.note || '', checked: false, ownership: 'Outsource',
-        fromLoan: true, loanVendor: loan.vendorName,
+        ...(kind === 'outsource' ? { fromOutsource: true } : { fromLoan: true }), loanVendor: loan.vendorName,
       }]);
       setNextId(n => n + 1);
-    } else if (!window.confirm(`Mark "${loan.itemName}" as returned to ${loan.vendorName}?`)) {
+    } else if (!window.confirm(`Mark "${loan.itemName}" as ${t.doneVerb}?`)) {
       return;
     }
-    setEventLoans(ls => ls.map(l => l.id !== loan.id ? l : {
+    setRentLike(kind, ls => ls.map(l => l.id !== loan.id ? l : {
       ...l, status: nextStatus, ...(nextStatus === 'Borrowed' ? { borrowedAt: today } : { returnedAt: today }),
     }));
     addActivityLog({
       userName: currentUser?.name || 'Admin', action: 'Update', module: 'Event Detail',
-      description: `Rented item "${loan.itemName}" on ${eventName} → ${nextStatus === 'Borrowed' ? 'Rented' : nextStatus}`,
+      description: `${t.name} "${loan.itemName}" on ${eventName} → ${statusLabels(kind)[nextStatus]}`,
     });
   }
 
-  function cancelLoan(loan) {
-    if (!window.confirm(`Cancel the rent request for "${loan.itemName}"?`)) return;
-    setEventLoans(ls => ls.filter(l => l.id !== loan.id));
+  function cancelLoan(kind, loan) {
+    if (!window.confirm(`Cancel the ${kindText(kind).record} request for "${loan.itemName}"?`)) return;
+    setRentLike(kind, ls => ls.filter(l => l.id !== loan.id));
   }
 
   function cancelProductionRequest(req) {
@@ -1251,8 +1256,14 @@ export default function EventDetailPage() {
           </div>
 
           <div className="event-actions-bar">
+            {outsourceEnabled && closingStatus === 'on-going' && !addLocked && (
+              <button className="btn btn-ghost btn-request-production" onClick={() => setBorrowOpen('outsource')}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+                Outsource Item
+              </button>
+            )}
             {loanEnabled && closingStatus === 'on-going' && !addLocked && (
-              <button className="btn btn-ghost btn-request-production" onClick={() => setBorrowOpen(true)}>
+              <button className="btn btn-ghost btn-request-production" onClick={() => setBorrowOpen('loan')}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 3h5v5"/><path d="M21 3l-7 7"/><path d="M8 21H3v-5"/><path d="M3 21l7-7"/></svg>
                 Rent Item
               </button>
@@ -1423,6 +1434,11 @@ export default function EventDetailPage() {
               Rented <span className="stage-tab-count">{eventLoans.length}</span>
             </button>
           )}
+          {(outsourceEnabled || eventOutsource.length > 0) && (
+            <button type="button" className={`stage-tab${effectiveStageFilter === 'outsource' ? ' active' : ''}`} onClick={() => setStageFilter('outsource')}>
+              Outsourced <span className="stage-tab-count">{eventOutsource.length}</span>
+            </button>
+          )}
         </div>
           <div className="view-toggle" role="group" aria-label="Item view">
             <button type="button" className={viewMode === 'card' ? 'active' : ''} aria-pressed={viewMode === 'card'} title="Card view" onClick={() => changeViewMode('card')}>
@@ -1434,14 +1450,16 @@ export default function EventDetailPage() {
           </div>
         </div>
 
-        {effectiveStageFilter === 'loans' ? (
+        {effectiveStageFilter === 'loans' || effectiveStageFilter === 'outsource' ? (
           <EventLoansPanel
-            loans={eventLoans}
-            loanEnabled={loanEnabled}
+            key={effectiveStageFilter}
+            kind={effectiveStageFilter === 'outsource' ? 'outsource' : 'loan'}
+            loans={effectiveStageFilter === 'outsource' ? eventOutsource : eventLoans}
+            loanEnabled={effectiveStageFilter === 'outsource' ? outsourceEnabled : loanEnabled}
             locked={itemsLocked}
-            onAdvance={advanceLoan}
-            onCancel={cancelLoan}
-            onOpenVendor={id => navigate(`/rent-vendor-detail?id=${id}`)}
+            onAdvance={l => advanceLoan(effectiveStageFilter === 'outsource' ? 'outsource' : 'loan', l)}
+            onCancel={l => cancelLoan(effectiveStageFilter === 'outsource' ? 'outsource' : 'loan', l)}
+            onOpenVendor={id => navigate(`${kindText(effectiveStageFilter === 'outsource' ? 'outsource' : 'loan').detail}?id=${id}`)}
           />
         ) : effectiveStageFilter === 'production' ? (
           <>
@@ -1777,13 +1795,14 @@ export default function EventDetailPage() {
 
       {borrowOpen && (
         <BorrowItemModal
-          vendors={getVendorsOfKind('loan')}
+          key={borrowOpen}
+          kind={borrowOpen}
           areas={AREAS}
           subAreas={SUB_AREAS}
-          catalogNames={getCatalog().map(i => i.name)}
+          by={currentUser?.name || 'Admin'}
           defaultDate={TODAY.toISOString().slice(0, 10)}
-          onClose={() => setBorrowOpen(false)}
-          onSubmit={submitBorrow}
+          onClose={() => setBorrowOpen(null)}
+          onSubmit={data => submitBorrow(borrowOpen, data)}
         />
       )}
 
@@ -1885,7 +1904,7 @@ export default function EventDetailPage() {
             ['Sub Area', detailItem.subArea || '—'],
             ['Ownership', detailItem.ownership || '—'],
             ['Added at stage', detailItem.stage],
-            ['Source', detailItem.fromLoan ? `Rented from ${detailItem.loanVendor || 'rent vendor'}` : detailItem.fromConvert ? 'Convert request' : detailItem.fromProduction ? 'Production request' : detailItem.warehouseItem ? 'Warehouse inventory' : 'Non-warehouse item'],
+            ['Source', detailItem.fromOutsource ? `Outsourced to ${detailItem.loanVendor || 'outsource vendor'}` : detailItem.fromLoan ? `Rented from ${detailItem.loanVendor || 'rent vendor'}` : detailItem.fromConvert ? 'Convert request' : detailItem.fromProduction ? 'Production request' : detailItem.warehouseItem ? 'Warehouse inventory' : 'Non-warehouse item'],
             ['Group', group ? group.name : '—'],
             ['Checking', detailItem.checking ? 'Yes' : 'No'],
             ['Cross-checked', detailItem.checked ? 'Yes' : 'No'],
@@ -2018,15 +2037,20 @@ export default function EventDetailPage() {
         {productionTab === 'new' ? (
           <>
             <p className="confirm-msg" style={{ marginTop: 0, marginBottom: 12 }}>
-              Ask for a new item that isn&rsquo;t in inventory to be produced for this event. Once it&rsquo;s marked done, it&rsquo;s added to the event&rsquo;s items.
+              Ask for an item to be produced for this event. Pick it from master data, or add a new item right here. Once it&rsquo;s marked done, it&rsquo;s added to the event&rsquo;s items.
             </p>
             <div className="prod-notice prod-notice-info">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-              <div>After the item is made it is added to <strong>Inventory</strong> and <strong>Warehouse Inventory</strong> marked <em>Needs setup</em>. Its information (SKU, category, unit, rack, etc.) must then be completed in the Inventory menu.</div>
+              <div>Not in the list? Choose <strong>+ Add &hellip; as new item</strong>: it is saved to <strong>Inventory</strong> master data right away (no need to open Master Data first). When the production is done, its stock goes into the deploy-to warehouse.</div>
             </div>
             <div className="form-group">
               <label>Item Name <span style={{ color: 'var(--red)' }}>*</span></label>
-              <input type="text" placeholder="e.g. Custom Welcome Sign 1×2m" value={productionForm.name} onChange={e => setProductionForm(f => ({ ...f, name: e.target.value }))} />
+              <CatalogItemPicker
+                value={productionForm.name}
+                by={currentUser?.name || 'Admin'}
+                extra={{ source: 'production' }}
+                onChange={name => setProductionForm(f => ({ ...f, name }))}
+              />
             </div>
             <div className="form-group">
               <label>Quantity <span style={{ color: 'var(--red)' }}>*</span></label>
@@ -2048,23 +2072,20 @@ export default function EventDetailPage() {
                 {VENDOR_ORIGINS.map(o => (
                   <button key={o} type="button" role="radio" aria-checked={productionForm.vendorOrigin === o}
                     className={productionForm.vendorOrigin === o ? 'active' : ''}
-                    onClick={() => setProductionForm(f => ({ ...f, vendorOrigin: o, vendorId: '' }))}>
+                    onClick={() => setProductionForm(f => ({ ...f, vendorOrigin: o, vendorId: '', vendorName: '' }))}>
                     {o === 'Internal' ? 'Internal vendor' : 'External vendor'}
                   </button>
                 ))}
               </div>
               <div style={{ marginTop: 8 }}>
-                <SearchableSelect
+                <VendorPicker
+                  kind="production"
+                  origin={productionForm.vendorOrigin}
                   value={productionForm.vendorId}
-                  onChange={v => setProductionForm(f => ({ ...f, vendorId: v }))}
-                  placeholder={`Select ${productionForm.vendorOrigin.toLowerCase()} vendor`}
-                  emptyText="No vendor found"
-                  options={vendorOptions.map(v => ({ value: String(v.id), label: v.name, meta: v.phone || '' }))}
+                  by={currentUser?.name || 'Admin'}
+                  onChange={(id, v) => setProductionForm(f => ({ ...f, vendorId: id, vendorName: v?.name || '' }))}
                 />
               </div>
-              {vendorOptions.length === 0 && (
-                <p style={{ fontSize: 11.5, color: 'var(--orange)', margin: '5px 0 0' }}>No {productionForm.vendorOrigin.toLowerCase()} vendors yet. Add one in Master Data &rarr; Vendor.</p>
-              )}
             </div>
             <div className="form-row">
               <div className="form-group">

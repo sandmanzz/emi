@@ -5,7 +5,7 @@ import { IconClose, IconCheck } from './icons';
 import { initialCategories } from '../data/categories';
 import { initialUnits } from '../data/units';
 import { initialWarehouses } from '../data/warehouses';
-import { addCatalogItem, updateCatalogItem, isNameTaken, isSkuTaken } from '../lib/catalogStore';
+import { addCatalogItem, updateCatalogItem, isNameTaken, isSkuTaken, suggestSku } from '../lib/catalogStore';
 import { formatIDR } from '../lib/superAdminUtils';
 import { fmtNum } from '../lib/format';
 
@@ -14,10 +14,13 @@ import { fmtNum } from '../lib/format';
 //   A new item can get its opening stock in one warehouse (logged as 'Opening stock').
 // - Item Value (Rp per unit) drives the asset value and is copied to the rows' valuation.
 // - A "Needs setup" draft is cleared automatically once category and unit are filled in.
-export default function ItemFormModal({ item = null, by = 'Admin', onClose, onSaved }) {
+// - Quick add from another form (2026-11-02: Event Detail → Rent / Outsource / Request Production):
+//   `initialName` pre-fills the name (and a free SKU), `extra` is merged into the new item
+//   (e.g. { source: 'production', needsSetup: true }) and `hideStock` hides the opening stock.
+export default function ItemFormModal({ item = null, by = 'Admin', initialName = '', extra = null, hideStock = false, title, onClose, onSaved }) {
   const warehouses = useMemo(() => [...new Set(initialWarehouses.map(w => w.name))].filter(w => w !== 'Buy').sort(), []);
   const [form, setForm] = useState(() => ({
-    name: item?.name || '', sku: item?.sku || '', category: item?.category || '', unit: item?.unit || '',
+    name: item?.name || initialName, sku: item?.sku || (initialName ? suggestSku(initialName) : ''), category: item?.category || '', unit: item?.unit || '',
     itemValue: item?.itemValue ? String(item.itemValue) : '', desc: item?.desc || '',
     homeWarehouse: item?.homeWarehouse || item?.warehouse || '', openingQty: '', openingWarehouse: '',
   }));
@@ -46,6 +49,7 @@ export default function ItemFormModal({ item = null, by = 'Admin', onClose, onSa
       itemValue: value, desc: form.desc.trim(), homeWarehouse: form.homeWarehouse,
       // completing category + unit finishes a production draft
       needsSetup: item?.needsSetup ? !(form.category && form.unit) : false,
+      ...(!item && extra ? extra : {}),
     };
     const saved = item
       ? updateCatalogItem(item.id, data)
@@ -59,7 +63,7 @@ export default function ItemFormModal({ item = null, by = 'Admin', onClose, onSa
     <Modal
       open
       size="lg"
-      title={item ? `Edit Item — ${item.name}` : 'New Item'}
+      title={title || (item ? `Edit Item — ${item.name}` : 'New Item')}
       onClose={onClose}
       footer={
         <>
@@ -120,7 +124,7 @@ export default function ItemFormModal({ item = null, by = 'Admin', onClose, onSa
         <textarea rows={2} placeholder="Optional" value={form.desc} onChange={e => set('desc', e.target.value)} />
       </div>
 
-      {!item ? (
+      {hideStock ? null : !item ? (
         <div className="item-form-stock">
           <div className="item-form-stock-title">Opening stock <span>(optional)</span></div>
           <div className="form-row">

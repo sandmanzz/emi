@@ -4,7 +4,7 @@ import VendorFormModal from '../components/VendorFormModal';
 import LoanLogTab from '../components/LoanLogTab';
 import { IconEdit } from '../components/icons';
 import { getVendor, updateVendor } from '../lib/vendorStore';
-import { getAllEventLoans, loanTotalCost } from '../lib/eventLoans';
+import { getAllEventLoans, loanTotalCost, kindText } from '../lib/eventLoans';
 import { formatIDR } from '../lib/superAdminUtils';
 import { addActivityLog } from '../lib/activityLogStore';
 import { getCurrentTenantUser } from '../lib/tenantAuth';
@@ -22,7 +22,9 @@ function InfoRow({ label, children }) {
 // Rent vendor detail (/rent-vendor-detail?id=; "Loan" renamed "Rent" 2026-10-19): the vendor's
 // profile (no Internal / External for rent vendors) plus everything we rented from them — which item, how many, for which event, when, and what it cost.
 // Records = every rental from this vendor: event rentals (Rent Item) and warehouse rentals.
-export default function LoanVendorDetailPage() {
+// kind = 'loan' (/rent-vendor-detail) or 'outsource' (/outsource-vendor-detail, 2026-11-02).
+export default function LoanVendorDetailPage({ kind = 'loan' }) {
+  const t = kindText(kind);
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const currentUser = getCurrentTenantUser();
@@ -30,13 +32,13 @@ export default function LoanVendorDetailPage() {
   const [vendor, setVendor] = useState(() => getVendor(id));
   const [editOpen, setEditOpen] = useState(false);
 
-  const loans = useMemo(() => getAllEventLoans().filter(l => l.vendorId === id), [id]);
+  const loans = useMemo(() => getAllEventLoans(kind).filter(l => l.vendorId === id), [id, kind]);
 
   if (!vendor) {
     return (
       <div style={{ padding: 40, textAlign: 'center' }}>
         <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>Vendor not found.</p>
-        <button className="btn-new" style={{ marginTop: 12 }} onClick={() => navigate('/rent')}>Back to Rent</button>
+        <button className="btn-new" style={{ marginTop: 12 }} onClick={() => navigate(t.menu)}>Back to {t.name}</button>
       </div>
     );
   }
@@ -56,7 +58,7 @@ export default function LoanVendorDetailPage() {
 
   function save(data) {
     updateVendor(vendor.id, data);
-    addActivityLog({ userName: currentUser?.name || 'Admin', action: 'Update', module: 'Rent', description: `Updated vendor "${data.name}"` });
+    addActivityLog({ userName: currentUser?.name || 'Admin', action: 'Update', module: t.name, description: `Updated vendor "${data.name}"` });
     setVendor(getVendor(vendor.id));
     setEditOpen(false);
   }
@@ -65,7 +67,7 @@ export default function LoanVendorDetailPage() {
     <>
       <div className="detail-header">
         <button
-          onClick={() => navigate('/rent')}
+          onClick={() => navigate(t.menu)}
           style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 13, color: 'var(--text-muted)', fontWeight: 500 }}
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 14, height: 14 }}><polyline points="15 18 9 12 15 6" /></svg>
@@ -73,7 +75,7 @@ export default function LoanVendorDetailPage() {
         </button>
         <h1 className="page-title" style={{ margin: 0, flex: 1, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           {vendor.name}
-          <span className="badge badge-blue" style={{ fontSize: 11 }}>Rent vendor</span>
+          <span className="badge badge-blue" style={{ fontSize: 11 }}>{t.vendor}</span>
         </h1>
         <button className="btn btn-ghost" onClick={() => setEditOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <IconEdit /> Edit
@@ -87,12 +89,12 @@ export default function LoanVendorDetailPage() {
           <InfoRow label="Address">{vendor.address}</InfoRow>
           <InfoRow label="Description">{vendor.description}</InfoRow>
           <InfoRow label="Events served">{events.size ? `${events.size} event${events.size === 1 ? '' : 's'}` : null}</InfoRow>
-          <InfoRow label="Rental cost">{totalCost ? formatIDR(totalCost) : null}</InfoRow>
+          <InfoRow label={t.cost}>{totalCost ? formatIDR(totalCost) : null}</InfoRow>
         </div>
         <div className="card" style={{ padding: 22 }}>
-          <div className="section-dot-label"><span style={{ background: 'var(--green)' }} />Items Rented</div>
+          <div className="section-dot-label"><span style={{ background: 'var(--green)' }} />Items {t.tab}</div>
           {byItem.length === 0
-            ? <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>Nothing rented from this vendor yet.</p>
+            ? <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>Nothing {t.tab.toLowerCase()} from this vendor yet.</p>
             : (
               <ul className="vendor-item-list">
                 {byItem.map(r => (
@@ -103,7 +105,7 @@ export default function LoanVendorDetailPage() {
                     </div>
                     <span className="vendor-item-qty">
                       {fmtNum(r.qty)} {r.unit}
-                      {r.out > 0 && <em> · {r.out} out now</em>}
+                      {r.out > 0 && <em> · {fmtNum(r.out)} {kind === 'outsource' ? 'received' : 'out now'}</em>}
                     </span>
                   </li>
                 ))}
@@ -112,11 +114,11 @@ export default function LoanVendorDetailPage() {
         </div>
       </div>
 
-      <div className="section-dot-label"><span style={{ background: 'var(--orange)' }} />Rent History</div>
-      <LoanLogTab vendorId={id} />
+      <div className="section-dot-label"><span style={{ background: 'var(--orange)' }} />{t.name} History</div>
+      <LoanLogTab kind={kind} vendorId={id} />
 
 
-      {editOpen && <VendorFormModal vendor={vendor} defaultKind="loan" onClose={() => setEditOpen(false)} onSave={save} />}
+      {editOpen && <VendorFormModal vendor={vendor} defaultKind={kind} onClose={() => setEditOpen(false)} onSave={save} />}
     </>
   );
 }
