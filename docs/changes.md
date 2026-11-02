@@ -50,6 +50,12 @@ explains a few non-obvious conventions that the entries below assume you already
 
 ---
 
+## Round 37 — Technical system-schema PRD (docs only, 2026-11-02)
+
+New `docs/prd/PRD-TECHNICAL-SYSTEM-SCHEMA.md` for tuning the mobile app. No code change.
+
+---
+
 ## Round 36 — Multi-event rental seed, rent vs production wording, past-event lock, date rule, Modify Item (2026-11-02)
 
 - `data/eventLoanSeed.js`: Gold Charger Plate on 5 events, new lists for Corporate Gala Bali, Grand Gala Night, Baby Shower Mila.

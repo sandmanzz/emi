@@ -899,6 +899,13 @@ clashes or seems off) — proceeding with the stated assumption unless corrected
 
 ## Raw instruction log
 
+### 2026-11-02 (3) — Super-technical system PRD for the mobile app (Claude Web)
+> tolong buatkan PRD super teknis, terkait skema sistem yang kita punya karena saya akan feed untuk claude untuk meng tune up mobile app yang ada. berikan secara sangat detail dan terperinci
+
+- Written `docs/prd/PRD-TECHNICAL-SYSTEM-SCHEMA.md`: data model of every entity/field, enums, state machines, business
+  rules, formulas, screens, target REST API with error codes, mobile guidance, known prototype gaps, file map.
+  Docs only, no code change.
+
 ### 2026-11-02 (2) — Multi-event sample data, rent vs production, past events locked, date logic, Modify Item (Claude Web)
 > 1. tambahkan juga sample data apabila barang tersebut dipakai di multiple event.
 > 2. perlu dicatat bahwa rent adalah sifatnya ketika barang sudah selesai akan dikembalikan beda dengan production ya kalau production barang selesai maka akan menjadi asset kita
