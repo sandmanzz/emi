@@ -168,7 +168,7 @@ export default function SubAreaPage() {
                 <SortTh label="Area"     colIndex={1} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ minWidth:160 }} />
                 <SortTh label="Created At" colIndex={2} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width:120 }} />
                 <SortTh label="Updated At" colIndex={3} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width:120 }} />
-                <th style={{ width:100, textAlign:'center' }}>Action</th>
+                <th className="col-action" style={{ width:100, textAlign:'center' }}>Action</th>
               </tr>
             </thead>
             <tbody>

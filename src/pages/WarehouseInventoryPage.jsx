@@ -651,7 +651,7 @@ export default function WarehouseInventoryPage() {
                   <SortTh label="Lane"           colIndex={15} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width:55, textAlign:'center' }} />
                   <th style={{ width:58, textAlign:'center' }}>Img</th>
                   <SortTh label="Updated"        colIndex={16} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width:95 }} />
-                  <th style={{ width:80, textAlign:'center' }}>Action</th>
+                  <th className="col-action" style={{ width:80, textAlign:'center' }}>Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -1154,7 +1154,7 @@ export default function WarehouseInventoryPage() {
                   <th style={{ width:110, textAlign:'right' }}>Items Changed</th>
                   <th style={{ width:110, textAlign:'right' }}>Net Variance</th>
                   <th style={{ width:100 }}>Status</th>
-                  <th style={{ width:140, textAlign:'center' }}>Action</th>
+                  <th className="col-action" style={{ width:140, textAlign:'center' }}>Action</th>
                 </tr>
               </thead>
               <tbody>

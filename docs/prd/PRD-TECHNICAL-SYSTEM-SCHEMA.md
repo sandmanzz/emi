@@ -12,6 +12,9 @@
 > guidance. §10 = known gaps. §11 = source-file map. Items marked **[RULE]** are hard rules; **[ASSUMPTION]** marks a
 > product decision that the owner has not confirmed.
 >
+> **Update 2026-11-11:** see `docs/prd/PRD-2026-11-11.md` — Checking Item flag, stage-based scan in/out (replaces §5.5's
+> "first scan = in, second = out"), QR Type INDIVIDUAL/GROUP, event `createdAt`, item `image`, event files, cart warning.
+>
 > Related docs: `docs/context.md` (all owner instructions, newest first — source of truth for decisions),
 > `docs/changes.md` (code changelog per round), `docs/backend.md` (backend notes), `docs/prd/PRD-2026-10-16.md`,
 > `PRD-2026-10-19.md`, `PRD-2026-11-02.md` (dated feature PRDs).

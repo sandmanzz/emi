@@ -9,11 +9,14 @@ import { initialAreas, SUB_AREAS } from '../data/areas';
 import { inventoryData, categories } from '../data/inventory';
 import { initialWarehouses } from '../data/warehouses';
 import { wiData } from '../data/warehouseInventory';
-import { getEventStageNames, isScanStage, isCuttingStockStage, isStockReturnStage, isProductionStage, isCheckOwnershipStage, isDeleteAllowedStage, isLoanStage, isOutsourceStage } from '../lib/eventStatuses';
+import { getEventStageNames, isScanStage, isCuttingStockStage, isStockReturnStage, isProductionStage, isCheckOwnershipStage, isDeleteAllowedStage, isLoanStage, isOutsourceStage, isCheckItemStage } from '../lib/eventStatuses';
 import { getInventoryRows, applyStockMovement } from '../lib/stockOpnameStore';
 import { VENDOR_ORIGINS } from '../lib/vendorStore';
 import { CatalogItemPicker, VendorPicker } from '../components/QuickPickers';
 import { getCatalog, stockInProduced } from '../lib/producedItems';
+import { setItemImageByName } from '../lib/catalogStore';
+import { getEventFiles, saveEventFiles } from '../lib/eventFiles';
+import { imageFileToDataUrl, fileToUpload, fmtBytes } from '../lib/imageUtils';
 import PrintPlanModal from '../components/PrintPlanModal';
 import { getEventSeedItems } from '../lib/eventItems';
 import { EventLoansPanel, BorrowItemModal } from '../components/EventLoans';
@@ -83,6 +86,13 @@ function ImagePlaceholder() {
   );
 }
 
+// Item photo on cards (2026-11-11): the catalog item's image (master data) when there is one,
+// shown with object-fit: cover in the same 4:3 box as the placeholder so cards keep one height.
+function ItemImage({ src, name }) {
+  if (!src) return <ImagePlaceholder />;
+  return <div className="item-img"><img src={src} alt={name} loading="lazy" /></div>;
+}
+
 function InvThumb() {
   return (
     <div className="inv-pick-thumb">
@@ -102,7 +112,8 @@ function ownershipBadgeClass(ownership) {
 
 const OWNERSHIP_CYCLE = ['IHC', 'IHP', 'Outsource'];
 
-function ItemCard({ item, group, showScanButton, onScanClick, onDelete, onCycleOwnership, onOpen, onModify }) {
+function ItemCard({ item, group, imageOf = () => null, vis = {}, showScanButton, onScanClick, onDelete, onCycleOwnership, onOpen, onModify, onToggleChecking }) {
+  const scannedNow = vis.scanPhase === 'out' ? !!item.scanOut : !!item.scanIn;
   // The whole card opens the detail drawer; buttons inside stop propagation so
   // they keep doing their own job.
   const stop = fn => e => { e.stopPropagation(); fn(); };
@@ -129,7 +140,7 @@ function ItemCard({ item, group, showScanButton, onScanClick, onDelete, onCycleO
           )}
         </div>
       )}
-      <ImagePlaceholder />
+      <ItemImage src={imageOf(item)} name={item.name} />
       <div className="item-body">
         <div className="item-badge-row">
           <span className={`area-badge ${areaBadgeClass(item.area)}`}>{item.area}</span>
@@ -174,8 +185,8 @@ function ItemCard({ item, group, showScanButton, onScanClick, onDelete, onCycleO
                 {group.name}
               </span>
             )}
-            {item.scanned && (
-              <span className="item-scanned-badge"><CheckIcon /> Scanned</span>
+            {vis.scanPhase && scannedNow && (
+              <span className="item-scanned-badge"><CheckIcon /> Scanned {vis.scanPhase === 'out' ? 'out' : 'in'}</span>
             )}
           </span>
           <span className="item-qty">Qty: {fmtNum(item.qty)}</span>
@@ -187,38 +198,52 @@ function ItemCard({ item, group, showScanButton, onScanClick, onDelete, onCycleO
           </svg>
           {item.pic || '-'}
         </div>
-        <div className="item-indicators">
-          <div className="indicator-row">
-            <span className={`indicator-box${item.checking ? ' checked' : ''}`}>
-              {item.checking && <CheckIcon />}
-            </span>
-            Checking
+        {vis.showChecking && (
+          <div className="item-indicators">
+            <button
+              type="button"
+              className={`indicator-row indicator-toggle${onToggleChecking ? '' : ' readonly'}`}
+              disabled={!onToggleChecking}
+              title={onToggleChecking ? 'Tick when this item has been checked' : 'Checking can be ticked only at a stage with Checking Item on'}
+              onClick={e => { e.stopPropagation(); onToggleChecking?.(item.id); }}
+            >
+              <span className={`indicator-box${item.checking ? ' checked' : ''}`}>
+                {item.checking && <CheckIcon />}
+              </span>
+              Checking
+            </button>
           </div>
-        </div>
-        <div className="scan-rows">
-          <div className="scan-row">
-            <span className={`scan-badge ${item.scanIn ? 'ok' : 'fail'}`}>
-              {item.scanIn ? <CheckIcon /> : <XIcon />}
-            </span>
-            <span className="scan-label-text" style={!item.scanIn ? { color: '#9aa0b8' } : {}}>
-              {item.scanIn ? `Scanned In at ${item.scanIn}` : 'Scan In'}
-            </span>
+        )}
+        {(vis.showScanIn || vis.showScanOut) && (
+          <div className="scan-rows">
+            {vis.showScanIn && (
+              <div className="scan-row">
+                <span className={`scan-badge ${item.scanIn ? 'ok' : 'fail'}`}>
+                  {item.scanIn ? <CheckIcon /> : <XIcon />}
+                </span>
+                <span className="scan-label-text" style={!item.scanIn ? { color: '#9aa0b8' } : {}}>
+                  {item.scanIn ? `Scanned In at ${item.scanIn}` : 'Scan In'}
+                </span>
+              </div>
+            )}
+            {vis.showScanOut && (
+              <div className="scan-row">
+                <span className={`scan-badge ${item.scanOut ? 'ok' : 'fail'}`}>
+                  {item.scanOut ? <CheckIcon /> : <XIcon />}
+                </span>
+                <span className="scan-label-text" style={!item.scanOut ? { color: '#9aa0b8' } : {}}>
+                  {item.scanOut ? `Scanned Out at ${item.scanOut}` : 'Scan Out'}
+                </span>
+              </div>
+            )}
           </div>
-          <div className="scan-row">
-            <span className={`scan-badge ${item.scanOut ? 'ok' : 'fail'}`}>
-              {item.scanOut ? <CheckIcon /> : <XIcon />}
-            </span>
-            <span className="scan-label-text" style={!item.scanOut ? { color: '#9aa0b8' } : {}}>
-              {item.scanOut ? `Scanned Out at ${item.scanOut}` : 'Scan Out'}
-            </span>
-          </div>
-        </div>
+        )}
         {item.note && <div className="item-note">{item.note}</div>}
         {showScanButton && (
           <div className="item-actions">
-            <button className={`btn-ia-scan${item.scanned ? ' scanned' : ''}`} onClick={e => { e.stopPropagation(); onScanClick(item); }}>
+            <button className={`btn-ia-scan${scannedNow ? ' scanned' : ''}`} onClick={e => { e.stopPropagation(); onScanClick(item); }}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h.01M14 17h3v3M17 14h3"/></svg>
-              {item.scanned ? 'Re-scan' : 'Scan'}
+              {scannedNow ? 'Re-scan' : vis.scanPhase === 'out' ? 'Scan Out' : 'Scan In'}
             </button>
           </div>
         )}
@@ -229,11 +254,11 @@ function ItemCard({ item, group, showScanButton, onScanClick, onDelete, onCycleO
 
 // List (table) alternative to the card grid. Same callbacks as ItemCard; a missing
 // onModify/onDelete/onCycleOwnership means that action is locked.
-function ItemTable({ items, packages, showScanButton, onScanClick, onDelete, onCycleOwnership, onOpen, onModify }) {
+function ItemTable({ items, packages, imageOf = () => null, vis = {}, showScanButton, onScanClick, onDelete, onCycleOwnership, onOpen, onModify, onToggleChecking }) {
   const stop = fn => e => { e.stopPropagation(); fn(); };
   return (
     <div className="table-wrap item-table-wrap">
-      <table className="item-table">
+      <table className="item-table has-action">
         <thead>
           <tr>
             <th>Item</th>
@@ -241,15 +266,17 @@ function ItemTable({ items, packages, showScanButton, onScanClick, onDelete, onC
             <th style={{ textAlign: 'right' }}>Qty</th>
             <th>PIC</th>
             <th>Ownership</th>
-            <th style={{ textAlign: 'center' }}>Checking</th>
-            <th>Scan In</th>
-            <th>Scan Out</th>
-            <th style={{ textAlign: 'right' }}>Action</th>
+            {vis.showChecking && <th style={{ textAlign: 'center' }}>Checking</th>}
+            {vis.showScanIn && <th>Scan In</th>}
+            {vis.showScanOut && <th>Scan Out</th>}
+            <th className="col-action" style={{ textAlign: 'right' }}>Action</th>
           </tr>
         </thead>
         <tbody>
           {items.map(item => {
             const group = item.groupId ? packages.find(p => p.id === item.groupId) : null;
+            const scannedNow = vis.scanPhase === 'out' ? !!item.scanOut : !!item.scanIn;
+            const img = imageOf(item);
             return (
               <tr
                 key={item.id}
@@ -260,10 +287,13 @@ function ItemTable({ items, packages, showScanButton, onScanClick, onDelete, onC
                 aria-label={`View details for ${item.name}`}
               >
                 <td>
-                  <div className="item-table-name">{item.name}</div>
+                  <div className="item-table-name">
+                    {img && <img className="item-table-thumb" src={img} alt="" />}
+                    {item.name}
+                  </div>
                   <div className="item-table-flags">
                     {group && <span className="badge badge-gray" style={{ fontSize: 10 }}>{group.name}</span>}
-                    {item.scanned && <span className="badge badge-green" style={{ fontSize: 10 }}>Scanned</span>}
+                    {vis.scanPhase && scannedNow && <span className="badge badge-green" style={{ fontSize: 10 }}>Scanned {vis.scanPhase}</span>}
                     <BrokenChip item={item} />
                     <StockBadge item={item} />
                     {item.fromProduction && <span className="badge badge-purple" style={{ fontSize: 10 }}>Production</span>}
@@ -289,16 +319,21 @@ function ItemTable({ items, packages, showScanButton, onScanClick, onDelete, onC
                     <span className={`badge ${ownershipBadgeClass(item.ownership)}`} style={{ fontSize: 10 }}>{item.ownership}</span>
                   )}
                 </td>
-                <td style={{ textAlign: 'center' }}>
-                  <span className={`indicator-box${item.checking ? ' checked' : ''}`} style={{ margin: '0 auto' }}>{item.checking && <CheckIcon />}</span>
-                </td>
-                <td className="item-table-scan">{item.scanIn || <span className="item-table-muted">—</span>}</td>
-                <td className="item-table-scan">{item.scanOut || <span className="item-table-muted">—</span>}</td>
-                <td>
+                {vis.showChecking && (
+                  <td style={{ textAlign: 'center' }}>
+                    <button type="button" className="indicator-toggle" disabled={!onToggleChecking} onClick={stop(() => onToggleChecking?.(item.id))}
+                      aria-label={item.checking ? 'Checked' : 'Not checked'}>
+                      <span className={`indicator-box${item.checking ? ' checked' : ''}`} style={{ margin: '0 auto' }}>{item.checking && <CheckIcon />}</span>
+                    </button>
+                  </td>
+                )}
+                {vis.showScanIn && <td className="item-table-scan">{item.scanIn || <span className="item-table-muted">—</span>}</td>}
+                {vis.showScanOut && <td className="item-table-scan">{item.scanOut || <span className="item-table-muted">—</span>}</td>}
+                <td className="col-action">
                   <div className="item-table-actions">
                     {showScanButton && (
-                      <button className={`btn-ia-scan${item.scanned ? ' scanned' : ''}`} style={{ flex: '0 0 auto', padding: '5px 10px' }} onClick={stop(() => onScanClick(item))}>
-                        {item.scanned ? 'Re-scan' : 'Scan'}
+                      <button className={`btn-ia-scan${scannedNow ? ' scanned' : ''}`} style={{ flex: '0 0 auto', padding: '5px 10px' }} onClick={stop(() => onScanClick(item))}>
+                        {scannedNow ? 'Re-scan' : vis.scanPhase === 'out' ? 'Scan Out' : 'Scan In'}
                       </button>
                     )}
                     {onModify && (
@@ -470,7 +505,12 @@ export default function EventDetailPage() {
   // was moved backward, since an item's `stage` is stamped once, at add-time).
   const scopedItems = useMemo(() => filtered.filter(it => stages.indexOf(it.stage) <= stageIndex), [filtered, stageIndex]);
   const currentStageItems = useMemo(() => filtered.filter(it => stages.indexOf(it.stage) === stageIndex), [filtered, stageIndex]); // "Added New"
-  const waitingScanItems = useMemo(() => scopedItems.filter(it => !it.scanned), [scopedItems]);
+  // Scan phases (2026-11-11). The FIRST stage with Scan = "Scan" is the scan-in stage, every later
+  // scan stage is a scan-out stage. A line is "waiting" when it lacks the scan of the current phase.
+  const scanStageIdx = useMemo(() => stages.map((st, i) => (isScanStage(st) ? i : -1)).filter(i => i >= 0), [stages]);
+  const stageScanPhase = !stageScanEnabled ? null : stageIndex === scanStageIdx[0] ? 'in' : 'out';
+  const isScannedNow = it => (stageScanPhase === 'out' ? !!it.scanOut : !!it.scanIn);
+  const waitingScanItems = useMemo(() => scopedItems.filter(it => !isScannedNow(it)), [scopedItems, stageScanPhase]); // eslint-disable-line react-hooks/exhaustive-deps -- isScannedNow only reads stageScanPhase
   const effectiveStageFilter = (stageFilter === 'waiting' && !stageScanEnabled) ? 'all' : stageFilter;
   const stageFiltered = effectiveStageFilter === 'added' ? currentStageItems : effectiveStageFilter === 'waiting' ? waitingScanItems : scopedItems;
 
@@ -487,7 +527,7 @@ export default function EventDetailPage() {
   }, [items]);
 
 
-  const unscannedCount = useMemo(() => items.filter(it => !it.scanned).length, [items]);
+  const unscannedCount = useMemo(() => items.filter(it => !isScannedNow(it)).length, [items, stageScanPhase]); // eslint-disable-line react-hooks/exhaustive-deps -- see waitingScanItems
   const hasNextStage = stageIndex < stages.length - 1;
   // "Ready to Close" is a derived display state, not stored — see eventClosing.js.
   const readyToClose = closingStatus === 'on-going' && !hasNextStage;
@@ -509,11 +549,29 @@ export default function EventDetailPage() {
 
   const maxReachedIndex = Math.max(furthestIndex, stageIndex);
 
+  // Card / list visibility follows Event Settings (2026-11-11, owner): a field only shows once the
+  // event has reached the first stage that needs it.
+  //  - Checking: first stage with Checking Item = True (and it can be ticked only AT such a stage).
+  //  - Scan In:  first stage with Scan = "Scan".  Scan Out: the second scan stage.
+  const firstCheckIdx = stages.findIndex(isCheckItemStage);
+  const itemFieldVisibility = {
+    showChecking: firstCheckIdx >= 0 && maxReachedIndex >= firstCheckIdx,
+    showScanIn: scanStageIdx.length > 0 && maxReachedIndex >= scanStageIdx[0],
+    showScanOut: scanStageIdx.length > 1 && maxReachedIndex >= scanStageIdx[1],
+    scanPhase: stageScanPhase,
+  };
+
   // Every stage change (Next, or reopening an already-reached stage from the
   // dropdown) goes through a confirmation popup first.
-  function requestStageChange(step) {
+  // Items still in the cart (picked but not saved to the event) — warn before moving forward (2026-11-11).
+  const [cartWarnStage, setCartWarnStage] = useState(null);
+  function requestStageChange(step, { skipCartCheck = false } = {}) {
     const targetIndex = stages.indexOf(step);
     if (targetIndex === stageIndex) return;
+    if (!skipCartCheck && targetIndex > stageIndex && cart.length > 0) {
+      setCartWarnStage(step);
+      return;
+    }
     if (targetIndex > maxReachedIndex + 1) return; // locked — only reachable via Next
     if (stageScanEnabled && targetIndex > stageIndex && unscannedCount > 0) {
       setStepperError(`${unscannedCount} item${unscannedCount === 1 ? '' : 's'} still need${unscannedCount === 1 ? 's' : ''} to be scanned before moving to the next stage.`);
@@ -657,7 +715,63 @@ export default function EventDetailPage() {
   const deleteAllowed = !itemsLocked && isDeleteAllowedStage(eventStatus);
 
   // Shared props for ItemCard / ItemTable; locked actions are passed as undefined.
+  // Item photos come from master data (catalog `image`), joined by name like everything else.
+  const [imageByName, setImageByName] = useState(() => new Map(getCatalog().filter(i => i.image).map(i => [i.name, i.image])));
+  const photoInputRef = useRef(null);
+  async function uploadItemPhoto(itemName, file) {
+    if (!file) return;
+    try {
+      const dataUrl = await imageFileToDataUrl(file);
+      if (!getCatalog().some(i => i.name === itemName)) { window.alert('This item is not in Inventory master data, so it has no photo slot.'); return; }
+      if (!setItemImageByName(itemName, dataUrl)) { window.alert('The browser storage is full. Remove some photos or files first.'); return; }
+      setImageByName(m => new Map(m).set(itemName, dataUrl));
+    } catch {
+      window.alert('This file could not be read as an image.');
+    }
+  }
+  function removeItemPhoto(itemName) {
+    if (!window.confirm(`Remove the photo of "${itemName}"? It is removed from Inventory master data too.`)) return;
+    setItemImageByName(itemName, '');
+    setImageByName(m => { const n = new Map(m); n.delete(itemName); return n; });
+  }
+
+  // Event files (drawer): any document or photo for this event — floor plan, rundown, contract, venue photos.
+  const [filesOpen, setFilesOpen] = useState(false);
+  const [eventFiles, setEventFilesState] = useState(() => getEventFiles(eventName));
+  const [filesError, setFilesError] = useState('');
+  const fileInputRef = useRef(null);
+  async function addEventFiles(fileList) {
+    setFilesError('');
+    const added = [];
+    for (const f of [...fileList]) {
+      try {
+        const up = await fileToUpload(f);
+        added.push({ ...up, id: `${Date.now()}-${added.length}`, uploadedBy: currentUser?.name || 'Admin', uploadedAt: new Date().toISOString() });
+      } catch (e) {
+        setFilesError(e.message || `"${f.name}" could not be read.`);
+      }
+    }
+    if (!added.length) return;
+    const next = [...added, ...eventFiles];
+    if (!saveEventFiles(eventName, next)) { setFilesError('The browser storage is full. Delete some files first.'); return; }
+    setEventFilesState(next);
+    addActivityLog({ userName: currentUser?.name || 'Admin', action: 'Create', module: 'Event Detail', description: `Uploaded ${added.length} file(s) to ${eventName}` });
+  }
+  function deleteEventFile(f) {
+    if (!window.confirm(`Delete "${f.name}"?`)) return;
+    const next = eventFiles.filter(x => x.id !== f.id);
+    saveEventFiles(eventName, next);
+    setEventFilesState(next);
+  }
+
+  const canTickChecking = isCheckItemStage(eventStatus) && !itemsLocked;
+  function toggleChecking(id) {
+    setItems(is => is.map(it => (it.id === id ? { ...it, checking: !it.checking } : it)));
+  }
   const itemActionProps = {
+    vis: itemFieldVisibility,
+    imageOf: it => imageByName.get(it.name) || null,
+    onToggleChecking: canTickChecking ? toggleChecking : undefined,
     onOpen: it => setDetailItemId(it.id),
     onModify: itemsLocked ? undefined : openModifyItem,
     onDelete: deleteAllowed ? deleteItem : undefined,
@@ -722,14 +836,13 @@ export default function EventDetailPage() {
     return { total: items.length, checkedCount: checkedItems.length, missingItems };
   }, [items]);
 
+  // Scan-in at the first scan stage, scan-out at later scan stages (2026-11-11; before, it was simply
+  // "first scan = in, second = out", which let Waiting scan out pass without scanning out).
   function doScan(id) {
     const now = new Date().toLocaleString('en-US', { month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit', hour12:true });
     setItems(is => is.map(it => {
       if (it.id !== id) return it;
-      const next = { ...it, scanned: true };
-      if (!it.scanIn)  return { ...next, scanIn: now };
-      if (!it.scanOut) return { ...next, scanOut: now };
-      return next;
+      return stageScanPhase === 'out' ? { ...it, scanned: true, scanOut: now } : { ...it, scanned: true, scanIn: now };
     }));
   }
 
@@ -1286,6 +1399,10 @@ export default function EventDetailPage() {
                 Request Production
               </button>
             )}
+            <button className="btn btn-ghost btn-request-production" onClick={() => setFilesOpen(true)} title="Files attached to this event">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+              Files{eventFiles.length > 0 && <span className="stage-tab-count">{eventFiles.length}</span>}
+            </button>
             {/* One button for picking items and reviewing the cart (they open the same picker);
                 the badge shows how many items are waiting in the cart. */}
             <button
@@ -1918,18 +2035,36 @@ export default function EventDetailPage() {
             ['Added at stage', detailItem.stage],
             ['Source', detailItem.fromOutsource ? `Outsourced to ${detailItem.loanVendor || 'outsource vendor'}` : detailItem.fromLoan ? `Rented from ${detailItem.loanVendor || 'rent vendor'}` : detailItem.fromConvert ? 'Convert request' : detailItem.fromProduction ? 'Production request' : detailItem.warehouseItem ? 'Warehouse inventory' : 'Non-warehouse item'],
             ['Group', group ? group.name : '—'],
-            ['Checking', detailItem.checking ? 'Yes' : 'No'],
+            ...(itemFieldVisibility.showChecking ? [['Checking', detailItem.checking ? 'Yes' : 'No']] : []),
             ['Cross-checked', detailItem.checked ? 'Yes' : 'No'],
-            ['Scan In', detailItem.scanIn || 'Not yet'],
-            ['Scan Out', detailItem.scanOut || 'Not yet'],
+            ...(itemFieldVisibility.showScanIn ? [['Scan In', detailItem.scanIn || 'Not yet']] : []),
+            ...(itemFieldVisibility.showScanOut ? [['Scan Out', detailItem.scanOut || 'Not yet']] : []),
           ];
           return (
             <>
-              <div className="drawer-img"><ImagePlaceholder /></div>
+              <div className="drawer-img">
+                {imageByName.get(detailItem.name)
+                  ? <img src={imageByName.get(detailItem.name)} alt={detailItem.name} />
+                  : <ImagePlaceholder />}
+              </div>
+              {!itemsLocked && (
+                <div className="drawer-photo-actions">
+                  <input ref={photoInputRef} type="file" accept="image/*" style={{ display: 'none' }}
+                    onChange={e => { uploadItemPhoto(detailItem.name, e.target.files?.[0]); e.target.value = ''; }} />
+                  <button type="button" className="drawer-link-btn" onClick={() => photoInputRef.current?.click()}>
+                    {imageByName.get(detailItem.name) ? 'Change photo' : 'Upload photo'}
+                  </button>
+                  {imageByName.get(detailItem.name) && (
+                    <button type="button" className="drawer-link-btn danger" onClick={() => removeItemPhoto(detailItem.name)}>Remove photo</button>
+                  )}
+                  <span className="field-hint" style={{ margin: 0 }}>Saved to the item in Inventory, so every event shows it.</span>
+                </div>
+              )}
               <div className="item-badge-row" style={{ marginBottom: 14 }}>
                 <span className={`area-badge ${areaBadgeClass(detailItem.area)}`}>{detailItem.area}</span>
                 {detailItem.ownership && <span className={`badge ${ownershipBadgeClass(detailItem.ownership)}`} style={{ fontSize: 10 }}>{detailItem.ownership}</span>}
-                {detailItem.scanned && <span className="badge badge-green" style={{ fontSize: 10 }}>Scanned</span>}
+                {detailItem.scanIn && <span className="badge badge-green" style={{ fontSize: 10 }}>Scanned in</span>}
+                {detailItem.scanOut && <span className="badge badge-green" style={{ fontSize: 10 }}>Scanned out</span>}
                 <BrokenChip item={detailItem} />
                 <StockBadge item={detailItem} />
                 {detailItem.resolution === 'returned' && <span className="badge badge-green" style={{ fontSize: 10 }}>Returned</span>}
@@ -2337,6 +2472,79 @@ export default function EventDetailPage() {
           </div>
         )}
       </Modal>
+      {/* Cart not saved yet — shown when Next is clicked with items still in the cart */}
+      <Modal
+        open={!!cartWarnStage}
+        title="Items in the cart are not added yet"
+        onClose={() => setCartWarnStage(null)}
+        footer={
+          <>
+            <button className="btn-cancel-modal" onClick={() => setCartWarnStage(null)}><IconClose /> Cancel</button>
+            <button className="btn btn-ghost" onClick={() => { const st = cartWarnStage; setCartWarnStage(null); requestStageChange(st, { skipCartCheck: true }); }}>Continue without them</button>
+            <button className="btn-save-modal" onClick={() => { setCartWarnStage(null); setPickerQuery(''); setPickerCategory(''); setPickerOpen(true); }}><IconCart /> Open cart</button>
+          </>
+        }
+      >
+        <div className="stage-confirm-cut">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <div>
+            <strong>{cart.length} item{cart.length === 1 ? ' is' : 's are'} still in the cart</strong> ({fmtNum(cart.reduce((s2, c) => s2 + c.qty, 0))} pcs) and
+            not part of this event yet. Open the cart and save them first, or continue to &ldquo;{cartWarnStage}&rdquo; without them
+            (they stay in the cart).
+          </div>
+        </div>
+        <ul className="cart-warn-list">
+          {cart.slice(0, 8).map(c => (
+            <li key={c.cartId}><span>{c.name}</span><span>{fmtNum(c.qty)} {c.unit} · {c.area || <em>no area</em>}</span></li>
+          ))}
+          {cart.length > 8 && <li className="more">+{cart.length - 8} more</li>}
+        </ul>
+      </Modal>
+
+      {/* Event files — upload, preview, download (2026-11-11) */}
+      <Drawer
+        open={filesOpen}
+        title="Event Files"
+        subtitle={`${eventFiles.length} file${eventFiles.length === 1 ? '' : 's'} · floor plans, rundowns, contracts, venue photos`}
+        onClose={() => setFilesOpen(false)}
+        footer={
+          <>
+            <input ref={fileInputRef} type="file" multiple style={{ display: 'none' }}
+              onChange={e => { addEventFiles(e.target.files || []); e.target.value = ''; }} />
+            <button className="btn-save-modal" onClick={() => fileInputRef.current?.click()}><IconPlus /> Upload files</button>
+          </>
+        }
+      >
+        <div
+          className="file-drop"
+          onClick={() => fileInputRef.current?.click()}
+          onDragOver={e => e.preventDefault()}
+          onDrop={e => { e.preventDefault(); addEventFiles(e.dataTransfer.files || []); }}
+        >
+          <strong>Drop files here or click to upload</strong>
+          <span>Photos are resized automatically. Other files up to 2 MB each (PDF, Excel, Word…).</span>
+        </div>
+        {filesError && <p className="field-error" style={{ marginBottom: 10 }}>{filesError}</p>}
+        {eventFiles.length === 0
+          ? <div className="no-data">No files yet.</div>
+          : (
+            <ul className="event-file-list">
+              {eventFiles.map(f => (
+                <li key={f.id}>
+                  {f.type.startsWith('image/')
+                    ? <a href={f.dataUrl} target="_blank" rel="noreferrer" className="event-file-thumb"><img src={f.dataUrl} alt={f.name} /></a>
+                    : <span className="event-file-thumb doc">{(f.name.split('.').pop() || 'file').slice(0, 4).toUpperCase()}</span>}
+                  <div className="event-file-meta">
+                    <a href={f.dataUrl} download={f.name} className="event-file-name">{f.name}</a>
+                    <span>{fmtBytes(f.size)} · {f.uploadedBy} · {new Date(f.uploadedAt).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                  </div>
+                  <button type="button" className="btn-icon delete" title="Delete file" onClick={() => deleteEventFile(f)}><IconDelete /></button>
+                </li>
+              ))}
+            </ul>
+          )}
+      </Drawer>
+
       <Modal open={!!scanningItem} title="Scan Item" onClose={closeScanPopup}>
         {scanningItem && (() => {
           const group = scanningItem.groupId ? packages.find(p => p.id === scanningItem.groupId) : null;

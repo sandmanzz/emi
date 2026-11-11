@@ -203,7 +203,7 @@ export default function CustomersPage() {
                 <SortTh label="MRR"     colIndex={4} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width: 120 }} />
                 <SortTh label="Users"   colIndex={5} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width: 70 }} />
                 <SortTh label="Joined"  colIndex={6} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width: 110 }} />
-                <th style={{ width: 120, textAlign: 'center' }}>Action</th>
+                <th className="col-action" style={{ width: 120, textAlign: 'center' }}>Action</th>
               </tr>
             </thead>
             <tbody>

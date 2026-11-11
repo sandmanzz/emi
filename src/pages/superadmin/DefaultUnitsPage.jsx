@@ -133,7 +133,7 @@ export default function DefaultUnitsPage() {
                 <th style={{ width: 100 }}>Type</th>
                 <SortTh label="Customers Using" colIndex={3} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width: 150, textAlign: 'right' }} />
                 <th style={{ width: 100 }}>Status</th>
-                <th style={{ width: 100, textAlign: 'center' }}>Action</th>
+                <th className="col-action" style={{ width: 100, textAlign: 'center' }}>Action</th>
               </tr>
             </thead>
             <tbody>

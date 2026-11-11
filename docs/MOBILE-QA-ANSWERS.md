@@ -943,6 +943,9 @@ optionally `emi:item:<sku>` for catalog lookups. This needs an owner decision.
 (`groupId`), one scan marks **every line in that package** (`finishScan` → `doScan` for each `group.itemIds`,
 `src/pages/EventDetailPage.jsx` ~line 751). Inside the Grouped tab only the box has a Scan button.
 
+> **Update 2026-11-11:** fixed on web — the stage now decides: first scan stage = scan-in, later scan stages = scan-out;
+> Scan In / Scan Out fields are hidden until those stages are reached. See `docs/prd/PRD-2026-11-11.md` §2.
+
 **9. Scan in vs scan out?** Decided by **order of scans, not by the stage** (`doScan`, ~line 725):
 ```js
 const next = { ...it, scanned: true };

@@ -50,6 +50,24 @@ explains a few non-obvious conventions that the entries below assume you already
 
 ---
 
+## Round 38 — UX pass: stage-aware Checking/Scan, filter drawer, QR type, card cover + created, frozen Action column, photos & event files, realistic mock, cart warning (2026-11-11)
+
+Spec with every rule: `docs/prd/PRD-2026-11-11.md`.
+- `lib/eventStatuses.js` `isCheckItemStage`; `data/eventStatuses.js` `checkItem` (Finish setup); `EventStatusPage.jsx` column/KPI/form.
+- `EventDetailPage.jsx`: `itemFieldVisibility` (showChecking/showScanIn/showScanOut/scanPhase), phase-based `doScan`,
+  `waitingScanItems` / `unscannedCount` by phase, Checking toggle, `ItemImage`, drawer photo upload, Files button + drawer,
+  cart warning modal (`cartWarnStage`). `ItemCard` / `ItemTable` take `vis`, `imageOf`, `onToggleChecking`.
+- New `lib/imageUtils.js` (resize to JPEG data URL, file → upload, `fmtBytes`), `lib/eventFiles.js` (`emi_event_files`).
+- `lib/catalogStore.js`: `image` field, `setItemImageByName`. `ItemFormModal.jsx`: Photo field.
+- `EventPage.jsx`: Filter button + drawer + chips, QR Type cards (`QR_TYPES`, required), card cover + Created line, `createdAt`
+  on create, resized cover upload.
+- `style.css`: frozen `.col-action` column rule + R38 styles; `className="col-action"` added to 20 Action headers.
+- Seeds: realistic events (`data/events.js`, renamed placeholders; `productionSeed.js` key), demo images in `public/demo/`,
+  `image` on 52 items.
+**Verified:** lint 11, build OK, Chromium checks listed in the PRD.
+
+---
+
 ## Round 37 — Technical system-schema PRD (docs only, 2026-11-02)
 
 New `docs/prd/PRD-TECHNICAL-SYSTEM-SCHEMA.md` for tuning the mobile app. No code change.

@@ -32,7 +32,7 @@ export const SEED_EVENT_PRODUCTION = {
     req(2, { name: 'Bridal Table Linen Set', qty: 3, area: 'BRIDAL TABLE', warehouse: 'Warehouse Cililitan', vendorOrigin: 'External', vendorId: 10, vendorName: 'CV Kain Nusantara', status: 'Done', stage: 'On preparing items', requestedAt: '2026-01-22', finishedAt: '2026-02-06' }),
     req(1, { name: 'Display Table Riser Set', qty: 4, area: 'DISPLAY TABLE', warehouse: 'Warehouse Bali 70', vendorOrigin: 'Internal', vendorId: 8, vendorName: 'Workshop Kayu Internal', status: 'Done', stage: 'Created by admin up', requestedAt: '2026-01-18', finishedAt: '2026-02-01' }),
   ],
-  [ev('2026-04-03', 'Wedding B')]: [
+  [ev('2026-04-03', 'Wedding Andre & Clarissa')]: [
     req(2, { name: 'White Candle 30cm', qty: 120, area: 'GUEST TABLE', warehouse: 'Warehouse Surabaya', vendorOrigin: 'External', vendorId: 14, vendorName: 'Lilin Aroma Jogja', status: 'Done', stage: 'On preparing items', requestedAt: '2026-03-10', finishedAt: '2026-03-24' }),
     req(1, { name: 'Greenery Wall Panel', qty: 2, area: 'FLORIST', warehouse: 'Warehouse Cililitan', vendorOrigin: 'Internal', vendorId: 9, vendorName: 'Tim Florist Internal', status: 'Done', stage: 'Created by admin up', requestedAt: '2026-03-08', finishedAt: '2026-03-20' }),
   ],

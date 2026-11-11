@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal';
+import Drawer from '../components/Drawer';
 import Pagination from '../components/Pagination';
 import SearchableSelect from '../components/SearchableSelect';
 import {
@@ -12,6 +13,17 @@ import { getEventClosing, isReadyToClose, isOnGoingByItems } from '../lib/eventC
 import { CLOSING_LABELS } from '../lib/eventClosingLabels';
 import { getEventStageNames } from '../lib/eventStatuses';
 import { saveEventProgress, resolveEventStage } from '../lib/eventProgress';
+import { imageFileToDataUrl } from '../lib/imageUtils';
+
+// QR Type (2026-11-11, owner asked to make its purpose clear). It decides how QR labels are printed
+// and scanned for this event's items:
+//  - INDIVIDUAL: one QR label per item line; the crew scans every line on its own.
+//  - GROUP: items are packed into boxes (Event Detail ⋮ → Group Items); one QR label per box, and
+//    scanning the box scans every item inside it. Items not in a box still get their own label.
+const QR_TYPES = [
+  { value: 'INDIVIDUAL', label: 'Individual', help: 'One QR label per item. Every item is scanned on its own. Best for small events or big single pieces (arches, sofas, screens).' },
+  { value: 'GROUP', label: 'Group (per box)', help: 'Items are packed into boxes and the QR label goes on the box. Scanning one box scans everything inside. Best for many small items (glasses, candles, flowers).' },
+];
 
 const PAGE_SIZE = 8;
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -41,6 +53,12 @@ function fmtUpdatedLabel(updatedAt) {
   if (!updatedAt || updatedAt === '-') return 'Updated: -';
   if (updatedAt.includes(',')) return `Updated: ${updatedAt}`;
   return `Updated: ${fmtDateShort(updatedAt)}`;
+}
+
+// "Created 12 Mar 2026" from an ISO date/datetime (2026-11-11).
+function fmtCreated(createdAt) {
+  if (!createdAt) return '—';
+  return fmtDateShort(createdAt.slice(0, 10));
 }
 
 function daysUntil(start) {
@@ -135,12 +153,19 @@ function EventCard({ r, onEdit, onDelete, navigate, readyToClose, onGoingByItems
   return (
     <div style={{
       background: '#fff', border: '1px solid var(--border)', borderRadius: 10,
-      borderTop: `3px solid ${accent}`, display: 'flex', flexDirection: 'column',
+      borderTop: `3px solid ${accent}`, display: 'flex', flexDirection: 'column', overflow: 'hidden',
       transition: 'box-shadow .15s, transform .15s',
     }}
     onMouseEnter={e => { e.currentTarget.style.boxShadow='0 6px 20px rgba(0,0,0,.08)'; e.currentTarget.style.transform='translateY(-1px)'; }}
     onMouseLeave={e => { e.currentTarget.style.boxShadow='none'; e.currentTarget.style.transform='none'; }}
     >
+      {/* Cover image (2026-11-11): fixed 16:9 box with object-fit cover, so any photo size looks the
+          same and cards with and without a photo keep the same text layout below it. */}
+      {r.image && (
+        <div className="event-card-cover">
+          <img src={r.image} alt="" loading="lazy" />
+        </div>
+      )}
       <div style={{ padding: '16px 18px 14px' }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: 10, gap: 6 }}>
           <div style={{ display:'flex', alignItems:'center', gap:6 }}>
@@ -180,8 +205,9 @@ function EventCard({ r, onEdit, onDelete, navigate, readyToClose, onGoingByItems
               <span>{r.location}</span>
             </div>
           )}
-          <div style={{ fontSize:11.5, color:'var(--text-muted)', marginTop:2 }}>
-            {fmtUpdatedLabel(r.updatedAt)}
+          <div className="event-card-dates">
+            <span title={r.createdAt || ''}>Created {fmtCreated(r.createdAt)}</span>
+            <span>{fmtUpdatedLabel(r.updatedAt)}</span>
           </div>
         </div>
       </div>
@@ -304,6 +330,12 @@ export default function EventPage() {
   // Empty = no filter. Dates compare against the event's start date (YYYY-MM-DD strings).
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const setFilter = (k, v) => { setFilters(f => ({ ...f, [k]: v })); setTabPage(1); };
+  // Filter drawer (2026-11-11): one "Filter" button opens a drawer; changes apply on "Apply".
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [draftFilters, setDraftFilters] = useState(EMPTY_FILTERS);
+  const setDraft = (k, v) => setDraftFilters(f => ({ ...f, [k]: v }));
+  function openFilters() { setDraftFilters(filters); setFilterOpen(true); }
+  function applyFilters() { setFilters(draftFilters); setTabPage(1); setFilterOpen(false); }
   const activeFilterCount = filters.locations.length + filters.stages.length + (filters.from ? 1 : 0) + (filters.to ? 1 : 0) + (filters.size ? 1 : 0);
   const stageNames = useMemo(() => getEventStageNames(), []);
   const locationOptions = useMemo(() => {
@@ -411,8 +443,9 @@ export default function EventPage() {
   }
   // Finish Date can't be before Start Date (2026-11-02).
   const dateError = form.start && form.finish && form.finish < form.start ? 'Finish Date can’t be before Start Date' : '';
+  const qrValid = QR_TYPES.some(t => t.value === form.qrType);
   function saveEvent() {
-    if (!form.name.trim() || dateError) return;
+    if (!form.name.trim() || dateError || !qrValid) return;
     const updatedAt = todayIsoDate();
     if (editingId) {
       setEvents(es => es.map(e => e.id === editingId ? { ...e, ...form, updatedAt } : e));
@@ -422,7 +455,7 @@ export default function EventPage() {
       // Event Status stage, written to the same store Event Detail's stepper reads.
       const firstStage = getEventStageNames()[0];
       if (firstStage) saveEventProgress(closingKeyFor(form), firstStage);
-      setEvents(es => [{ id:nextId, ...form, type, itemCount:0, updatedAt }, ...es]);
+      setEvents(es => [{ id:nextId, ...form, type, itemCount:0, createdAt: new Date().toISOString(), updatedAt }, ...es]);
       setNextId(n => n+1);
     }
     setModalOpen(false);
@@ -457,6 +490,10 @@ export default function EventPage() {
         <input className="search-input" type="text" placeholder={placeholder}
           value={tabQuery} onChange={e => { setTabQuery(e.target.value); setTabPage(1); }} />
       </div>
+      <button type="button" className={`btn-filter${activeFilterCount ? ' active' : ''}`} onClick={openFilters}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+        Filter{activeFilterCount > 0 && <span className="btn-filter-count">{activeFilterCount}</span>}
+      </button>
       <button className="btn-print" onClick={() => window.print()}><IconPrint /> Print</button>
     </div>
   );
@@ -520,23 +557,62 @@ export default function EventPage() {
         ))}
       </div>
 
-      {/* Filters — apply to all tabs */}
-      <div className="event-filters">
-        <SearchableSelect inline multiple value={filters.locations} onChange={v => setFilter('locations', v)}
-          placeholder="All locations" searchPlaceholder="Search location…" options={locationOptions} />
-        <SearchableSelect inline multiple value={filters.stages} onChange={v => setFilter('stages', v)}
-          placeholder="All stages" searchPlaceholder="Search stage…" options={stageNames.map(s => ({ value: s, label: s }))} />
-        <SearchableSelect inline value={filters.size} onChange={v => setFilter('size', v)} placeholder="Any size"
-          options={[{ value: '', label: 'Any size' }, ...Object.entries(SIZE_FILTERS).map(([k, f]) => ({ value: k, label: f.label }))]} />
-        <label className="event-filter-date">From <input type="date" value={filters.from} max={filters.to || undefined} onChange={e => setFilter('from', e.target.value)} /></label>
-        <label className="event-filter-date">To <input type="date" value={filters.to} min={filters.from || undefined} onChange={e => setFilter('to', e.target.value)} /></label>
-        {activeFilterCount > 0 && (
+      {/* Active filters (set in the Filter drawer) — apply to all tabs and to the tab counts */}
+      {activeFilterCount > 0 && (
+        <div className="event-filter-chips">
+          {filters.locations.map(l => <button key={`l-${l}`} type="button" className="filter-chip" onClick={() => setFilter('locations', filters.locations.filter(x => x !== l))}>{l} <IconClose /></button>)}
+          {filters.stages.map(st => <button key={`s-${st}`} type="button" className="filter-chip" onClick={() => setFilter('stages', filters.stages.filter(x => x !== st))}>{st} <IconClose /></button>)}
+          {filters.size && <button type="button" className="filter-chip" onClick={() => setFilter('size', '')}>{SIZE_FILTERS[filters.size].label} <IconClose /></button>}
+          {filters.from && <button type="button" className="filter-chip" onClick={() => setFilter('from', '')}>From {fmtDateShort(filters.from)} <IconClose /></button>}
+          {filters.to && <button type="button" className="filter-chip" onClick={() => setFilter('to', '')}>To {fmtDateShort(filters.to)} <IconClose /></button>}
+          <span className="event-filter-summary">{filteredEvents.length} of {events.length} events</span>
+          <button type="button" className="link-btn" onClick={() => { setFilters(EMPTY_FILTERS); setTabPage(1); }}>Clear all</button>
+        </div>
+      )}
+
+      <Drawer
+        open={filterOpen}
+        title="Filter events"
+        subtitle="Applies to every tab"
+        onClose={() => setFilterOpen(false)}
+        footer={
           <>
-            <span className="event-filter-summary">{filteredEvents.length} of {events.length} events</span>
-            <button type="button" className="link-btn" onClick={() => { setFilters(EMPTY_FILTERS); setTabPage(1); }}>Clear filters ({activeFilterCount})</button>
+            <button className="btn-cancel-modal" onClick={() => setDraftFilters(EMPTY_FILTERS)}>Reset</button>
+            <button className="btn-save-modal" onClick={applyFilters}><IconCheck /> Apply</button>
           </>
-        )}
-      </div>
+        }
+      >
+        <div className="form-group">
+          <label>Location</label>
+          <SearchableSelect multiple value={draftFilters.locations} onChange={v => setDraft('locations', v)}
+            placeholder="All locations" searchPlaceholder="Search location…" options={locationOptions} />
+        </div>
+        <div className="form-group">
+          <label>Event status (stage)</label>
+          <SearchableSelect multiple value={draftFilters.stages} onChange={v => setDraft('stages', v)}
+            placeholder="All stages" searchPlaceholder="Search stage…" options={stageNames.map(st => ({ value: st, label: st }))} />
+        </div>
+        <div className="form-row">
+          <div className="form-group">
+            <label>Start date from</label>
+            <input type="date" value={draftFilters.from} max={draftFilters.to || undefined} onChange={e => setDraft('from', e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label>Start date to</label>
+            <input type="date" value={draftFilters.to} min={draftFilters.from || undefined} onChange={e => setDraft('to', e.target.value)} />
+          </div>
+        </div>
+        <div className="form-group">
+          <label>Number of items</label>
+          <div className="filter-radio-list">
+            {[['', 'Any size'], ...Object.entries(SIZE_FILTERS).map(([k, f]) => [k, f.label])].map(([k, label]) => (
+              <label key={k || 'any'} className="pp-check">
+                <input type="radio" name="event-size" checked={draftFilters.size === k} onChange={() => setDraft('size', k)} /> {label}
+              </label>
+            ))}
+          </div>
+        </div>
+      </Drawer>
 
       {/* Tab bar — one tab per event status flag value */}
       <div style={{ display:'flex', borderBottom:'2px solid var(--border)', marginBottom:20, gap:0, overflowX:'auto' }}>
@@ -654,7 +730,7 @@ export default function EventPage() {
         footer={
           <>
             <button className="btn-cancel-modal" onClick={() => setModalOpen(false)}><IconClose /> Cancel</button>
-            <button className="btn-save-modal"   onClick={saveEvent} disabled={!form.name.trim() || !!dateError}><IconCheck /> Save Event</button>
+            <button className="btn-save-modal"   onClick={saveEvent} disabled={!form.name.trim() || !!dateError || !qrValid}><IconCheck /> Save Event</button>
           </>
         }
       >
@@ -706,21 +782,20 @@ export default function EventPage() {
             <label>PIC</label>
             <input type="text" placeholder="Person in charge" value={form.pic} onChange={setF('pic')} />
           </div>
-          <div className="form-group">
-            <label>QR Type</label>
-            <SearchableSelect
-              value={form.qrType}
-              onChange={v => setForm(f => ({ ...f, qrType: v }))}
-              options={[
-                { value: '', label: 'Select QR Type' },
-                { value: 'scan_in', label: 'Scan In' },
-                { value: 'scan_out', label: 'Scan Out' },
-                { value: 'scan_both', label: 'Scan In & Out' },
-                { value: 'none', label: 'No Scan' },
-              ]}
-              placeholder="Select QR Type"
-            />
+        </div>
+        <div className="form-group">
+          <label>QR Type <span style={{ color:'var(--red)' }}>*</span></label>
+          <div className="qr-type-choice" role="radiogroup" aria-label="QR type">
+            {QR_TYPES.map(t => (
+              <button key={t.value} type="button" role="radio" aria-checked={form.qrType === t.value}
+                className={`qr-type-option${form.qrType === t.value ? ' active' : ''}`}
+                onClick={() => setForm(f => ({ ...f, qrType: t.value }))}>
+                <strong>{t.label}</strong>
+                <span>{t.help}</span>
+              </button>
+            ))}
           </div>
+          <p className="field-hint">Decides how QR labels are printed and scanned for this event&rsquo;s items.</p>
         </div>
         <div className="form-group">
           <label>Address</label>
@@ -744,9 +819,9 @@ export default function EventPage() {
               onChange={e => {
                 const file = e.target.files?.[0];
                 if (!file) return;
-                const reader = new FileReader();
-                reader.onload = ev => setForm(f => ({ ...f, image: ev.target.result }));
-                reader.readAsDataURL(file);
+                // Shrunk before saving (lib/imageUtils.js) so the cover fits in browser storage.
+                imageFileToDataUrl(file, 1200).then(img => setForm(f => ({ ...f, image: img }))).catch(() => window.alert('This file could not be read as an image.'));
+                e.target.value = '';
               }}
             />
             <div

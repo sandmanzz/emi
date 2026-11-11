@@ -176,7 +176,7 @@ export default function ProductionLogTab({ warehouseNames, onStockChanged }) {
                 <th>Deploy to</th>
                 <th style={{ width: 110 }}>Status</th>
                 <th style={{ width: 100 }}>Finished</th>
-                <th style={{ width: 170, textAlign: 'center' }}>Action</th>
+                <th className="col-action" style={{ width: 170, textAlign: 'center' }}>Action</th>
               </tr>
             </thead>
             <tbody>

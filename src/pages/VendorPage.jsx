@@ -192,7 +192,7 @@ export default function VendorPage({ kind = 'production' }) {
                     <th style={{ width: 140 }}>Phone</th>
                     <th>Address</th>
                     <th style={{ width: 100, textAlign: 'right' }}>{cfg.countLabel}</th>
-                    <th style={{ width: 90, textAlign: 'center' }}>Action</th>
+                    <th className="col-action" style={{ width: 90, textAlign: 'center' }}>Action</th>
                   </tr>
                 </thead>
                 <tbody>

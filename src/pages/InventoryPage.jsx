@@ -254,7 +254,7 @@ export default function InventoryPage() {
                 <SortTh label="Status"       colIndex={8} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width:110 }} />
                 <SortTh label="Updated At"   colIndex={9} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width:100 }} />
                 <th style={{ width:60, textAlign:'center' }}>Image</th>
-                <th style={{ width:80, textAlign:'center' }}>Action</th>
+                <th className="col-action" style={{ width:80, textAlign:'center' }}>Action</th>
               </tr>
             </thead>
             <tbody>

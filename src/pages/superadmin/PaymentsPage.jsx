@@ -98,7 +98,7 @@ export default function PaymentsPage() {
                 <SortTh label="Method"    colIndex={4} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width: 130 }} />
                 <SortTh label="Status"    colIndex={5} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width: 100 }} />
                 <SortTh label="Date"      colIndex={6} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width: 110 }} />
-                <th style={{ width: 70, textAlign: 'center' }}>Action</th>
+                <th className="col-action" style={{ width: 70, textAlign: 'center' }}>Action</th>
               </tr>
             </thead>
             <tbody>

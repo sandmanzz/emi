@@ -140,7 +140,7 @@ export default function UnitPage() {
                 <SortTh label="Items"       colIndex={3} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width:80, textAlign:'right' }} />
                 <SortTh label="Created At"  colIndex={4} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width:120 }} />
                 <SortTh label="Updated At"  colIndex={5} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width:120 }} />
-                <th style={{ width:100, textAlign:'center' }}>Action</th>
+                <th className="col-action" style={{ width:100, textAlign:'center' }}>Action</th>
               </tr>
             </thead>
             <tbody>

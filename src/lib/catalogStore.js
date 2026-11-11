@@ -3,7 +3,9 @@ import { getInventoryRows, renameItemRows, setItemValuation, stockInto } from '.
 
 // The Inventory catalog (master data of items) — persisted in localStorage (2026-10-16).
 // Stored fields:  { id, name, sku, category, unit, itemValue, desc, homeWarehouse,
-//                   needsSetup, source, producedBy, producedFor, updatedAt }
+//                   needsSetup, source, producedBy, producedFor, image, updatedAt }
+// image (2026-11-11) = photo data URL (shrunk on upload, lib/imageUtils.js); shown on Event Detail cards,
+// list rows and the item drawer. Set in the item form or straight from the Event Detail drawer.
 // DERIVED on read from warehouse rows (lib/stockOpnameStore.js — the single stock source):
 //   totalStock  = Σ itemStock of the rows with the same name
 //   warehouses  = [{ name, stock }] sorted by stock, `warehouse` = the main one (or homeWarehouse)
@@ -24,7 +26,7 @@ function strip(i) {
     id: i.id, name: i.name, sku: i.sku || '', category: i.category || '', unit: i.unit || '',
     itemValue: Number(i.itemValue) || 0, desc: i.desc || '', homeWarehouse: i.homeWarehouse || i.warehouse || '',
     needsSetup: !!i.needsSetup, source: i.source || '', producedBy: i.producedBy || '', producedFor: i.producedFor || '',
-    updatedAt: i.updatedAt || '-',
+    image: i.image || '', updatedAt: i.updatedAt || '-',
   };
 }
 
@@ -110,6 +112,20 @@ export function updateCatalogItem(id, changes) {
   if (next.name !== old.name) renameItemRows(old.name, next.name);
   if (next.itemValue !== old.itemValue) setItemValuation(next.name, next.itemValue);
   return next;
+}
+
+// Sets / clears an item's photo by name (Event Detail drawer "Upload photo"). Returns false when the
+// browser storage is full.
+export function setItemImageByName(name, image) {
+  const before = items;
+  items = items.map(i => (i.name === name ? { ...i, image } : i));
+  try {
+    localStorage.setItem(KEY, JSON.stringify(items));
+    return true;
+  } catch {
+    items = before;
+    return false;
+  }
 }
 
 // Deletes an item. Refused (returns false) while it still has stock in any warehouse.

@@ -36,6 +36,13 @@ Newest session first.
 
 ---
 
+## Session 2026-11-11 — UX pass (head of design / UX)
+
+- Checking and Scan In/Out on Event Detail now appear only once Event Settings says so; scan phase follows the stage.
+- Filter drawer on the event list, explained QR Type, event card cover + Created date, frozen Action columns everywhere.
+- Item photos and event files (drawer); realistic mock data with demo images; warning when Next is clicked with a full cart.
+- Spec `docs/prd/PRD-2026-11-11.md`.
+
 ## Session 2026-11-02 (2) — Multi-event rentals, rent vs production, past events locked, Modify Item
 
 - Gold Charger Plate rented for 5 events in the seed; rent = returned to vendor, production = our asset (badges + texts).

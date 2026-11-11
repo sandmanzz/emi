@@ -157,7 +157,7 @@ export default function UsersPage() {
                 <th style={{ width: 110 }}>Role</th>
                 <th style={{ width: 100 }}>Status</th>
                 <th style={{ width: 140 }}>Last Active</th>
-                <th style={{ width: 120, textAlign: 'center' }}>Action</th>
+                <th className="col-action" style={{ width: 120, textAlign: 'center' }}>Action</th>
               </tr>
             </thead>
             <tbody>

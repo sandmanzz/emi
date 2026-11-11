@@ -146,7 +146,7 @@ export default function LoanLogTab({ kind = 'loan', vendorId = null, allowCreate
                 <th style={{ width: 190 }}>Period</th>
                 <th style={{ width: 130, textAlign: 'right' }}>{t.cost.replace(' cost', ' Cost')}</th>
                 <th style={{ width: 100 }}>Status</th>
-                <th style={{ width: 190, textAlign: 'center' }}>Action</th>
+                <th className="col-action" style={{ width: 190, textAlign: 'center' }}>Action</th>
               </tr>
             </thead>
             <tbody>

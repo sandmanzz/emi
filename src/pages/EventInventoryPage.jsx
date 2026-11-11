@@ -108,7 +108,7 @@ export default function EventInventoryPage() {
                 <SortTh label="Item"         colIndex={3} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} />
                 <th style={{ width:110, textAlign:'right' }}>Stock Item</th>
                 <th style={{ width:120, textAlign:'right' }}>Stock in Cart</th>
-                <th style={{ width:70, textAlign:'center' }}>Action</th>
+                <th className="col-action" style={{ width:70, textAlign:'center' }}>Action</th>
               </tr>
             </thead>
             <tbody>

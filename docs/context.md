@@ -899,6 +899,32 @@ clashes or seems off) — proceeding with the stated assumption unless corrected
 
 ## Raw instruction log
 
+### 2026-11-11 — UX pass as head of design/UX (Claude Web)
+> work as head of design dan head of ux
+> 1. perhatikan bagian ini, jadi untuk "checking" itu harus disesuaikan dengan event setting kalau memang belum mencapai state yang membutuhkan checking maka itu bisa di hide dulu. (ss1)
+> 2. scan in dan out begitu juga (ss1)
+> 3. untuk filter saya mau di taruh di 1 tombol dan ketika dibuka muncul filter drawer nya saja (ss2)
+> 4. qr type ini perlu diperjelas lagi fungsinya agar tidak membingungkan user
+> 5. (ss4) tambahkan juga created at nya taruh di tempat yang proper, card kamu juga harus perhatikan agar ketika saya menggunakan image maka ini bisa terlihat dengan baik
+> 6. kalau di table ada action , maka wajib di freeze untuk action nya
+> 7. di event detail juga harus bisa mengakomodir jika ada image, buat supaya lebih mudah. di event user juga bisa upload file ya dimana nanti file akna ditampilak ndi drawer
+> 8. berikan mock data lebih real lagi, kemudian pastikan jika ada barang yang belum di add dan masih ada di cart maka ada notifikasi ketika mau klik next.
+> setiap permintaan wajib dokumentasikan supaya dev bisa paham.
+
+- **Standing rule:** document every request so developers understand it (PRD per date + changes.md).
+- **Standing rule:** every table with an Action column freezes it (`className="col-action"` on the last `<th>`).
+- New Event Status flag **Checking Item**; Checking hidden until the first such stage, tickable only at it.
+- Scan In shown from the first scan stage, Scan Out from the second; scan phase is decided by the stage (fixes the
+  scan-out gap).
+- Event list filters moved into a drawer behind one Filter button; active filters as chips.
+- QR Type = Individual / Group (per box), shown as explained option cards (values `INDIVIDUAL` / `GROUP`).
+- Event card: Created date + 16:9 cover image. Item photos (catalog `image`) on cards/list/drawer, upload from the drawer.
+  Event files drawer (upload, preview, download, delete).
+- Realistic event/item mock data with demo images; cart-not-saved warning on Next.
+- Note: the owner's screenshots 2–5 come from the production app (server filters, Invite User tab, GROUP/INDIVIDUAL); the
+  same changes were made in this web reference.
+- Spec: `docs/prd/PRD-2026-11-11.md`.
+
 ### 2026-11-02 (3) — Super-technical system PRD for the mobile app (Claude Web)
 > tolong buatkan PRD super teknis, terkait skema sistem yang kita punya karena saya akan feed untuk claude untuk meng tune up mobile app yang ada. berikan secara sangat detail dan terperinci
 

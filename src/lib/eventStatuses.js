@@ -68,6 +68,14 @@ export function isOutsourceStage(statusName) {
   return record.outsourceItem === undefined ? record.loanItem === true : record.outsourceItem === true;
 }
 
+// Checking Item (2026-11-11): at a stage with this flag the crew ticks "Checking" on each item
+// (cards / list). Before the event reaches the first such stage the Checking field is hidden.
+// Missing field = false.
+export function isCheckItemStage(statusName) {
+  const record = getEventStatuses().find(s => s.status === statusName);
+  return record?.checkItem === true;
+}
+
 // While the event is at this stage, items may be deleted. Missing field counts as true
 // (status lists saved before the flag existed keep the old behaviour).
 export function isDeleteAllowedStage(statusName) {

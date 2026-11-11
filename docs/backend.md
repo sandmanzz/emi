@@ -126,6 +126,18 @@ whose status is still `on-going`.
 
 ---
 
+## R38 (2026-11-11) — checking flag, scan phase, files, images, QR type
+
+Spec: [prd/PRD-2026-11-11.md](prd/PRD-2026-11-11.md).
+- Event status: add `checkItem: boolean`. `PATCH /events/{id}/items/{lineId}/checking {checking}` → 409 unless the event is at a
+  `checkItem` stage and not in Checking Inventory or later.
+- Scan: `POST …/scan` decides the field by stage — first `scan` stage writes `scanInAt`, later scan stages write `scanOutAt`.
+  The advance gate counts lines missing the current phase's timestamp.
+- Event: `qrType: 'INDIVIDUAL' | 'GROUP'` (required), `createdAt` (server), `imageUrl`.
+- Items: `imageUrl` (upload `POST /items/{id}/image`, multipart, resize server-side).
+- Event files: `GET/POST /events/{id}/files` (multipart, `{id, name, mimeType, size, url, uploadedBy, uploadedAt}`),
+  `DELETE /events/{id}/files/{fileId}`. Enforce a size limit (web uses 2 MB for non-images).
+
 ## Event edit rules, Modify Item (2026-11-02, R36)
 
 - `PUT /events/{id}` → `409` when the event's last day (max of finish/start/date) is before today (server date).

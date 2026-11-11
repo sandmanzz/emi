@@ -201,7 +201,7 @@ export default function WarehousePage() {
                 <SortTh label="Created At" colIndex={3} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width:165 }} />
                 <SortTh label="Updated At" colIndex={4} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width:165 }} />
                 <th style={{ width:60, textAlign:'center' }}>Image</th>
-                <th style={{ width:90, textAlign:'center' }}>Action</th>
+                <th className="col-action" style={{ width:90, textAlign:'center' }}>Action</th>
               </tr>
             </thead>
             <tbody>

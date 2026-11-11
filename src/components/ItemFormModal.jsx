@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
+import { imageFileToDataUrl } from '../lib/imageUtils';
 import Modal from './Modal';
 import SearchableSelect from './SearchableSelect';
 import { IconClose, IconCheck } from './icons';
@@ -23,8 +24,10 @@ export default function ItemFormModal({ item = null, by = 'Admin', initialName =
     name: item?.name || initialName, sku: item?.sku || (initialName ? suggestSku(initialName) : ''), category: item?.category || '', unit: item?.unit || '',
     itemValue: item?.itemValue ? String(item.itemValue) : '', desc: item?.desc || '',
     homeWarehouse: item?.homeWarehouse || item?.warehouse || '', openingQty: '', openingWarehouse: '',
+    image: item?.image || '',
   }));
   const [touched, setTouched] = useState(false);
+  const photoRef = useRef(null);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const nameTaken = form.name.trim() && isNameTaken(form.name, item?.id ?? null);
@@ -46,7 +49,7 @@ export default function ItemFormModal({ item = null, by = 'Admin', initialName =
     if (!valid) return;
     const data = {
       name: form.name.trim(), sku: form.sku.trim().toUpperCase(), category: form.category, unit: form.unit,
-      itemValue: value, desc: form.desc.trim(), homeWarehouse: form.homeWarehouse,
+      itemValue: value, desc: form.desc.trim(), homeWarehouse: form.homeWarehouse, image: form.image,
       // completing category + unit finishes a production draft
       needsSetup: item?.needsSetup ? !(form.category && form.unit) : false,
       ...(!item && extra ? extra : {}),
@@ -117,6 +120,25 @@ export default function ItemFormModal({ item = null, by = 'Admin', initialName =
           <label>Home Warehouse</label>
           <SearchableSelect value={form.homeWarehouse} onChange={v => set('homeWarehouse', v)} placeholder="Where it is usually kept"
             options={[{ value: '', label: '— None —' }, ...warehouses.map(w => ({ value: w, label: w }))]} />
+        </div>
+      </div>
+      <div className="form-group">
+        <label>Photo</label>
+        <div className="item-form-photo">
+          {form.image
+            ? <img src={form.image} alt="" />
+            : <div className="item-form-photo-empty">No photo</div>}
+          <div>
+            <input ref={photoRef} type="file" accept="image/*" style={{ display: 'none' }}
+              onChange={e => {
+                const f = e.target.files?.[0];
+                e.target.value = '';
+                if (f) imageFileToDataUrl(f).then(img => set('image', img)).catch(() => window.alert('This file could not be read as an image.'));
+              }} />
+            <button type="button" className="btn btn-ghost" onClick={() => photoRef.current?.click()}>{form.image ? 'Change photo' : 'Upload photo'}</button>
+            {form.image && <button type="button" className="link-btn" style={{ marginLeft: 10, color: 'var(--red)' }} onClick={() => set('image', '')}>Remove</button>}
+            <p className="field-hint">Shown on Event Detail cards and the item drawer. Resized automatically.</p>
+          </div>
         </div>
       </div>
       <div className="form-group">

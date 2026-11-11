@@ -146,7 +146,7 @@ export default function AreaPage() {
                 <th style={{ width:110, textAlign:'center' }}>Sub Areas</th>
                 <SortTh label="Created At" colIndex={3} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width:120 }} />
                 <SortTh label="Updated At" colIndex={4} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width:120 }} />
-                <th style={{ width:110, textAlign:'center' }}>Action</th>
+                <th className="col-action" style={{ width:110, textAlign:'center' }}>Action</th>
               </tr>
             </thead>
             <tbody>
