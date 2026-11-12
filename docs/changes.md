@@ -50,6 +50,16 @@ explains a few non-obvious conventions that the entries below assume you already
 
 ---
 
+## Round 40 — Cutting Stock / Stock Return with real stock movements + illustrated notice (2026-11-12)
+
+New `lib/eventStockCuts.js` (cut/return/reserved, `emi_event_stock_cuts`), `components/StockMoveNotice.jsx` (+ CSS).
+`EventDetailPage.jsx`: `confirmStageChange` calls `cutStock` / `returnStock`, only stock lines, cut flags restored on load,
+banner + illustrated confirm; `transferTargetCandidates` no longer memoized (React Compiler lint). `EventStatusPage.jsx`:
+Cutting Stock + Stock Return columns/KPI/form with exclusivity. Seed: cut Waiting scan in, return Waiting scan out.
+`WarehouseInventoryPage.jsx`: "N in events" chip. Spec `docs/prd/PRD-2026-11-12.md` §2. Lint 11, build OK.
+
+---
+
 ## Round 39 — Event Status "Allow Add Item" (2026-11-12)
 
 `lib/eventStatuses.js` `isAddAllowedStage`; seed `allowAddItem`; `EventStatusPage.jsx` column/KPI/form; `EventDetailPage.jsx`

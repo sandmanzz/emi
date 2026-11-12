@@ -12,6 +12,7 @@ import { isNeedsSetup, markItemSetUp, getCatalog } from '../lib/producedItems';
 import { getAllProductions } from '../lib/productionRequests';
 import { getGeneralRentals, loanDisplayStatus, LOAN_LABEL, LOAN_BADGE } from '../lib/eventLoans';
 import { TODAY } from '../data/events';
+import { reservedByRow } from '../lib/eventStockCuts';
 import { fmtNum, formatIDR } from '../lib/format';
 
 const PAGE_SIZE = 10;
@@ -213,6 +214,8 @@ export default function WarehouseInventoryPage() {
       warehouseStock: l.qty, itemStock: l.qty, vendorName: l.vendorName, dueDate: l.dueDate,
       rentStatus: loanDisplayStatus(l, TODAY), updatedAt: l.borrowedAt || '',
     })), []);
+  // Stock cut for events and not returned yet (already deducted from the row; shown as a hint).
+  const reserved = useMemo(() => reservedByRow(), [inventoryRows]); // eslint-disable-line react-hooks/exhaustive-deps -- re-read after stock changes
   const sourceOf = r => (r.isRent ? 'rent' : producedNames.has(r.name) ? 'produced' : 'normal');
 
   const filtered = useMemo(() => {
@@ -680,6 +683,7 @@ export default function WarehouseInventoryPage() {
                       <td className="name-cell">
                         {r.name}
                         {producedNames.has(r.name) && <span className="badge badge-green needs-setup-chip" title="Made by a production vendor">Produced</span>}
+                        {reserved.get(r.id) > 0 && <span className="badge badge-orange needs-setup-chip" title="Cut for events (Cutting Stock) and not returned yet — already deducted from this stock">{fmtNum(reserved.get(r.id))} in events</span>}
                         {isNeedsSetup(r.name) && <span className="badge badge-orange needs-setup-chip" title="Created from a production request — complete its information">Needs setup</span>}
                       </td>
                       <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums' }}>{fmtNum(r.warehouseStock)}</td>

@@ -126,6 +126,12 @@ whose status is still `on-going`.
 
 ---
 
+## R40 (2026-11-12) — cutting stock reservations
+
+Event status `cuttingStock` / `stockReturn` (one each). Advance into the cut stage → per stock line a movement `EVENT_CUT`
+(−qty, reserved for the event) and a reservation record `{eventId, lineId, rowId, qty}`; advance into the return stage →
+`EVENT_RETURN` (+qty − brokenWrittenOff) and close the reservation. Idempotent per line. Expose `reservedQty` per row.
+
 ## R39 (2026-11-12) — allowAddItem
 
 Event status `allowAddItem: boolean` (default true). Every endpoint that adds to an event (items, rentals, outsource orders,

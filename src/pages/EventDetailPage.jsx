@@ -16,6 +16,8 @@ import { CatalogItemPicker, VendorPicker } from '../components/QuickPickers';
 import { getCatalog, stockInProduced } from '../lib/producedItems';
 import { setItemImageByName } from '../lib/catalogStore';
 import { getEventFiles, saveEventFiles } from '../lib/eventFiles';
+import { getEventStockCuts, isStockLine, previewCut, cutStock, returnStock } from '../lib/eventStockCuts';
+import StockMoveNotice from '../components/StockMoveNotice';
 import { imageFileToDataUrl, fileToUpload, fmtBytes } from '../lib/imageUtils';
 import PrintPlanModal from '../components/PrintPlanModal';
 import { getEventSeedItems } from '../lib/eventItems';
@@ -377,7 +379,11 @@ export default function EventDetailPage() {
 
   // Seed items for this event: its own list, a generated list sized to its item count, or
   // the 26 generic items (see lib/eventItems.js — Event Report reads the same list).
-  const baseItems = getEventSeedItems(eventName);
+  // Lines already cut / returned are restored from emi_event_stock_cuts, so a reload never cuts twice.
+  const savedCuts = getEventStockCuts(eventName);
+  const baseItems = getEventSeedItems(eventName).map(it => savedCuts[it.id]
+    ? { ...it, stockCut: true, stockReturned: !!savedCuts[it.id].returnedAt }
+    : it);
   const baseNextId = Math.max(0, ...baseItems.map(i => i.id)) + 1;
   const [items, setItems] = useState(() => {
     const incoming = getIncomingItems(eventName);
@@ -541,11 +547,10 @@ export default function EventDetailPage() {
   // Transfer target candidates — other events still "on-going" (upcoming, not
   // yet in any closing phase), matching the same set EventPage.jsx's "Upcoming"
   // tab shows.
-  const transferTargetCandidates = useMemo(() => initialEvents
+  const transferTargetCandidates = initialEvents
     .filter(e => e.type === 'upcoming')
     .map(e => ({ ...e, key: eventKeyFor(e) }))
-    .filter(e => e.key !== eventName && getEventClosing(e.key) === 'on-going'),
-  [eventName]);
+    .filter(e => e.key !== eventName && getEventClosing(e.key) === 'on-going');
 
   const maxReachedIndex = Math.max(furthestIndex, stageIndex);
 
@@ -643,7 +648,9 @@ export default function EventDetailPage() {
   }
 
   const pendingCutStages = pendingStage ? cuttingStagesBetween(pendingStage) : [];
-  const itemsToCut = useMemo(() => items.filter(it => !it.stockCut), [items]);
+  // Only lines from our own stock are cut (not rented / outsourced lines).
+  const itemsToCut = useMemo(() => items.filter(it => isStockLine(it) && !it.stockCut), [items]);
+  const cutPreview = pendingCutStages.length > 0 ? previewCut(itemsToCut) : [];
 
   // Stock-return stages crossed going forward (same rule as cutting).
   function returnStagesBetween(step) {
@@ -654,37 +661,56 @@ export default function EventDetailPage() {
   const pendingReturnStages = pendingStage ? returnStagesBetween(pendingStage) : [];
   // Items that will be returned: already cut (or about to be cut in this same move)
   // and not yet returned.
-  const pendingReturnCount = pendingReturnStages.length === 0 ? 0 : items.filter(it =>
-    !it.stockReturned && (it.stockCut || pendingCutStages.length > 0)).length;
+  const pendingReturnLines = pendingReturnStages.length === 0 ? [] : items.filter(it =>
+    isStockLine(it) && !it.stockReturned && (it.stockCut || pendingCutStages.length > 0));
+  const pendingReturnCount = pendingReturnLines.length;
+
+  // Data for the illustrated notices (confirm popup + banner above the stepper).
+  const groupByWarehouse = prev => [...prev.reduce((m, p) => {
+    if (p.row && p.cut > 0) m.set(p.row.warehouseName, (m.get(p.row.warehouseName) || 0) + p.cut);
+    return m;
+  }, new Map())].map(([name, qty]) => ({ name, qty })).sort((a, b) => b.qty - a.qty);
+  const firstReturnStage = stages.find(isStockReturnStage) || '';
+  const nextStageName = stages[stageIndex + 1];
+  const nextIsCut = !!nextStageName && isCuttingStockStage(nextStageName) && itemsToCut.length > 0;
+  const nextIsReturn = !!nextStageName && isStockReturnStage(nextStageName)
+    && items.some(it => isStockLine(it) && it.stockCut && !it.stockReturned);
+  const nextCutQty = itemsToCut.reduce((sum, it) => sum + it.qty, 0);
+  const returnSavedCuts = getEventStockCuts(eventName);
+  const returnPreview = pendingReturnLines.map(it => {
+    const c = returnSavedCuts[it.id];
+    return { name: c?.warehouse || it.warehouse || '—', qty: c ? Math.max(0, c.qty - (it.brokenWrittenOff || 0) - (it.brokenQty || 0)) : it.qty };
+  });
 
   function confirmStageChange() {
     const step = pendingStage;
     if (!step) return;
     const targetIndex = stages.indexOf(step);
+    const by = currentUser?.name || 'Admin';
+    // Cutting Stock: real deduction from Warehouse Inventory rows (ledger "Event cut", reserved for this event).
     if (cuttingStagesBetween(step).length > 0 && itemsToCut.length > 0) {
       const cutIds = new Set(itemsToCut.map(it => it.id));
-      const totalQty = itemsToCut.reduce((sum, it) => sum + it.qty, 0);
+      const res = cutStock(eventName, itemsToCut, { stage: step, by });
       setItems(is => is.map(it => cutIds.has(it.id) ? { ...it, stockCut: true } : it));
       addActivityLog({
-        userName: currentUser?.name || 'Admin', action: 'Update', module: 'Event Detail',
-        description: `Cut stock for ${cutIds.size} item(s) (${totalQty} pcs) on ${eventName} at "${step}"`,
+        userName: by, action: 'Update', module: 'Event Detail',
+        description: `Cut stock for ${res.lines} item(s) (${res.qty} pcs) on ${eventName} at "${step}"${res.short ? ` — ${res.short} pcs short (not in stock)` : ''}`,
       });
     }
+    // Stock Return: puts the cut quantity back (minus broken units written off). Broken write-off runs first.
+    if (targetIndex > stageIndex) writeOffBrokenItems(step);
     if (returnStagesBetween(step).length > 0 && pendingReturnCount > 0) {
-      const cutting = cuttingStagesBetween(step).length > 0;
-      const toReturn = items.filter(it => !it.stockReturned && (it.stockCut || cutting));
-      const returnIds = new Set(toReturn.map(it => it.id));
-      const totalQty = toReturn.reduce((sum, it) => sum + it.qty, 0);
+      const returnIds = new Set(pendingReturnLines.map(it => it.id));
+      // Include broken units written off in this same move (writeOffBrokenItems updates state asynchronously).
+      const lines = pendingReturnLines.map(it => ({ ...it, brokenWrittenOff: (it.brokenWrittenOff || 0) + (targetIndex > stageIndex ? it.brokenQty || 0 : 0) }));
+      const res = returnStock(eventName, lines, { stage: step, by });
       setItems(is => is.map(it => returnIds.has(it.id) ? { ...it, stockCut: true, stockReturned: true } : it));
       addActivityLog({
-        userName: currentUser?.name || 'Admin', action: 'Return', module: 'Event Detail',
-        description: `Returned stock for ${returnIds.size} item(s) (${totalQty} pcs) on ${eventName} at "${step}"`,
+        userName: by, action: 'Return', module: 'Event Detail',
+        description: `Returned stock for ${res.lines} item(s) (${res.qty} pcs) on ${eventName} at "${step}"${res.lost ? ` — ${res.lost} broken pcs not returned` : ''}`,
       });
     }
-    if (targetIndex > stageIndex) {
-      writeOffBrokenItems(step);
-      applyConversions(step);
-    }
+    if (targetIndex > stageIndex) applyConversions(step);
     setEventStatus(step);
     saveEventProgress(eventName, step);
     if (targetIndex > furthestIndex) {
@@ -746,10 +772,11 @@ export default function EventDetailPage() {
   async function addEventFiles(fileList) {
     setFilesError('');
     const added = [];
+    const firstId = Math.max(0, ...eventFiles.map(x => Number(x.id) || 0)) + 1;
     for (const f of [...fileList]) {
       try {
         const up = await fileToUpload(f);
-        added.push({ ...up, id: `${Date.now()}-${added.length}`, uploadedBy: currentUser?.name || 'Admin', uploadedAt: new Date().toISOString() });
+        added.push({ ...up, id: firstId + added.length, uploadedBy: currentUser?.name || 'Admin', uploadedAt: new Date().toISOString() });
       } catch (e) {
         setFilesError(e.message || `"${f.name}" could not be read.`);
       }
@@ -1488,6 +1515,15 @@ export default function EventDetailPage() {
           )}
         </div>
 
+        {/* Heads-up before Next when the next stage moves stock (2026-11-12). */}
+        {closingStatus === 'on-going' && nextIsCut && (
+          <StockMoveNotice compact mode="cut" stages={[nextStageName]} lines={itemsToCut.length} qty={nextCutQty} onDetails={handleNextClick} />
+        )}
+        {closingStatus === 'on-going' && nextIsReturn && (
+          <StockMoveNotice compact mode="return" stages={[nextStageName]}
+            lines={items.filter(it => isStockLine(it) && it.stockCut && !it.stockReturned).length}
+            qty={items.filter(it => isStockLine(it) && it.stockCut && !it.stockReturned).reduce((sum, it) => sum + it.qty, 0)} onDetails={handleNextClick} />
+        )}
         {(addLocked || itemsLocked) && (
           <div className="ed-lock-note">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
@@ -2436,19 +2472,19 @@ export default function EventDetailPage() {
         {pendingStage && isScanStage(pendingStage) && (
           <p className="confirm-msg">Items must be scanned at this stage before the event can move on.</p>
         )}
-        {pendingCutStages.length > 0 && (
-          <div className="stage-confirm-cut">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-            <div>
-              <strong>Cutting Stock is on for {pendingCutStages.map(s => `“${s}”`).join(', ')}.</strong>
-              {itemsToCut.length > 0 ? (
-                <> Confirming deducts <strong>{itemsToCut.length} item{itemsToCut.length === 1 ? '' : 's'}</strong> ({itemsToCut.reduce((sum, it) => sum + it.qty, 0)} pcs) from warehouse stock. Going back to an earlier stage does not restore it.</>
-              ) : (
-                <> All items on this event have already been deducted, so nothing more will be cut.</>
-              )}
-            </div>
-          </div>
-        )}
+        {pendingCutStages.length > 0 && (itemsToCut.length > 0 ? (
+          <StockMoveNotice
+            mode="cut"
+            stages={pendingCutStages}
+            lines={cutPreview.filter(p => p.cut > 0).length}
+            qty={cutPreview.reduce((sum, p) => sum + p.cut, 0)}
+            short={cutPreview.reduce((sum, p) => sum + p.short, 0)}
+            byWarehouse={groupByWarehouse(cutPreview)}
+            returnStage={firstReturnStage}
+          />
+        ) : (
+          <p className="confirm-msg">Cutting Stock is on for {pendingCutStages.map(st => `“${st}”`).join(', ')}, but every item of this event is already cut.</p>
+        ))}
         {pendingStage && stages.indexOf(pendingStage) > stageIndex && pendingConversions.length > 0 && (
           <div className="stage-confirm-cut">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
@@ -2462,19 +2498,20 @@ export default function EventDetailPage() {
             </div>
           </div>
         )}
-        {pendingReturnStages.length > 0 && (
-          <div className="stage-confirm-cut stage-confirm-return">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
-            <div>
-              <strong>Stock Return is on for {pendingReturnStages.map(s => `“${s}”`).join(', ')}.</strong>
-              {pendingReturnCount > 0 ? (
-                <> Confirming returns <strong>{pendingReturnCount} item{pendingReturnCount === 1 ? '' : 's'}</strong> to warehouse stock.</>
-              ) : (
-                <> No items have had their stock cut, so nothing will be returned.</>
-              )}
-              {' '}After this, <strong>no more items can be added</strong> to this event.
-            </div>
-          </div>
+        {pendingReturnStages.length > 0 && (pendingReturnCount > 0 ? (
+          <StockMoveNotice
+            mode="return"
+            stages={pendingReturnStages}
+            lines={pendingReturnCount}
+            qty={returnPreview.reduce((sum, w) => sum + w.qty, 0)}
+            lost={pendingReturnLines.reduce((sum, it) => sum + (it.brokenWrittenOff || 0) + (it.brokenQty || 0), 0)}
+            byWarehouse={[...returnPreview.reduce((m, w) => m.set(w.name, (m.get(w.name) || 0) + w.qty), new Map())].map(([name, qty]) => ({ name, qty }))}
+          />
+        ) : (
+          <p className="confirm-msg">Stock Return is on for {pendingReturnStages.map(st => `“${st}”`).join(', ')}. No stock was cut for this event, so nothing goes back. After this, no more items can be added.</p>
+        ))}
+        {pendingReturnStages.length > 0 && pendingReturnCount > 0 && (
+          <p className="confirm-msg" style={{ color: 'var(--text-muted)' }}>After this, <strong>no more items can be added</strong> to this event.</p>
         )}
       </Modal>
       {/* Cart not saved yet — shown when Next is clicked with items still in the cart */}

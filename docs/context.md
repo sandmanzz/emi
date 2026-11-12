@@ -899,6 +899,18 @@ clashes or seems off) — proceeding with the stated assumption unless corrected
 
 ## Raw instruction log
 
+### 2026-11-12 (2) — Cutting Stock back, with real stock deduction and an illustrated notice (Claude Web)
+> tambahkan 1 lagi untuk cutting stock, artinya jika sudah enable maka ketika masuk ke fase itu stok akan dianggap sudah berkurang dan di reservasi untuk event tersebut. pastikan sebelum klik next di event detail nya harus ada penjelasan yang jelas dan ada ilustrasi atau icon agar membuat user notice
+
+- **Clash noted:** the owner removed Cutting Stock from Event Settings on 2026-10-05; this request brings it back
+  (supersedes that decision).
+- Cutting Stock (one stage) now **really deducts** the event's stock lines from Warehouse Inventory and reserves them for
+  the event (ledger "Event cut"); Stock Return (one stage) puts them back minus written-off broken units ("Event return").
+  Stock Return was also missing from Event Settings, so it is back too (needed so reserved stock comes back).
+- Before Next: an orange banner "Next stage cuts stock" with icon; the confirm popup shows an illustrated
+  Warehouse → Event panel with pcs, per-warehouse totals, shortfall and when the stock comes back.
+- Seed: Cutting Stock = Waiting scan in, Stock Return = Waiting scan out. Spec: `docs/prd/PRD-2026-11-12.md` §2.
+
 ### 2026-11-12 — Event Status: Allow Add Item (Claude Web)
 > untuk ini tambahkan opsi juga untuk allow add item, jadi kalau allow maka user masih bisa add dan kalau no maka user sudah tidak bisa add item lagi. tujuanya untuk menjaga agar tidak ada penambahan di akhir
 

@@ -42,7 +42,7 @@ export default function EventStatusPage() {
   const [deleteModal,  setDeleteModal]  = useState(false);
   const [editingId,    setEditingId]    = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [form, setForm] = useState({ status: '', code: '', scan: 'None', productionItem: false, checkOwnership: false, allowDelete: true, allowAddItem: true, loanItem: false, outsourceItem: false, checkItem: false, order: '' });
+  const [form, setForm] = useState({ status: '', code: '', scan: 'None', productionItem: false, checkOwnership: false, allowDelete: true, allowAddItem: true, loanItem: false, outsourceItem: false, checkItem: false, cuttingStock: false, stockReturn: false, order: '' });
 
   // Reordering is edit-mode + explicit Save, not instant-apply-per-click.
   const [reorderMode,    setReorderMode]    = useState(false);
@@ -86,7 +86,7 @@ export default function EventStatusPage() {
 
   function openNew() {
     setEditingId(null);
-    setForm({ status: '', code: '', scan: 'None', productionItem: false, checkOwnership: false, allowDelete: true, allowAddItem: true, loanItem: false, outsourceItem: false, checkItem: false, order: String(statuses.length + 1) });
+    setForm({ status: '', code: '', scan: 'None', productionItem: false, checkOwnership: false, allowDelete: true, allowAddItem: true, loanItem: false, outsourceItem: false, checkItem: false, cuttingStock: false, stockReturn: false, order: String(statuses.length + 1) });
     setStatusModal(true);
   }
 
@@ -94,7 +94,7 @@ export default function EventStatusPage() {
     const r = statuses.find(x => x.id === id);
     if (!r) return;
     setEditingId(id);
-    setForm({ status: r.status, code: r.code || '', scan: r.scan, productionItem: r.productionItem === true, checkOwnership: r.checkOwnership === true, allowDelete: r.allowDelete !== false, allowAddItem: r.allowAddItem !== false, loanItem: r.loanItem === true, outsourceItem: isOutsourceFlag(r), checkItem: r.checkItem === true, order: String(r.order) });
+    setForm({ status: r.status, code: r.code || '', scan: r.scan, productionItem: r.productionItem === true, checkOwnership: r.checkOwnership === true, allowDelete: r.allowDelete !== false, allowAddItem: r.allowAddItem !== false, loanItem: r.loanItem === true, outsourceItem: isOutsourceFlag(r), checkItem: r.checkItem === true, cuttingStock: r.cuttingStock === true, stockReturn: r.stockReturn === true, order: String(r.order) });
     setStatusModal(true);
   }
 
@@ -104,11 +104,11 @@ export default function EventStatusPage() {
     const now = new Date().toISOString().slice(0, 10);
     if (editingId) {
       setStatuses(ss => ss.map(s => s.id === editingId
-        ? { ...s, status: form.status, code: form.code, scan: form.scan, productionItem: form.productionItem, checkOwnership: form.checkOwnership, allowDelete: form.allowDelete, allowAddItem: form.allowAddItem, loanItem: form.loanItem, outsourceItem: form.outsourceItem, checkItem: form.checkItem, order: parseInt(form.order) || s.order, updatedAt: now }
+        ? { ...s, status: form.status, code: form.code, scan: form.scan, productionItem: form.productionItem, checkOwnership: form.checkOwnership, allowDelete: form.allowDelete, allowAddItem: form.allowAddItem, loanItem: form.loanItem, outsourceItem: form.outsourceItem, checkItem: form.checkItem, cuttingStock: form.cuttingStock, stockReturn: form.stockReturn, order: parseInt(form.order) || s.order, updatedAt: now }
         : s
       ));
     } else {
-      setStatuses(ss => [...ss, { id: nextId, order: parseInt(form.order) || ss.length + 1, status: form.status, code: form.code, scan: form.scan, productionItem: form.productionItem, checkOwnership: form.checkOwnership, allowDelete: form.allowDelete, allowAddItem: form.allowAddItem, loanItem: form.loanItem, outsourceItem: form.outsourceItem, checkItem: form.checkItem, eventRunning: 0, updatedAt: now }]);
+      setStatuses(ss => [...ss, { id: nextId, order: parseInt(form.order) || ss.length + 1, status: form.status, code: form.code, scan: form.scan, productionItem: form.productionItem, checkOwnership: form.checkOwnership, allowDelete: form.allowDelete, allowAddItem: form.allowAddItem, loanItem: form.loanItem, outsourceItem: form.outsourceItem, checkItem: form.checkItem, cuttingStock: form.cuttingStock, stockReturn: form.stockReturn, eventRunning: 0, updatedAt: now }]);
       setNextId(n => n + 1);
     }
     setStatusModal(false);
@@ -156,6 +156,10 @@ export default function EventStatusPage() {
   const scanEnabled    = statuses.filter(s => s.scan === 'Scan').length;
   const productionEnabled = statuses.filter(s => s.productionItem === true).length;
   const ownershipEnabled = statuses.filter(s => s.checkOwnership === true).length;
+  // Cutting Stock / Stock Return: one status each, never the same status (2026-11-12).
+  const cutOwner = statuses.find(st => st.cuttingStock === true && st.id !== editingId);
+  const returnOwner = statuses.find(st => st.stockReturn === true && st.id !== editingId);
+  const cutCount = statuses.filter(st => st.cuttingStock === true).length;
   const addAllowed = statuses.filter(s => s.allowAddItem !== false).length; // missing field = allowed
   const deleteAllowed = statuses.filter(s => s.allowDelete !== false).length; // missing field = allowed (pre-2026-10-16 data)
   const loanEnabled = statuses.filter(s => s.loanItem === true).length;
@@ -177,19 +181,20 @@ export default function EventStatusPage() {
         Ownership set to &ldquo;True&rdquo; asks whether any item needs an ownership change
         before the event moves on from that stage. A status with Production Item set
         to &ldquo;True&rdquo; lets users request new items to be produced while an
-        event is at that stage. A status with Allow Add Item set to &ldquo;False&rdquo; stops new items from being added. A status with Allow Delete set to &ldquo;False&rdquo; stops
+        event is at that stage. A status with Cutting Stock set to &ldquo;True&rdquo; deducts and reserves the event&rsquo;s stock when an event moves into it; Stock Return puts it back. A status with Allow Add Item set to &ldquo;False&rdquo; stops new items from being added. A status with Allow Delete set to &ldquo;False&rdquo; stops
         items from being deleted from an event while it is at that stage. A status with Rent Item set to
         &ldquo;True&rdquo; lets users rent items from a rent vendor while an event is at that stage, and Outsource Item
         set to &ldquo;True&rdquo; lets them order items from an outsource vendor. Checking Item set to &ldquo;True&rdquo; shows the
         Checking tick box on items from that status on. Scan In appears from the first Scan status, Scan Out from the second.
       </p>
 
-      <div className="stats-bar" style={{ gridTemplateColumns:'repeat(10,1fr)' }}>
+      <div className="stats-bar" style={{ gridTemplateColumns:'repeat(11,1fr)' }}>
         {[
           { label:'Total Statuses',  value:statuses.length, color:'var(--brand)',  bg:'var(--brand-bg)' },
           { label:'Scan Enabled',    value:scanEnabled,     color:'var(--green)',  bg:'var(--green-bg)' },
           { label:'Check Ownership', value:ownershipEnabled, color:'var(--green)',  bg:'var(--green-bg)' },
           { label:'Production Item', value:productionEnabled, color:'var(--purple)', bg:'var(--purple-bg)' },
+          { label:'Cutting Stock',   value:cutCount,        color:'var(--orange)', bg:'var(--orange-bg)' },
           { label:'Allow Add Item',  value:addAllowed,      color:'var(--green)',  bg:'var(--green-bg)' },
           { label:'Allow Delete',    value:deleteAllowed,   color:'var(--red)',    bg:'var(--red-bg)' },
           { label:'Rent Item',       value:loanEnabled,     color:'var(--brand)',  bg:'var(--brand-bg)' },
@@ -251,6 +256,8 @@ export default function EventStatusPage() {
                 <SortTh label="Status"        colIndex={1} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ minWidth:170 }} />
                 <th style={{ width:80, textAlign:'center' }}>Code</th>
                 <th style={{ width:100, textAlign:'center' }}>Scan</th>
+                <th style={{ width:96, textAlign:'center', whiteSpace:'normal', lineHeight:1.3 }}>Cutting Stock</th>
+                <th style={{ width:96, textAlign:'center', whiteSpace:'normal', lineHeight:1.3 }}>Stock Return</th>
                 <th style={{ width:96, textAlign:'center', whiteSpace:'normal', lineHeight:1.3 }}>Production Item</th>
                 <th style={{ width:96, textAlign:'center', whiteSpace:'normal', lineHeight:1.3 }}>Check Ownership</th>
                 <th style={{ width:96, textAlign:'center', whiteSpace:'normal', lineHeight:1.3 }}>Allow Add Item</th>
@@ -265,7 +272,7 @@ export default function EventStatusPage() {
             </thead>
             <tbody>
               {pageData.length === 0
-                ? <tr><td colSpan={15} style={{ textAlign:'center', padding:40, color:'var(--text-muted)' }}>No statuses found.</td></tr>
+                ? <tr><td colSpan={17} style={{ textAlign:'center', padding:40, color:'var(--text-muted)' }}>No statuses found.</td></tr>
                 : pageData.map((r, idx) => (
                   <tr key={r.id}>
                     <td style={{ textAlign:'center' }}>
@@ -302,6 +309,8 @@ export default function EventStatusPage() {
                       {r.code ? <span className="badge badge-gray" style={{ fontSize:11 }}>{r.code}</span> : <span style={{ color:'var(--text-muted)', fontSize:12 }}>—</span>}
                     </td>
                     <td style={{ textAlign:'center' }}><ScanBadge scan={r.scan} /></td>
+                    <td style={{ textAlign:'center' }}><BoolBadge value={r.cuttingStock === true} /></td>
+                    <td style={{ textAlign:'center' }}><BoolBadge value={r.stockReturn === true} /></td>
                     <td style={{ textAlign:'center' }}><BoolBadge value={r.productionItem === true} /></td>
                     <td style={{ textAlign:'center' }}><BoolBadge value={r.checkOwnership === true} /></td>
                     <td style={{ textAlign:'center' }}><BoolBadge value={r.allowAddItem !== false} /></td>
@@ -364,6 +373,38 @@ export default function EventStatusPage() {
             ]}
             placeholder="None"
           />
+        </div>
+        <div className="form-group">
+          <label>Cutting Stock</label>
+          <SearchableSelect
+            value={form.cuttingStock ? 'true' : 'false'}
+            onChange={v => setForm(f => ({ ...f, cuttingStock: v === 'true', stockReturn: v === 'true' ? false : f.stockReturn }))}
+            options={[
+              { value: 'false', label: 'False' },
+              { value: 'true',  label: cutOwner ? `True — already used by “${cutOwner.status}”` : 'True', disabled: !!cutOwner },
+            ]}
+            placeholder="False"
+          />
+          <p style={{ fontSize: 11.5, color: 'var(--text-muted)', margin: '5px 0 0' }}>
+            When True, moving an event INTO this status deducts its items from warehouse stock and reserves them for the
+            event (logged as &ldquo;Event cut&rdquo; in Stock History). Only one status can have it.
+          </p>
+        </div>
+        <div className="form-group">
+          <label>Stock Return</label>
+          <SearchableSelect
+            value={form.stockReturn ? 'true' : 'false'}
+            onChange={v => setForm(f => ({ ...f, stockReturn: v === 'true', cuttingStock: v === 'true' ? false : f.cuttingStock }))}
+            options={[
+              { value: 'false', label: 'False' },
+              { value: 'true',  label: returnOwner ? `True — already used by “${returnOwner.status}”` : 'True', disabled: !!returnOwner },
+            ]}
+            placeholder="False"
+          />
+          <p style={{ fontSize: 11.5, color: 'var(--text-muted)', margin: '5px 0 0' }}>
+            When True, moving an event INTO this status puts the cut stock back (minus broken units). After it, no items
+            can be added. Only one status can have it, and not the same one as Cutting Stock.
+          </p>
         </div>
         <div className="form-group">
           <label>Production Item</label>

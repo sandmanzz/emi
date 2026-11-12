@@ -2695,3 +2695,39 @@ table:has(thead th.col-action:last-child) tbody tr:hover > *:last-child { backgr
 .item-form-photo img, .item-form-photo-empty { width: 84px; height: 84px; border-radius: var(--r-lg); object-fit: cover; border: 1px solid var(--border); flex-shrink: 0; }
 .item-form-photo-empty { display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--text-muted); background: var(--bg); }
 .indicator-row.indicator-toggle { font-size: 11.5px; color: var(--text-muted); }
+
+/* Cutting Stock / Stock Return explanation (2026-11-12) */
+.stock-move { border: 1.5px solid #fed7aa; background: linear-gradient(180deg, #fff7ed, #fff); border-radius: var(--r-xl); padding: 16px; margin: 12px 0; }
+.stock-move.return { border-color: #a7f3d0; background: linear-gradient(180deg, #ecfdf5, #fff); }
+.stock-move-art { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 12px; }
+.stock-move-node { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.stock-move-node small { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; }
+.stock-move-icon { width: 58px; height: 58px; border-radius: 16px; background: var(--white); box-shadow: 0 2px 8px rgba(0,0,0,.06); display: flex; align-items: center; justify-content: center; color: var(--orange); }
+.stock-move.return .stock-move-icon { color: var(--green); }
+.stock-move-icon svg { width: 38px; height: 38px; }
+.stock-move-flow { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 110px; }
+.stock-move-qty { font-size: 13px; font-weight: 800; color: var(--orange); background: var(--white); border: 1px solid #fed7aa; border-radius: 20px; padding: 2px 10px; }
+.stock-move.return .stock-move-qty { color: var(--green); border-color: #a7f3d0; }
+.stock-move-line { display: flex; gap: 6px; }
+.stock-move-line i { width: 8px; height: 8px; border-radius: 50%; background: var(--orange); opacity: .3; animation: stockMoveDot 1.2s infinite; }
+.stock-move.return .stock-move-line i { background: var(--green); }
+.stock-move-line i:nth-child(2) { animation-delay: .2s; }
+.stock-move-line i:nth-child(3) { animation-delay: .4s; }
+@keyframes stockMoveDot { 0%, 100% { opacity: .25; transform: translateX(0); } 50% { opacity: 1; transform: translateX(4px); } }
+@media (prefers-reduced-motion: reduce) { .stock-move-line i { animation: none; opacity: .7; } }
+.stock-move-title { font-size: 15px; font-weight: 800; color: var(--text); margin-bottom: 6px; text-align: center; }
+.stock-move-text p { font-size: 13px; color: var(--text-2); line-height: 1.55; margin: 0 0 8px; }
+.stock-move-wh { list-style: none; margin: 0 0 8px; padding: 0; border: 1px solid var(--border-2); border-radius: var(--r-lg); background: var(--white); }
+.stock-move-wh li { display: flex; justify-content: space-between; padding: 6px 12px; font-size: 12.5px; border-bottom: 1px solid var(--border-2); }
+.stock-move-wh li:last-child { border-bottom: none; }
+.stock-move-wh b { color: var(--orange); }
+.stock-move.return .stock-move-wh b { color: var(--green); }
+.stock-move-text .stock-move-warn { color: var(--red); font-weight: 600; }
+.stock-move-text .stock-move-foot { font-size: 12px; color: var(--text-muted); margin: 0; }
+.stock-move-banner { display: flex; align-items: center; gap: 10px; border: 1px solid #fed7aa; background: var(--orange-bg); color: #9a3412; border-radius: var(--r-lg); padding: 9px 12px; font-size: 12.5px; margin-top: 10px; }
+.stock-move-banner.return { border-color: #a7f3d0; background: var(--green-bg); color: #065f46; }
+.stock-move-banner > div { flex: 1; }
+.stock-move-banner-icon { width: 30px; height: 30px; border-radius: 8px; background: var(--white); display: flex; align-items: center; justify-content: center; flex-shrink: 0; animation: stockMovePulse 2s infinite; }
+.stock-move-banner-icon svg { width: 18px; height: 18px; }
+@keyframes stockMovePulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(234,88,12,.35); } 50% { box-shadow: 0 0 0 6px rgba(234,88,12,0); } }
+@media (prefers-reduced-motion: reduce) { .stock-move-banner-icon { animation: none; } }
