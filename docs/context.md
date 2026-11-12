@@ -899,6 +899,14 @@ clashes or seems off) — proceeding with the stated assumption unless corrected
 
 ## Raw instruction log
 
+### 2026-11-12 (3) — Event Settings UI redesign (Claude Web)
+> ingat work as head of engineer, head of design, head of creative and head of product. kalau kamu liat di event setting sudah sangat panjang tolong perbaiki UI nya agar tetap rapi
+
+- **Standing rule:** work with the eyes of head of engineering, design, creative and product.
+- Event Status page redesigned: 12 True/False columns → one **Rules** column of chips; 11 KPI cards → 4 compact KPIs +
+  a pipeline strip; long paragraph → one line + "What do the rules mean?" legend; form → grouped switches. No data change.
+- Spec: `docs/prd/PRD-2026-11-12.md` §3.
+
 ### 2026-11-12 (2) — Cutting Stock back, with real stock deduction and an illustrated notice (Claude Web)
 > tambahkan 1 lagi untuk cutting stock, artinya jika sudah enable maka ketika masuk ke fase itu stok akan dianggap sudah berkurang dan di reservasi untuk event tersebut. pastikan sebelum klik next di event detail nya harus ada penjelasan yang jelas dan ada ilustrasi atau icon agar membuat user notice
 

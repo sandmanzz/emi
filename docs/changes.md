@@ -50,6 +50,13 @@ explains a few non-obvious conventions that the entries below assume you already
 
 ---
 
+## Round 41 — Event Settings (Event Status page) redesign (2026-11-12)
+
+`EventStatusPage.jsx`: `RULES` / `RULE_GROUPS` model, `RuleChips`, `Switch`, legend, compact KPIs + pipeline, 6-column
+table, grouped switch form; `style.css` `.es-*`. No data change. Spec `docs/prd/PRD-2026-11-12.md` §3. Lint 11, build OK.
+
+---
+
 ## Round 40 — Cutting Stock / Stock Return with real stock movements + illustrated notice (2026-11-12)
 
 New `lib/eventStockCuts.js` (cut/return/reserved, `emi_event_stock_cuts`), `components/StockMoveNotice.jsx` (+ CSS).

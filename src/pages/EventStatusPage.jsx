@@ -2,7 +2,6 @@ import { useState, useMemo } from 'react';
 import Modal from '../components/Modal';
 import Pagination from '../components/Pagination';
 import SortTh from '../components/SortTh';
-import SearchableSelect from '../components/SearchableSelect';
 import { IconSearch, IconPlus, IconEdit, IconDelete, IconClose, IconCheck } from '../components/icons';
 import { getEventStatuses, saveEventStatuses } from '../lib/eventStatuses';
 
@@ -18,16 +17,64 @@ function fmtDate(d) {
   return `${parseInt(day)} ${MONTHS_SHORT[parseInt(m) - 1]} ${y}`;
 }
 
-function ScanBadge({ scan }) {
-  return scan === 'Scan'
-    ? <span className="badge badge-green" style={{ fontSize:'11px' }}>Scan</span>
-    : <span className="badge badge-gray"  style={{ fontSize:'11px', background:'transparent', border:'1px solid var(--border)', color:'var(--text-muted)', fontWeight:400 }}>None</span>;
+// One definition of every stage rule (2026-11-12 redesign: the table had 12 True/False columns).
+// The table shows a stage's rules as chips (only what is ON, plus red "No …" chips for the two rules that
+// default to allowed), the form groups them as switches, and the legend explains each one.
+//  key   — field on the status record;  on(r) — is the rule active;  def — default for a new status
+//  restrictive — default-true rules: the chip is shown when the rule is OFF ("No adding" / "No deleting").
+const RULE_GROUPS = [
+  { id: 'scan', label: 'Scanning', color: 'green' },
+  { id: 'stock', label: 'Stock', color: 'orange' },
+  { id: 'items', label: 'Items', color: 'blue' },
+  { id: 'requests', label: 'Requests', color: 'purple' },
+];
+const RULES = [
+  { key: 'scan', group: 'scan', label: 'Scan items', chip: 'Scan', on: r => r.scan === 'Scan',
+    desc: 'Every item must be scanned before the event can move on. The first scan stage is Scan In, the next one Scan Out.' },
+  { key: 'cuttingStock', group: 'stock', label: 'Cutting Stock', chip: 'Cut stock', on: r => r.cuttingStock === true, unique: true,
+    desc: 'Entering this stage deducts the event’s items from warehouse stock and reserves them for the event. One stage only.' },
+  { key: 'stockReturn', group: 'stock', label: 'Stock Return', chip: 'Return stock', on: r => r.stockReturn === true, unique: true,
+    desc: 'Entering this stage puts the cut stock back (minus broken units). After it nothing can be added. One stage only.' },
+  { key: 'allowAddItem', group: 'items', label: 'Allow adding items', chip: 'No adding', restrictive: true, on: r => r.allowAddItem !== false,
+    desc: 'Off = nothing can be added at this stage (Add Item, Rent, Outsource, Production). Use it for late stages.' },
+  { key: 'allowDelete', group: 'items', label: 'Allow deleting items', chip: 'No deleting', restrictive: true, on: r => r.allowDelete !== false,
+    desc: 'Off = items can’t be deleted from the event at this stage.' },
+  { key: 'checkItem', group: 'items', label: 'Checking Item', chip: 'Checking', on: r => r.checkItem === true,
+    desc: 'The crew ticks “Checking” on each item here. The field is hidden before the first stage with this on.' },
+  { key: 'checkOwnership', group: 'items', label: 'Check ownership', chip: 'Ownership check', on: r => r.checkOwnership === true,
+    desc: 'Before leaving this stage, ask whether any item needs an ownership change (IHC / IHP / Outsource).' },
+  { key: 'productionItem', group: 'requests', label: 'Production Item', chip: 'Production', on: r => r.productionItem === true,
+    desc: 'Users can request items to be produced (they become our assets).' },
+  { key: 'loanItem', group: 'requests', label: 'Rent Item', chip: 'Rent', on: r => r.loanItem === true,
+    desc: 'Users can rent items from a rent vendor (returned after the event).' },
+  { key: 'outsourceItem', group: 'requests', label: 'Outsource Item', chip: 'Outsource', on: isOutsourceFlag,
+    desc: 'Users can order items or work from an outsource vendor.' },
+];
+const groupColor = id => RULE_GROUPS.find(g => g.id === id)?.color || 'gray';
+
+function RuleChips({ r }) {
+  const chips = RULES.filter(rule => (rule.restrictive ? !rule.on(r) : rule.on(r)));
+  if (chips.length === 0) return <span className="es-none">No special rules</span>;
+  return (
+    <div className="es-chips">
+      {chips.map(rule => (
+        <span key={rule.key} className={`es-chip ${rule.restrictive ? 'red' : groupColor(rule.group)}`} title={rule.desc}>{rule.chip}</span>
+      ))}
+    </div>
+  );
 }
 
-function BoolBadge({ value }) {
-  return value
-    ? <span className="badge badge-orange" style={{ fontSize:'11px' }}>True</span>
-    : <span className="badge badge-gray"  style={{ fontSize:'11px', background:'transparent', border:'1px solid var(--border)', color:'var(--text-muted)', fontWeight:400 }}>False</span>;
+function Switch({ checked, onChange, disabled, label, desc, note }) {
+  return (
+    <label className={`es-switch-row${disabled ? ' disabled' : ''}`}>
+      <span className="es-switch-text">
+        <strong>{label}</strong>
+        <span>{desc}</span>
+        {note && <em>{note}</em>}
+      </span>
+      <input type="checkbox" className="es-switch" role="switch" checked={checked} disabled={disabled} onChange={e => onChange(e.target.checked)} />
+    </label>
+  );
 }
 
 export default function EventStatusPage() {
@@ -154,61 +201,87 @@ export default function EventStatusPage() {
   const deleteRecord   = statuses.find(x => x.id === deleteTarget);
   const runningTotal   = statuses.reduce((a, s) => a + s.eventRunning, 0);
   const scanEnabled    = statuses.filter(s => s.scan === 'Scan').length;
-  const productionEnabled = statuses.filter(s => s.productionItem === true).length;
-  const ownershipEnabled = statuses.filter(s => s.checkOwnership === true).length;
   // Cutting Stock / Stock Return: one status each, never the same status (2026-11-12).
   const cutOwner = statuses.find(st => st.cuttingStock === true && st.id !== editingId);
   const returnOwner = statuses.find(st => st.stockReturn === true && st.id !== editingId);
-  const cutCount = statuses.filter(st => st.cuttingStock === true).length;
-  const addAllowed = statuses.filter(s => s.allowAddItem !== false).length; // missing field = allowed
-  const deleteAllowed = statuses.filter(s => s.allowDelete !== false).length; // missing field = allowed (pre-2026-10-16 data)
-  const loanEnabled = statuses.filter(s => s.loanItem === true).length;
-  const outsourceEnabled = statuses.filter(isOutsourceFlag).length;
-  const checkItemEnabled = statuses.filter(s => s.checkItem === true).length;
+
+  const [legendOpen, setLegendOpen] = useState(false);
+  // Form value for a rule (scan is stored as 'Scan' / 'None').
+  const ruleValue = rule => (rule.key === 'scan' ? form.scan === 'Scan' : form[rule.key]);
+  function setRule(rule, v) {
+    if (rule.key === 'scan') { setForm(f => ({ ...f, scan: v ? 'Scan' : 'None' })); return; }
+    setForm(f => ({
+      ...f, [rule.key]: v,
+      // Cutting Stock and Stock Return can't be on the same stage.
+      ...(rule.key === 'cuttingStock' && v ? { stockReturn: false } : {}),
+      ...(rule.key === 'stockReturn' && v ? { cuttingStock: false } : {}),
+    }));
+  }
+  const cutStage = statuses.find(st => st.cuttingStock === true);
+  const returnStage = statuses.find(st => st.stockReturn === true);
+  const ordered = [...statuses].sort((x, y) => x.order - y.order);
 
   return (
     <>
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:22 }}>
-        <h1 className="page-title" style={{ margin:0 }}>Event Status</h1>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:22, gap:12 }}>
+        <div>
+          <h1 className="page-title" style={{ margin:0 }}>Event Status</h1>
+          <p className="es-intro">
+            The stages every event goes through, in order. Each stage has rules (scan, stock, items, requests).{' '}
+            <button type="button" className="link-btn" onClick={() => setLegendOpen(o => !o)}>{legendOpen ? 'Hide' : 'What do the rules mean?'}</button>
+          </p>
+        </div>
         <button className="btn-new" onClick={openNew}><IconPlus /> New Status</button>
       </div>
 
-      <p style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: -14, marginBottom: 18 }}>
-        This list drives the stage stepper on every event&rsquo;s detail page, in the
-        order shown below — add, remove, reorder, or rename a status here and it
-        applies everywhere. A status with Scan set to &ldquo;Scan&rdquo; requires
-        items to be scanned while an event is at that stage. A status with Check
-        Ownership set to &ldquo;True&rdquo; asks whether any item needs an ownership change
-        before the event moves on from that stage. A status with Production Item set
-        to &ldquo;True&rdquo; lets users request new items to be produced while an
-        event is at that stage. A status with Cutting Stock set to &ldquo;True&rdquo; deducts and reserves the event&rsquo;s stock when an event moves into it; Stock Return puts it back. A status with Allow Add Item set to &ldquo;False&rdquo; stops new items from being added. A status with Allow Delete set to &ldquo;False&rdquo; stops
-        items from being deleted from an event while it is at that stage. A status with Rent Item set to
-        &ldquo;True&rdquo; lets users rent items from a rent vendor while an event is at that stage, and Outsource Item
-        set to &ldquo;True&rdquo; lets them order items from an outsource vendor. Checking Item set to &ldquo;True&rdquo; shows the
-        Checking tick box on items from that status on. Scan In appears from the first Scan status, Scan Out from the second.
-      </p>
-
-      <div className="stats-bar" style={{ gridTemplateColumns:'repeat(11,1fr)' }}>
-        {[
-          { label:'Total Statuses',  value:statuses.length, color:'var(--brand)',  bg:'var(--brand-bg)' },
-          { label:'Scan Enabled',    value:scanEnabled,     color:'var(--green)',  bg:'var(--green-bg)' },
-          { label:'Check Ownership', value:ownershipEnabled, color:'var(--green)',  bg:'var(--green-bg)' },
-          { label:'Production Item', value:productionEnabled, color:'var(--purple)', bg:'var(--purple-bg)' },
-          { label:'Cutting Stock',   value:cutCount,        color:'var(--orange)', bg:'var(--orange-bg)' },
-          { label:'Allow Add Item',  value:addAllowed,      color:'var(--green)',  bg:'var(--green-bg)' },
-          { label:'Allow Delete',    value:deleteAllowed,   color:'var(--red)',    bg:'var(--red-bg)' },
-          { label:'Rent Item',       value:loanEnabled,     color:'var(--brand)',  bg:'var(--brand-bg)' },
-          { label:'Outsource Item',  value:outsourceEnabled, color:'var(--purple)', bg:'var(--purple-bg)' },
-          { label:'Checking Item',   value:checkItemEnabled, color:'var(--green)', bg:'var(--green-bg)' },
-          { label:'Events Running',  value:runningTotal,    color:'var(--orange)', bg:'var(--orange-bg)' },
-        ].map(s => (
-          <div key={s.label} className="stat-card">
-            <div className="stat-icon" style={{ background:s.bg }}>
-              <span className="stat-value" style={{ color:s.color }}>{s.value}</span>
+      {legendOpen && (
+        <div className="card es-legend">
+          {RULE_GROUPS.map(g => (
+            <div key={g.id} className="es-legend-group">
+              <div className="es-legend-title"><span className={`es-dot ${g.color}`} />{g.label}</div>
+              {RULES.filter(rule => rule.group === g.id).map(rule => (
+                <div key={rule.key} className="es-legend-row">
+                  <span className={`es-chip ${rule.restrictive ? 'red' : g.color}`}>{rule.chip}</span>
+                  <span>{rule.desc}</span>
+                </div>
+              ))}
             </div>
-            <span className="stat-label">{s.label}</span>
+          ))}
+        </div>
+      )}
+
+      {/* Summary: 4 key numbers + the pipeline at a glance (replaces 11 KPI cards). */}
+      <div className="es-summary">
+        <div className="es-kpis">
+          {[
+            { label:'Stages', value:statuses.length, color:'var(--brand)' },
+            { label:'Scan stages', value:scanEnabled, color:'var(--green)' },
+            { label:'Events running', value:runningTotal, color:'var(--orange)' },
+          ].map(k => (
+            <div key={k.label} className="es-kpi"><b style={{ color:k.color }}>{k.value}</b><span>{k.label}</span></div>
+          ))}
+          <div className="es-kpi wide">
+            <span>Stock</span>
+            <b className="es-kpi-text">
+              {cutStage ? <>Cut at <em>{cutStage.status}</em></> : 'No cutting stage'}
+              {' · '}
+              {returnStage ? <>Return at <em>{returnStage.status}</em></> : 'no return stage'}
+            </b>
           </div>
-        ))}
+        </div>
+        <ol className="es-pipeline" aria-label="Stage order">
+          {ordered.map(st => (
+            <li key={st.id} title={RULES.filter(rule => (rule.restrictive ? !rule.on(st) : rule.on(st))).map(rule => rule.chip).join(', ') || 'No special rules'}>
+              <span className="es-pipe-num">{st.order}</span>
+              <span className="es-pipe-name">{st.status}</span>
+              <span className="es-pipe-icons">
+                {st.scan === 'Scan' && <i className="green" />}
+                {(st.cuttingStock || st.stockReturn) && <i className="orange" />}
+                {st.allowAddItem === false && <i className="red" />}
+              </span>
+            </li>
+          ))}
+        </ol>
       </div>
 
       <div className="card">
@@ -221,7 +294,6 @@ export default function EventStatusPage() {
                 value={query} onChange={e => { setQuery(e.target.value); setPage(1); }}
               />
             </div>
-            <button className="btn-search">Search</button>
           </div>
           <div className="toolbar-right">
             {reorderMode ? (
@@ -230,100 +302,61 @@ export default function EventStatusPage() {
                 <button className="btn-save-modal" onClick={saveReorder}><IconCheck /> Save Order</button>
               </>
             ) : (
-              <>
-                <button className="btn btn-ghost" onClick={startReorder}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width:14, height:14 }}><polyline points="8 7 12 3 16 7"/><polyline points="16 17 12 21 8 17"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
-                  Edit Order
-                </button>
-                <button className="btn-new" onClick={openNew}><IconPlus /> New</button>
-              </>
+              <button className="btn btn-ghost" onClick={startReorder}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width:14, height:14 }}><polyline points="8 7 12 3 16 7"/><polyline points="16 17 12 21 8 17"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
+                Edit Order
+              </button>
             )}
           </div>
         </div>
 
         {reorderMode && (
           <p style={{ fontSize: 12.5, color: 'var(--brand)', background: 'var(--brand-bg)', padding: '9px 14px', borderRadius: 'var(--r-lg)', margin: '0 0 14px' }}>
-            Reordering — use the arrows below, then <strong>Save Order</strong> to apply, or <strong>Cancel</strong> to discard.
+            Reordering — use the arrows next to each number, then <strong>Save Order</strong> to apply, or <strong>Cancel</strong> to discard.
           </p>
         )}
 
         <div className="table-wrap">
-          <table>
+          <table className="es-table">
             <thead>
               <tr>
-                <SortTh label="Order"         colIndex={0} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width:70, textAlign:'center' }} />
-                <th style={{ width:80, textAlign:'center' }}>Edit Order</th>
-                <SortTh label="Status"        colIndex={1} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ minWidth:170 }} />
-                <th style={{ width:80, textAlign:'center' }}>Code</th>
-                <th style={{ width:100, textAlign:'center' }}>Scan</th>
-                <th style={{ width:96, textAlign:'center', whiteSpace:'normal', lineHeight:1.3 }}>Cutting Stock</th>
-                <th style={{ width:96, textAlign:'center', whiteSpace:'normal', lineHeight:1.3 }}>Stock Return</th>
-                <th style={{ width:96, textAlign:'center', whiteSpace:'normal', lineHeight:1.3 }}>Production Item</th>
-                <th style={{ width:96, textAlign:'center', whiteSpace:'normal', lineHeight:1.3 }}>Check Ownership</th>
-                <th style={{ width:96, textAlign:'center', whiteSpace:'normal', lineHeight:1.3 }}>Allow Add Item</th>
-                <th style={{ width:96, textAlign:'center', whiteSpace:'normal', lineHeight:1.3 }}>Allow Delete</th>
-                <th style={{ width:96, textAlign:'center', whiteSpace:'normal', lineHeight:1.3 }}>Rent Item</th>
-                <th style={{ width:96, textAlign:'center', whiteSpace:'normal', lineHeight:1.3 }}>Outsource Item</th>
-                <th style={{ width:96, textAlign:'center', whiteSpace:'normal', lineHeight:1.3 }}>Checking Item</th>
-                <SortTh label="Event Running" colIndex={4} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width:120, textAlign:'right' }} />
-                <SortTh label="Updated At"    colIndex={5} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width:120 }} />
-                <th className="col-action" style={{ width:100, textAlign:'center' }}>Action</th>
+                <SortTh label="Order"   colIndex={0} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width:90 }} />
+                <SortTh label="Status"  colIndex={1} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ minWidth:200 }} />
+                <th style={{ minWidth:280 }}>Rules</th>
+                <SortTh label="Events"  colIndex={4} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width:90, textAlign:'right' }} />
+                <SortTh label="Updated" colIndex={5} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width:110 }} />
+                <th className="col-action" style={{ width:90, textAlign:'center' }}>Action</th>
               </tr>
             </thead>
             <tbody>
               {pageData.length === 0
-                ? <tr><td colSpan={17} style={{ textAlign:'center', padding:40, color:'var(--text-muted)' }}>No statuses found.</td></tr>
+                ? <tr><td colSpan={6} style={{ textAlign:'center', padding:40, color:'var(--text-muted)' }}>No statuses found.</td></tr>
                 : pageData.map((r, idx) => (
                   <tr key={r.id}>
-                    <td style={{ textAlign:'center' }}>
-                      <span style={{ display:'inline-flex', alignItems:'center', justifyContent:'center', width:28, height:28, background:'var(--brand-bg)', color:'var(--brand)', borderRadius:6, fontWeight:700, fontSize:13 }}>{r.order}</span>
+                    <td>
+                      <div className="es-order">
+                        <span className="es-order-num">{r.order}</span>
+                        {reorderMode && (
+                          <span className="es-order-arrows">
+                            <button className="btn-icon" title="Move up" disabled={idx === 0} onClick={() => moveOrder(r.id, -1)}>
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+                            </button>
+                            <button className="btn-icon" title="Move down" disabled={idx === pageData.length - 1} onClick={() => moveOrder(r.id, 1)}>
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                            </button>
+                          </span>
+                        )}
+                      </div>
                     </td>
-                    <td style={{ textAlign:'center' }}>
-                      {reorderMode ? (
-                        <div style={{ display:'inline-flex', flexDirection:'column', gap:2 }}>
-                          <button
-                            className="btn-icon"
-                            title="Move up"
-                            style={{ padding:'2px 5px', color: idx === 0 ? 'var(--border)' : 'var(--text-muted)' }}
-                            disabled={idx === 0}
-                            onClick={() => moveOrder(r.id, -1)}
-                          >
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ width:12, height:12 }}><polyline points="18 15 12 9 6 15"/></svg>
-                          </button>
-                          <button
-                            className="btn-icon"
-                            title="Move down"
-                            style={{ padding:'2px 5px', color: idx === pageData.length - 1 ? 'var(--border)' : 'var(--text-muted)' }}
-                            disabled={idx === pageData.length - 1}
-                            onClick={() => moveOrder(r.id, 1)}
-                          >
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ width:12, height:12 }}><polyline points="6 9 12 15 18 9"/></svg>
-                          </button>
-                        </div>
-                      ) : (
-                        <span style={{ color:'var(--text-muted)', fontSize:12 }}>—</span>
-                      )}
+                    <td>
+                      <div className="es-name">{r.status}</div>
+                      {r.code && <span className="es-code">{r.code}</span>}
                     </td>
-                    <td className="name-cell">{r.status}</td>
-                    <td style={{ textAlign:'center' }}>
-                      {r.code ? <span className="badge badge-gray" style={{ fontSize:11 }}>{r.code}</span> : <span style={{ color:'var(--text-muted)', fontSize:12 }}>—</span>}
-                    </td>
-                    <td style={{ textAlign:'center' }}><ScanBadge scan={r.scan} /></td>
-                    <td style={{ textAlign:'center' }}><BoolBadge value={r.cuttingStock === true} /></td>
-                    <td style={{ textAlign:'center' }}><BoolBadge value={r.stockReturn === true} /></td>
-                    <td style={{ textAlign:'center' }}><BoolBadge value={r.productionItem === true} /></td>
-                    <td style={{ textAlign:'center' }}><BoolBadge value={r.checkOwnership === true} /></td>
-                    <td style={{ textAlign:'center' }}><BoolBadge value={r.allowAddItem !== false} /></td>
-                    <td style={{ textAlign:'center' }}><BoolBadge value={r.allowDelete !== false} /></td>
-                    <td style={{ textAlign:'center' }}><BoolBadge value={r.loanItem === true} /></td>
-                    <td style={{ textAlign:'center' }}><BoolBadge value={isOutsourceFlag(r)} /></td>
-                    <td style={{ textAlign:'center' }}><BoolBadge value={r.checkItem === true} /></td>
+                    <td><RuleChips r={r} /></td>
                     <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums', fontWeight:600 }}>
-                      {r.eventRunning > 0
-                        ? <span style={{ color:'var(--orange)' }}>{r.eventRunning}</span>
-                        : <span style={{ color:'var(--text-muted)' }}>0</span>}
+                      <span style={{ color: r.eventRunning > 0 ? 'var(--orange)' : 'var(--text-muted)' }}>{r.eventRunning}</span>
                     </td>
-                    <td style={{ color:'var(--text-muted)', fontSize:'12.5px' }}>{fmtDate(r.updatedAt)}</td>
+                    <td style={{ color:'var(--text-muted)', fontSize:'12.5px', whiteSpace:'nowrap' }}>{fmtDate(r.updatedAt)}</td>
                     <td>
                       <div className="action-btns" style={{ justifyContent:'center' }}>
                         <button className="btn-icon edit"   title="Edit"   disabled={reorderMode} onClick={() => openEdit(r.id)}><IconEdit /></button>
@@ -341,6 +374,7 @@ export default function EventStatusPage() {
 
       <Modal
         open={statusModal}
+        size="lg"
         title={editingId ? 'Edit Event Status' : 'New Event Status'}
         onClose={() => setStatusModal(false)}
         footer={
@@ -350,169 +384,39 @@ export default function EventStatusPage() {
           </>
         }
       >
-        <div className="form-group">
-          <label>Order <span style={{ color:'var(--red)' }}>*</span></label>
-          <input type="number" min="1" placeholder="e.g. 1" value={form.order} onChange={e => setForm(f => ({ ...f, order: e.target.value }))} />
+        <div className="es-form-basics">
+          <div className="form-group">
+            <label>Order <span style={{ color:'var(--red)' }}>*</span></label>
+            <input type="number" min="1" placeholder="e.g. 1" value={form.order} onChange={e => setForm(f => ({ ...f, order: e.target.value }))} />
+          </div>
+          <div className="form-group">
+            <label>Status Name <span style={{ color:'var(--red)' }}>*</span></label>
+            <input type="text" placeholder="e.g. Event running" value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} />
+          </div>
+          <div className="form-group">
+            <label>Code</label>
+            <input type="text" placeholder="e.g. ER" value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value.toUpperCase() }))} />
+          </div>
         </div>
-        <div className="form-group">
-          <label>Status Name <span style={{ color:'var(--red)' }}>*</span></label>
-          <input type="text" placeholder="e.g. Event running" value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} />
-        </div>
-        <div className="form-group">
-          <label>Code</label>
-          <input type="text" placeholder="e.g. ER" value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value.toUpperCase() }))} />
-        </div>
-        <div className="form-group">
-          <label>Scan</label>
-          <SearchableSelect
-            value={form.scan}
-            onChange={v => setForm(f => ({ ...f, scan: v }))}
-            options={[
-              { value: 'None', label: 'None' },
-              { value: 'Scan', label: 'Scan' },
-            ]}
-            placeholder="None"
-          />
-        </div>
-        <div className="form-group">
-          <label>Cutting Stock</label>
-          <SearchableSelect
-            value={form.cuttingStock ? 'true' : 'false'}
-            onChange={v => setForm(f => ({ ...f, cuttingStock: v === 'true', stockReturn: v === 'true' ? false : f.stockReturn }))}
-            options={[
-              { value: 'false', label: 'False' },
-              { value: 'true',  label: cutOwner ? `True — already used by “${cutOwner.status}”` : 'True', disabled: !!cutOwner },
-            ]}
-            placeholder="False"
-          />
-          <p style={{ fontSize: 11.5, color: 'var(--text-muted)', margin: '5px 0 0' }}>
-            When True, moving an event INTO this status deducts its items from warehouse stock and reserves them for the
-            event (logged as &ldquo;Event cut&rdquo; in Stock History). Only one status can have it.
-          </p>
-        </div>
-        <div className="form-group">
-          <label>Stock Return</label>
-          <SearchableSelect
-            value={form.stockReturn ? 'true' : 'false'}
-            onChange={v => setForm(f => ({ ...f, stockReturn: v === 'true', cuttingStock: v === 'true' ? false : f.cuttingStock }))}
-            options={[
-              { value: 'false', label: 'False' },
-              { value: 'true',  label: returnOwner ? `True — already used by “${returnOwner.status}”` : 'True', disabled: !!returnOwner },
-            ]}
-            placeholder="False"
-          />
-          <p style={{ fontSize: 11.5, color: 'var(--text-muted)', margin: '5px 0 0' }}>
-            When True, moving an event INTO this status puts the cut stock back (minus broken units). After it, no items
-            can be added. Only one status can have it, and not the same one as Cutting Stock.
-          </p>
-        </div>
-        <div className="form-group">
-          <label>Production Item</label>
-          <SearchableSelect
-            value={form.productionItem ? 'true' : 'false'}
-            onChange={v => setForm(f => ({ ...f, productionItem: v === 'true' }))}
-            options={[
-              { value: 'false', label: 'False' },
-              { value: 'true',  label: 'True' },
-            ]}
-            placeholder="False"
-          />
-          <p style={{ fontSize: 11.5, color: 'var(--text-muted)', margin: '5px 0 0' }}>
-            When True, users can request new items to be produced while an event is at this status.
-          </p>
-        </div>
-        <div className="form-group">
-          <label>Check Ownership</label>
-          <SearchableSelect
-            value={form.checkOwnership ? 'true' : 'false'}
-            onChange={v => setForm(f => ({ ...f, checkOwnership: v === 'true' }))}
-            options={[
-              { value: 'false', label: 'False' },
-              { value: 'true',  label: 'True' },
-            ]}
-            placeholder="False"
-          />
-          <p style={{ fontSize: 11.5, color: 'var(--text-muted)', margin: '5px 0 0' }}>
-            When True, moving an event on from this status first asks whether any item needs an ownership change.
-          </p>
-        </div>
-        <div className="form-group">
-          <label>Allow Add Item</label>
-          <SearchableSelect
-            value={form.allowAddItem ? 'true' : 'false'}
-            onChange={v => setForm(f => ({ ...f, allowAddItem: v === 'true' }))}
-            options={[
-              { value: 'true',  label: 'True' },
-              { value: 'false', label: 'False' },
-            ]}
-            placeholder="True"
-          />
-          <p style={{ fontSize: 11.5, color: 'var(--text-muted)', margin: '5px 0 0' }}>
-            When False, nothing can be added to an event at this status (Add Item, Rent Item, Outsource Item, Request
-            Production) &mdash; use it for late stages so no items are added at the end.
-          </p>
-        </div>
-        <div className="form-group">
-          <label>Allow Delete</label>
-          <SearchableSelect
-            value={form.allowDelete ? 'true' : 'false'}
-            onChange={v => setForm(f => ({ ...f, allowDelete: v === 'true' }))}
-            options={[
-              { value: 'true',  label: 'True' },
-              { value: 'false', label: 'False' },
-            ]}
-            placeholder="True"
-          />
-          <p style={{ fontSize: 11.5, color: 'var(--text-muted)', margin: '5px 0 0' }}>
-            When False, items can&rsquo;t be deleted from an event while it is at this status.
-          </p>
-        </div>
-        <div className="form-group">
-          <label>Rent Item</label>
-          <SearchableSelect
-            value={form.loanItem ? 'true' : 'false'}
-            onChange={v => setForm(f => ({ ...f, loanItem: v === 'true' }))}
-            options={[
-              { value: 'false', label: 'False' },
-              { value: 'true',  label: 'True' },
-            ]}
-            placeholder="False"
-          />
-          <p style={{ fontSize: 11.5, color: 'var(--text-muted)', margin: '5px 0 0' }}>
-            When True, users can rent items from a rent vendor while an event is at this status.
-          </p>
-        </div>
-        <div className="form-group">
-          <label>Outsource Item</label>
-          <SearchableSelect
-            value={form.outsourceItem ? 'true' : 'false'}
-            onChange={v => setForm(f => ({ ...f, outsourceItem: v === 'true' }))}
-            options={[
-              { value: 'false', label: 'False' },
-              { value: 'true',  label: 'True' },
-            ]}
-            placeholder="False"
-          />
-          <p style={{ fontSize: 11.5, color: 'var(--text-muted)', margin: '5px 0 0' }}>
-            When True, users can order items from an outsource vendor while an event is at this status.
-          </p>
-        </div>
-        <div className="form-group">
-          <label>Checking Item</label>
-          <SearchableSelect
-            value={form.checkItem ? 'true' : 'false'}
-            onChange={v => setForm(f => ({ ...f, checkItem: v === 'true' }))}
-            options={[
-              { value: 'false', label: 'False' },
-              { value: 'true',  label: 'True' },
-            ]}
-            placeholder="False"
-          />
-          <p style={{ fontSize: 11.5, color: 'var(--text-muted)', margin: '5px 0 0' }}>
-            When True, the crew ticks &ldquo;Checking&rdquo; on each item at this status. The Checking field stays hidden on
-            Event Detail until the event reaches the first status with this on.
-          </p>
-        </div>
+        {RULE_GROUPS.map(g => (
+          <div key={g.id} className="es-form-group">
+            <div className="es-legend-title"><span className={`es-dot ${g.color}`} />{g.label}</div>
+            {RULES.filter(rule => rule.group === g.id).map(rule => {
+              const owner = rule.key === 'cuttingStock' ? cutOwner : rule.key === 'stockReturn' ? returnOwner : null;
+              return (
+                <Switch
+                  key={rule.key}
+                  label={rule.label}
+                  desc={rule.desc}
+                  checked={!!ruleValue(rule)}
+                  disabled={!!owner && !ruleValue(rule)}
+                  note={owner && !ruleValue(rule) ? `Already used by “${owner.status}”. Turn it off there first.` : null}
+                  onChange={v => setRule(rule, v)}
+                />
+              );
+            })}
+          </div>
+        ))}
       </Modal>
 
       <Modal
