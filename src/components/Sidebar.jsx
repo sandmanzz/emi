@@ -1,5 +1,6 @@
 import { NavLink, Link } from 'react-router-dom';
 import { version } from '../../package.json';
+import { incompleteCount } from '../lib/catalogStore';
 import { isTenantAdmin } from '../lib/tenantAuth';
 
 const EVENT_SETTINGS_ITEM = {
@@ -92,6 +93,7 @@ const SECTIONS = [
 
 export default function Sidebar({ visible, mobile = false }) {
   const isAdmin = isTenantAdmin();
+  const incomplete = incompleteCount();
   const sections = SECTIONS.map(section => {
     if (section.label !== 'Events' || !isAdmin) return section;
     return { ...section, items: [...section.items, EVENT_SETTINGS_ITEM] };
@@ -110,6 +112,8 @@ export default function Sidebar({ visible, mobile = false }) {
             >
               {icon}
               <span>{label}</span>
+              {/* Reminder (2026-11-12): items created from events / productions with incomplete data. */}
+              {to === '/inventory' && incomplete > 0 && <span className="nav-badge" title={`${incomplete} item(s) with incomplete data`}>{incomplete}</span>}
             </NavLink>
           ))}
         </div>

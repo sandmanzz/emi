@@ -8,7 +8,7 @@ const KEY = 'emi_event_progress'; // { [eventName]: statusName }
 // show without the user manually walking a stepper first — resolved live via
 // getEventStageNames() rather than a hardcoded stage name, since that list is
 // itself user-editable. Only applies when nothing's been explicitly saved yet.
-const SEED_AT_LAST_STAGE = ['2026-10-18 | ROOFTOP SUNSET MIXER'];
+const SEED_AT_LAST_STAGE = ['2026-10-18 | ROOFTOP SUNSET MIXER', '2026-06-10 | HARVEST FESTIVAL BAZAAR', '2026-05-30 | SUMMIT AFTERPARTY']; // closing demos sit at the finished stage
 
 // Seeded stage for the small demo events (data/events.js ids 95-99), whose items in
 // data/eventItemsSeed.js were added at or before these stages. A stage name that no

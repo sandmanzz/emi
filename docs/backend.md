@@ -126,6 +126,14 @@ whose status is still `on-going`.
 
 ---
 
+## R43 (2026-11-12) — partial transfer, draft items
+
+- `POST /events/{id}/items/{lineId}/transfer {targetEventId, stage, qty}` (qty ≤ outstanding): creates the target line, returns
+  cut stock for those pcs (EVENT_RETURN), stores the transfer on the line. `GET /events?status=ON_GOING` should include
+  `currentStage` for the picker.
+- Draft items: `POST /items {draft:true, source:'EVENT', eventId}` → `needsSetup = true`; complete when category, unit and
+  itemValue are set. `GET /items?incomplete=true` + count for the menu badge.
+
 ## R42 (2026-11-12) — closing: checking, For Return, partial return
 
 Closing status adds `PARTIAL_RETURN`; `checking-inventory` is shown as "Ready for Checking". Event status rule `closeStage`

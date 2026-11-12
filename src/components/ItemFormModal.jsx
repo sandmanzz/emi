@@ -51,7 +51,8 @@ export default function ItemFormModal({ item = null, by = 'Admin', initialName =
       name: form.name.trim(), sku: form.sku.trim().toUpperCase(), category: form.category, unit: form.unit,
       itemValue: value, desc: form.desc.trim(), homeWarehouse: form.homeWarehouse, image: form.image,
       // completing category + unit finishes a production draft
-      needsSetup: item?.needsSetup ? !(form.category && form.unit) : false,
+      // a draft (from a production or an event) is complete once category, unit and Item Value are filled
+      needsSetup: item?.needsSetup ? !(form.category && form.unit && value > 0) : false,
       ...(!item && extra ? extra : {}),
     };
     const saved = item
@@ -77,7 +78,7 @@ export default function ItemFormModal({ item = null, by = 'Admin', initialName =
     >
       {item?.needsSetup && (
         <div className="setup-banner" style={{ marginBottom: 14 }}>
-          <div><strong>Created by a production.</strong> Fill in category, unit and Item Value. Saving with a category and unit marks it as set up.</div>
+          <div><strong>{item?.source === 'event' ? 'Created while adding items to an event.' : 'Created by a production.'}</strong> Check the SKU and fill in category, unit and Item Value (and a warehouse and photo if you can). Saving with category, unit and Item Value marks it complete.</div>
         </div>
       )}
       <div className="form-row">

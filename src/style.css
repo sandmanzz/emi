@@ -2830,3 +2830,20 @@ table:has(thead th.col-action:last-child) tbody tr:hover > *:last-child { backgr
 .return-table td { vertical-align: top; }
 .return-qty { width: 90px; border: 1px solid var(--border); border-radius: var(--r); padding: 6px 8px; font: inherit; font-size: 13px; }
 .return-note { font-size: 11.5px; color: #92400e; background: #fffbeb; border-radius: 4px; padding: 2px 6px; margin-top: 4px; display: inline-block; }
+
+/* ---- 2026-11-12 (R43): transfer with qty + target stage, quick-create item, incomplete reminder ---- */
+.return-context { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12.5px; color: var(--text-muted); background: var(--bg); border: 1px solid var(--border-2); border-radius: var(--r-lg); padding: 8px 12px; margin-bottom: 10px; }
+.return-context strong { color: var(--text); }
+.transfer-box-title { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--purple); }
+.transfer-current { font-size: 12px; color: var(--text-2); background: var(--purple-bg); border-radius: 6px; padding: 5px 8px; }
+.transfer-current strong { color: var(--purple); }
+.transfer-qty { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-2); }
+.transfer-qty input { width: 80px; border: 1px solid var(--border); border-radius: var(--r); padding: 6px 8px; font: inherit; font-size: 13px; }
+.transfer-qty span { color: var(--text-muted); }
+.inv-pick-create { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; border: 1.5px dashed var(--brand); background: var(--brand-bg); color: var(--brand); border-radius: var(--r-lg); padding: 9px 12px; margin: 8px 0; cursor: pointer; font: inherit; font-size: 13px; }
+.inv-pick-create svg { width: 16px; height: 16px; flex-shrink: 0; }
+.inv-pick-create small { display: block; font-size: 11.5px; color: var(--text-muted); margin-top: 1px; }
+.inv-pick-create:hover { background: #e0e7ff; }
+.quick-similar { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; font-size: 12px; color: var(--text-muted); margin-top: 6px; }
+.nav-badge { margin-left: auto; background: var(--orange); color: #fff; font-size: 10.5px; font-weight: 700; border-radius: 10px; padding: 0 7px; line-height: 18px; }
+.incomplete-line { font-size: 11px; color: var(--orange); font-weight: 500; margin-top: 2px; }

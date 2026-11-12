@@ -8,13 +8,13 @@ import { IconSearch, IconPlus, IconEdit, IconDelete, IconClose, IconCheck, IconC
 import { initialAreas, SUB_AREAS } from '../data/areas';
 import { inventoryData, categories } from '../data/inventory';
 import { initialWarehouses } from '../data/warehouses';
-import { wiData } from '../data/warehouseInventory';
 import { getEventStageNames, isScanStage, isCuttingStockStage, isStockReturnStage, isProductionStage, isCheckOwnershipStage, isDeleteAllowedStage, isLoanStage, isOutsourceStage, isCheckItemStage, isAddAllowedStage, getClosingStageName } from '../lib/eventStatuses';
 import { getInventoryRows, applyStockMovement } from '../lib/stockOpnameStore';
 import { VENDOR_ORIGINS } from '../lib/vendorStore';
 import { CatalogItemPicker, VendorPicker } from '../components/QuickPickers';
 import { getCatalog, stockInProduced } from '../lib/producedItems';
-import { setItemImageByName } from '../lib/catalogStore';
+import { setItemImageByName, addCatalogItem, suggestSku, isNameTaken } from '../lib/catalogStore';
+import { initialUnits } from '../data/units';
 import { getEventFiles, saveEventFiles } from '../lib/eventFiles';
 import { getEventStockCuts, isStockLine, previewCut, cutStock, returnStock, returnStockParts } from '../lib/eventStockCuts';
 import { getEventChecking, updateLineChecking } from '../lib/eventChecking';
@@ -68,7 +68,7 @@ function stockBadge(s) {
 // single fixed totalStock — used so the picker's stock figure reflects whichever
 // warehouse the user picked, not always the item's original home warehouse.
 function stockAtWarehouse(inv, warehouseName) {
-  const row = wiData.find(r => r.name === inv.name && r.warehouseName === warehouseName);
+  const row = getInventoryRows().find(r => r.name === inv.name && r.warehouseName === warehouseName);
   return row ? row.itemStock : 0;
 }
 
@@ -177,6 +177,12 @@ function ItemCard({ item, group, checking = null, imageOf = () => null, vis = {}
           )}
           {item.resolution === 'returned' && (
             <span className="badge badge-green" style={{ fontSize: 10 }}>Returned</span>
+          )}
+          {item.newItem && <span className="badge badge-orange" style={{ fontSize: 10 }} title="Created from this event — complete it in Inventory; not in stock yet">New item</span>}
+          {(item.transferredQty || 0) > 0 && (
+            <span className="badge badge-purple" style={{ fontSize: 10 }} title={(item.transfers || []).map(t => `${t.qty} → ${t.toName} (${t.stage})`).join('\n')}>
+              Transferred {item.transferredQty}{item.resolution === 'transferred' ? '' : ' (part)'}
+            </span>
           )}
         </div>
         <div className="item-name-row">
@@ -319,6 +325,7 @@ function ItemTable({ items, packages, checking = null, imageOf = () => null, vis
                     {item.fromLoan && <span className="badge badge-blue" style={{ fontSize: 10 }}>Rented</span>}
                     {item.fromOutsource && <span className="badge badge-purple" style={{ fontSize: 10 }}>Outsourced</span>}
                     {item.resolution === 'returned' && <span className="badge badge-green" style={{ fontSize: 10 }}>Returned</span>}
+                    {(item.transferredQty || 0) > 0 && <span className="badge badge-purple" style={{ fontSize: 10 }}>Transferred {item.transferredQty}</span>}
                   </div>
                   {item.note && <div className="item-table-note">{item.note}</div>}
                   {checking && item.checkNote && <div className="item-table-note">📝 {item.checkNote}</div>}
@@ -413,9 +420,9 @@ export default function EventDetailPage() {
     // Closing checks (Checked / note / returned qty) survive a reload — lib/eventChecking.js.
     .map(it => savedChecks[it.id]
       ? { ...it, checked: !!savedChecks[it.id].checked, checkNote: savedChecks[it.id].note || '', returnedQty: savedChecks[it.id].returnedQty || 0,
-          ...(savedChecks[it.id].returnedAt ? { resolution: 'returned' } : {}) }
-      : it)
-    .filter(it => !savedChecks[it.id]?.transferredTo);
+          transferredQty: savedChecks[it.id].transferredQty || 0, transfers: savedChecks[it.id].transfers || [],
+          ...(savedChecks[it.id].resolution ? { resolution: savedChecks[it.id].resolution } : savedChecks[it.id].returnedAt ? { resolution: 'returned' } : {}) }
+      : it);
   const baseNextId = Math.max(0, ...baseItems.map(i => i.id)) + 1;
   const [items, setItems] = useState(() => {
     const incoming = getIncomingItems(eventName);
@@ -552,6 +559,7 @@ export default function EventDetailPage() {
     : effectiveStageFilter === 'waiting' ? waitingScanItems
     : effectiveStageFilter === 'unchecked' ? filtered.filter(it => !it.checked)
     : effectiveStageFilter === 'checkedTab' ? filtered.filter(it => it.checked)
+    : effectiveStageFilter === 'transferredTab' ? filtered.filter(it => (it.transferredQty || 0) > 0)
     : scopedItems;
 
   const areaCounts = useMemo(() => {
@@ -876,13 +884,40 @@ export default function EventDetailPage() {
     setPackagingOpen(false);
   }
 
+  // Live catalog (not the seed) so items created from this picker show up at once.
+  const [pickerCatalog, setPickerCatalog] = useState(() => getCatalog());
   const pickerFiltered = useMemo(() => {
     const q = pickerQuery.trim().toLowerCase();
-    return inventoryData.filter(inv =>
+    return pickerCatalog.filter(inv =>
       (!q || inv.name.toLowerCase().includes(q) || inv.sku.toLowerCase().includes(q)) &&
       (!pickerCategory || inv.category === pickerCategory)
     );
-  }, [pickerQuery, pickerCategory]);
+  }, [pickerQuery, pickerCategory, pickerCatalog]);
+
+  // Quick-create an item while adding items to an event (2026-11-12, owner: users want to create the item right
+  // there; it must be flagged so Inventory reminds them to complete it). Saved to master data as a draft
+  // (needsSetup, source 'event') with a suggested SKU, then put in the cart as "not in stock yet".
+  const [quickItem, setQuickItem] = useState(null); // { name, category, unit, qty }
+  const similarToQuick = quickItem && quickItem.name.trim().length >= 3
+    ? pickerCatalog.filter(i => i.name.toLowerCase().includes(quickItem.name.trim().toLowerCase().slice(0, 12))).slice(0, 4)
+    : [];
+  const quickNameTaken = !!quickItem && isNameTaken(quickItem.name);
+  function saveQuickItem() {
+    const name = quickItem.name.trim();
+    if (!name || quickNameTaken || !quickItem.unit || !(Number(quickItem.qty) >= 1)) return;
+    const item = addCatalogItem({
+      name, sku: suggestSku(name), category: quickItem.category, unit: quickItem.unit, itemValue: 0,
+      needsSetup: true, source: 'event', producedFor: eventName,
+    });
+    addActivityLog({ userName: currentUser?.name || 'Admin', action: 'Create', module: 'Inventory', description: `Created draft item "${name}" from ${eventName} (needs completing in Inventory)` });
+    setPickerCatalog(getCatalog());
+    setCart(c => [...c, {
+      cartId: nextCartId, inventoryId: item.id, name, sku: item.sku, category: item.category || '—', unit: item.unit,
+      totalStock: 9999, warehouse: 'Not in stock yet', qty: Math.floor(Number(quickItem.qty)), area: '', subArea: '', isNew: true,
+    }]);
+    setNextCartId(n => n + 1);
+    setQuickItem(null);
+  }
 
   const areaLabel = selectedArea || 'All Place';
   const hasMissingArea = cart.some(c => !c.area);
@@ -1049,11 +1084,12 @@ export default function EventDetailPage() {
 
   // Outstanding = pieces of a stock line that are not back in the warehouse yet.
   function lineOutstanding(it) {
-    if (!isStockLine(it) || it.resolution === 'returned') return 0;
+    if (!isStockLine(it) || it.resolution === 'returned' || it.resolution === 'transferred') return 0;
     const cut = getEventStockCuts(eventName)[it.id];
-    if (cut?.returnedAt && !it.returnedQty) return 0; // already returned at a Stock Return stage
+    if (cut?.returnedAt && !it.returnedQty && !it.transferredQty) return 0; // already returned at a Stock Return stage
     const base = cut ? cut.qty : it.qty;
-    return Math.max(0, base - (it.brokenWrittenOff || 0) - (it.returnedQty || 0));
+    // Out = what left the warehouse − broken written off − returned − transferred to other events (2026-11-12).
+    return Math.max(0, base - (it.brokenWrittenOff || 0) - (it.returnedQty || 0) - (it.transferredQty || 0));
   }
   const stockLines = items.filter(isStockLine);
   const outstandingLines = stockLines.filter(it => lineOutstanding(it) > 0);
@@ -1100,8 +1136,9 @@ export default function EventDetailPage() {
       if (!u) return it;
       return { ...it, returnedQty: u.returnedQty, ...(u.complete ? { resolution: 'returned', stockReturned: it.stockCut ? true : it.stockReturned } : {}) };
     }));
+    const anyReturned = items.some(it => it.resolution === 'returned' || (it.returnedQty || 0) > 0) || updated.size > 0;
     const finalStatus = returnLeftQty > 0 ? 'partial-return'
-      : items.some(it => it.resolution === 'returned') || updated.size > 0 || stockLines.length === 0 ? 'returned-completed' : 'transferred';
+      : anyReturned || stockLines.length === 0 ? 'returned-completed' : 'transferred';
     setEventClosing(eventName, finalStatus);
     setClosingStatus(finalStatus);
     addActivityLog({
@@ -1111,31 +1148,50 @@ export default function EventDetailPage() {
     closeReturnTransfer();
   }
 
+  // Transfer (part of) a line to another on-going event instead of returning it (2026-11-12: with qty,
+  // and the target event's current stage is shown and pre-selected).
+  const [transferQty, setTransferQty] = useState('');
   function openTransferPicker(item) {
     setTransferPickerItemId(item.id);
     setTransferTargetEvent('');
     setTransferTargetStage('');
+    setTransferQty(String(lineOutstanding(item)));
+  }
+  function chooseTransferEvent(key) {
+    setTransferTargetEvent(key);
+    setTransferTargetStage(resolveEventStage(key) || '');
   }
 
   function cancelTransferPicker() {
     setTransferPickerItemId(null);
   }
 
-  // Transfer a whole line to another on-going event instead of returning it (kept from the old flow).
   function confirmTransferItem() {
     const item = items.find(it => it.id === transferPickerItemId);
     if (!item || !transferTargetEvent || !transferTargetStage) return;
+    const out = lineOutstanding(item);
+    const qty = Math.max(0, Math.min(out, Math.floor(Number(transferQty) || 0)));
+    if (qty <= 0) return;
     const target = transferTargetCandidates.find(e => e.key === transferTargetEvent);
+    const by = currentUser?.name || 'Admin';
     queueMovedItem(transferTargetEvent, {
       name: item.name, area: item.area, subArea: item.subArea,
-      stage: transferTargetStage, qty: lineOutstanding(item) || item.qty, pic: item.pic,
-      ownership: item.ownership, note: item.note,
+      stage: transferTargetStage, qty, pic: item.pic,
+      ownership: item.ownership, note: `Transferred from ${eventName}${item.note ? ` — ${item.note}` : ''}`,
     });
-    updateLineChecking(eventName, item.id, { transferredTo: transferTargetEvent });
-    setItems(is => is.filter(it => it.id !== item.id));
+    // Cut stock of the transferred pieces goes back to its row; the target event cuts it again at its own
+    // Cutting Stock stage, so stock is never deducted twice.
+    if (getEventStockCuts(eventName)[item.id]) returnStockParts(eventName, [{ line: item, qty }], { stage: 'Transfer', by });
+    const transferredQty = (item.transferredQty || 0) + qty;
+    const transfers = [...(item.transfers || []), { to: transferTargetEvent, toName: target?.name || transferTargetEvent, stage: transferTargetStage, qty, at: new Date().toISOString() }];
+    const done = out - qty <= 0;
+    const resolution = done ? ((item.returnedQty || 0) > 0 ? 'returned' : 'transferred') : undefined;
+    updateLineChecking(eventName, item.id, { transferredQty, transfers, ...(resolution ? { resolution } : {}) });
+    setItems(is => is.map(it => (it.id === item.id ? { ...it, transferredQty, transfers, ...(resolution ? { resolution } : {}) } : it)));
+    setReturnDraft(d => ({ ...d, [item.id]: String(out - qty) }));
     addActivityLog({
-      userName: currentUser?.name || 'Admin', action: 'Transfer', module: 'Event Detail',
-      description: `Transferred "${item.name}" from ${eventName} to ${target?.name || transferTargetEvent} (${transferTargetStage})`,
+      userName: by, action: 'Transfer', module: 'Event Detail',
+      description: `Transferred ${qty} × "${item.name}" from ${eventName} to ${target?.name || transferTargetEvent} (${transferTargetStage})`,
     });
     setTransferPickerItemId(null);
   }
@@ -1479,7 +1535,9 @@ export default function EventDetailPage() {
         id: nextId + i, name: c.name, area: c.area, subArea: c.subArea, stage: eventStatus,
         qty: c.qty, pic: '', checking: false, scanned: false, groupId: null,
         warehouseItem: true, scanIn: null, scanOut: null, note: '',
-        checked: false, ownership: 'IHC', warehouse: c.warehouse,
+        checked: false, ownership: 'IHC', warehouse: c.isNew ? '' : c.warehouse,
+        // A new draft item has no stock row yet: it can't be cut and is flagged on the card.
+        ...(c.isNew ? { warehouseItem: false, newItem: true, note: 'New item — not in stock yet' } : {}),
       })),
     ]);
     setNextId(n => n + cart.length);
@@ -1718,6 +1776,11 @@ export default function EventDetailPage() {
               <button type="button" className={`stage-tab${effectiveStageFilter === 'checkedTab' ? ' active' : ''}`} onClick={() => setStageFilter('checkedTab')}>
                 Checked <span className="stage-tab-count">{checkedCount}</span>
               </button>
+              {items.some(it => (it.transferredQty || 0) > 0) && (
+                <button type="button" className={`stage-tab${effectiveStageFilter === 'transferredTab' ? ' active' : ''}`} onClick={() => setStageFilter('transferredTab')}>
+                  Transferred <span className="stage-tab-count">{items.filter(it => (it.transferredQty || 0) > 0).length}</span>
+                </button>
+              )}
             </>
           )}
           <button type="button" className={`stage-tab${effectiveStageFilter === 'grouped' ? ' active' : ''}`} onClick={() => setStageFilter('grouped')}>
@@ -1957,6 +2020,15 @@ export default function EventDetailPage() {
               />
             </div>
 
+            <button type="button" className="inv-pick-create" onClick={() => setQuickItem({ name: pickerQuery.trim(), category: pickerCategory, unit: 'pcs', qty: '1' })}>
+              <IconPlus />
+              <span>
+                {pickerQuery.trim() && !pickerFiltered.some(i => i.name.toLowerCase() === pickerQuery.trim().toLowerCase())
+                  ? <>Not in the list? <strong>Create &ldquo;{pickerQuery.trim()}&rdquo; as a new item</strong></>
+                  : <>Item not in Inventory yet? <strong>Create a new item</strong></>}
+                <small>Saved as a draft in Inventory — complete its details there later.</small>
+              </span>
+            </button>
             <div className="inv-pick-list">
               {pickerFiltered.length === 0
                 ? <div className="no-data">No items found.</div>
@@ -2070,7 +2142,7 @@ export default function EventDetailPage() {
                         </div>
                         <div className="cart-item-info">
                           <div className="cart-item-name">{c.name}</div>
-                          <div className="cart-item-meta">{c.category} · {c.unit} · {c.warehouse}</div>
+                          <div className="cart-item-meta">{c.isNew && <span className="badge badge-orange" style={{ fontSize: 10, marginRight: 6 }}>New item</span>}{c.category} · {c.unit} · {c.warehouse}</div>
                           {c.area && (
                             <div className="cart-item-location">{c.area}{c.subArea ? ` · ${c.subArea}` : ''}</div>
                           )}
@@ -2209,6 +2281,7 @@ export default function EventDetailPage() {
             ['Checked (closing)', detailItem.checked ? 'Yes' : 'No'],
             ...(detailItem.checkNote ? [['Check note', detailItem.checkNote]] : []),
             ...(detailItem.returnedQty ? [['Returned', `${detailItem.returnedQty} pcs`]] : []),
+            ...((detailItem.transfers || []).map((t, i) => [`Transfer ${i + 1}`, `${t.qty} pcs → ${t.toName} (${t.stage})`])),
             ...(itemFieldVisibility.showScanIn ? [['Scan In', detailItem.scanIn || 'Not yet']] : []),
             ...(itemFieldVisibility.showScanOut ? [['Scan Out', detailItem.scanOut || 'Not yet']] : []),
           ];
@@ -2907,6 +2980,61 @@ export default function EventDetailPage() {
         }
       </Modal>
 
+      {/* Quick-create an item from the Add Item picker (2026-11-12) */}
+      <Modal
+        open={!!quickItem}
+        title="Create a new item"
+        onClose={() => setQuickItem(null)}
+        footer={
+          <>
+            <button className="btn-cancel-modal" onClick={() => setQuickItem(null)}><IconClose /> Cancel</button>
+            <button className="btn-save-modal" onClick={saveQuickItem}
+              disabled={!quickItem?.name.trim() || quickNameTaken || !quickItem?.unit || !(Number(quickItem?.qty) >= 1)}>
+              <IconCheck /> Create &amp; add to cart
+            </button>
+          </>
+        }
+      >
+        {quickItem && (
+          <>
+            <div className="prod-notice prod-notice-info">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+              <div>The item is saved in <strong>Inventory</strong> as a <strong>draft</strong> (marked &ldquo;Incomplete&rdquo;) and added to this
+                event as <em>not in stock yet</em>. Someone completes its SKU, value and warehouse in Inventory later.</div>
+            </div>
+            <div className="form-group">
+              <label>Item Name <span style={{ color: 'var(--red)' }}>*</span></label>
+              <input type="text" autoFocus value={quickItem.name} onChange={e => setQuickItem(q => ({ ...q, name: e.target.value }))} placeholder="e.g. Rattan Peacock Chair" />
+              {quickNameTaken && <p className="field-error">This item already exists — search for it in the list instead.</p>}
+              {!quickNameTaken && similarToQuick.length > 0 && (
+                <div className="quick-similar">
+                  Similar items already in Inventory:
+                  {similarToQuick.map(i => (
+                    <button key={i.id} type="button" className="link-btn" onClick={() => { setPickerQuery(i.name); setQuickItem(null); }}>{i.name}</button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label>Category</label>
+                <SearchableSelect value={quickItem.category} onChange={v => setQuickItem(q => ({ ...q, category: v }))} placeholder="Select category"
+                  options={[{ value: '', label: '— Later —' }, ...categories.map(c => ({ value: c, label: c }))]} />
+              </div>
+              <div className="form-group">
+                <label>Unit <span style={{ color: 'var(--red)' }}>*</span></label>
+                <SearchableSelect value={quickItem.unit} onChange={v => setQuickItem(q => ({ ...q, unit: v }))}
+                  options={initialUnits.map(u => ({ value: u.abbr, label: `${u.name} (${u.abbr})` }))} />
+              </div>
+            </div>
+            <div className="form-group">
+              <label>Quantity for this event <span style={{ color: 'var(--red)' }}>*</span></label>
+              <input type="number" min="1" value={quickItem.qty} onChange={e => setQuickItem(q => ({ ...q, qty: e.target.value }))} />
+            </div>
+          </>
+        )}
+      </Modal>
+
       {/* Start Checking — at the finished stage (2026-11-12) */}
       <Modal
         open={startCheckOpen}
@@ -2969,6 +3097,12 @@ export default function EventDetailPage() {
           </>
         }
       >
+        <div className="return-context">
+          <span>Event stage: <strong>{eventStatus}</strong></span>
+          <span>Status: <strong>{CLOSING_LABELS[closingStatus]?.label}</strong></span>
+          <span><strong>{fmtNum(checkedCount)}/{fmtNum(items.length)}</strong> checked</span>
+          <span><strong>{fmtNum(outstandingQty)}</strong> pcs out</span>
+        </div>
         {returnStockQty > 0 ? (
           <StockMoveNotice
             mode="return"
@@ -3007,12 +3141,26 @@ export default function EventDetailPage() {
                         {r.it.checkNote && <div className="return-note">{r.it.checkNote}</div>}
                         {transferPickerItemId === r.it.id && (
                           <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                            <SearchableSelect value={transferTargetEvent} onChange={setTransferTargetEvent} placeholder="Select an on-going event" emptyText="No other on-going events"
-                              options={transferTargetCandidates.map(e => ({ value: e.key, label: `${e.name} (${e.code})` }))} />
-                            <SearchableSelect value={transferTargetStage} onChange={setTransferTargetStage} placeholder="Select event status stage"
-                              options={stages.map(st => ({ value: st, label: st }))} />
+                            <div className="transfer-box-title">Transfer to another event</div>
+                            <SearchableSelect value={transferTargetEvent} onChange={chooseTransferEvent} placeholder="Select an on-going event" emptyText="No other on-going events"
+                              options={transferTargetCandidates.map(e => ({ value: e.key, label: `${e.name} (${e.code})`, meta: resolveEventStage(e.key) || '' }))} />
+                            {transferTargetEvent && (
+                              <div className="transfer-current">
+                                Currently at <strong>{resolveEventStage(transferTargetEvent) || stages[0]}</strong>
+                                {' '}(step {stages.indexOf(resolveEventStage(transferTargetEvent) || stages[0]) + 1} of {stages.length})
+                              </div>
+                            )}
+                            <SearchableSelect value={transferTargetStage} onChange={setTransferTargetStage} placeholder="Add it at stage…"
+                              options={stages.map(st => ({ value: st, label: st, meta: st === resolveEventStage(transferTargetEvent) ? 'current' : '' }))} />
+                            <label className="transfer-qty">
+                              Quantity to transfer
+                              <input type="number" min="1" max={r.out} value={transferQty} onChange={e => setTransferQty(e.target.value)} />
+                              <span>of {fmtNum(r.out)} out</span>
+                            </label>
                             <div style={{ display: 'flex', gap: 8 }}>
-                              <button className="btn-save-modal" disabled={!transferTargetEvent || !transferTargetStage} onClick={confirmTransferItem}><IconCheck /> Confirm Transfer</button>
+                              <button className="btn-save-modal" disabled={!transferTargetEvent || !transferTargetStage || !(Number(transferQty) >= 1 && Number(transferQty) <= r.out)} onClick={confirmTransferItem}>
+                                <IconCheck /> Transfer {fmtNum(Math.min(r.out, Math.floor(Number(transferQty) || 0)))} pcs
+                              </button>
                               <button className="btn-cancel-m" onClick={cancelTransferPicker}>Cancel</button>
                             </div>
                           </div>

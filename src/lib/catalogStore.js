@@ -137,6 +137,23 @@ export function deleteCatalogItem(id) {
   return true;
 }
 
+// Incomplete items (2026-11-12): drafts made from a finished production or created on the spot while adding
+// items to an event (`source: 'event'`, `producedFor` = event key). They stay flagged (`needsSetup`) until
+// SKU, category, unit and Item Value are filled in Inventory. `missingInfo` lists what is still empty.
+export function missingInfo(item) {
+  if (!item) return [];
+  const m = [];
+  if (!item.category) m.push('category');
+  if (!item.unit) m.push('unit');
+  if (!Number(item.itemValue)) m.push('item value');
+  if (!item.homeWarehouse && !(item.warehouses || []).length) m.push('warehouse');
+  if (!item.image) m.push('photo');
+  return m;
+}
+export function incompleteCount() {
+  return items.filter(i => i.needsSetup).length;
+}
+
 // --- "Needs setup" drafts (items created by a finished production) -----------------
 
 export function isNeedsSetup(itemName) {

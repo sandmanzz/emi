@@ -899,6 +899,19 @@ clashes or seems off) — proceeding with the stated assumption unless corrected
 
 ## Raw instruction log
 
+### 2026-11-12 (5) — Transfer with qty + target stage, Transferred tab; create items from Add Item + Inventory reminder (Claude Web)
+> for return anda perlu memberikan info state apa yang terakhir lagi aktif. kemudian untuk memindahkan harus ada informasi di chip all dll harus ada yang transferred juga. kemudian jumlah transfer ada butuh qty nya artinya bisa partial transfer.
+> oke untuk topik lain pada saat mengisi barang ke event ada permintaan dari user bisa tidak membuat data barang disana, saya pikir kita bisa lakukan tapi memang harus membuat pengingat di menu barang untuk barang barang yang belum lengkap datanya.
+
+- For Return shows a context bar (this event's stage, status, checked, pcs out). Transfer: target event list shows each event's
+  current stage; after choosing, "Currently at <stage> (step n of m)" and that stage is pre-selected; **quantity** field →
+  partial transfer. Transferred lines stay on the event with a "Transferred N" badge and a **Transferred** tab.
+- Add Item picker: "Create a new item" (from the search text) → quick form (name with duplicate check + similar items,
+  category, unit, qty) → draft item in Inventory (`needsSetup`, `source: 'event'`) + cart line "New item · Not in stock yet".
+- Inventory reminder: orange sidebar badge on Inventory, banner "N items have incomplete data", "Incomplete" chip and
+  "Missing: …" line per item. Complete = category + unit + Item Value filled.
+- Spec: `docs/prd/PRD-2026-11-12.md` §5–§6.
+
 ### 2026-11-12 (4) — Closing flow: Ready for Checking → For Return → Partial Return (Claude Web)
 > jadi gini ketika sudah selesai finish akan masuk ke ready for checking. di ready for checking user sudah tidak bisa add barang apa apa lagi ke event. dan list item akan memiliki tombol checked dan note. kalau checked ya berati status nya checked kalau note user bisa memasukan informasi soal barang tersebut. dan jika sudah selesai semua di check maka main action akan berubah menjadi for return. ketika diklik akan ada confirm bahwa stock akan dikembalikan seperti semula. akan ada kondisi dimana bisa jadi barang itu belum selesai diambil semua maka nanti status event nya akan menjadi partial return.
 > coba pahami case ini dan perbaiki secara UI dan flow nya. jangan lupa selalu update di md terkait

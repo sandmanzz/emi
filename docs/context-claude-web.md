@@ -42,6 +42,8 @@ Newest session first.
   (rule chips, legend, pipeline, grouped switches).
 - Closing flow: Start Checking at Finished → Ready for Checking (Checked + Note per item, nothing can be added) → For Return
   (stock back as before) → Partial Return when something is still out → Returned & Completed.
+- Transfer with quantity and target stage info, Transferred tab; create items on the spot from Add Item with an Inventory
+  reminder for incomplete items.
 - Spec `docs/prd/PRD-2026-11-12.md`.
 
 ## Session 2026-11-11 — UX pass (head of design / UX)

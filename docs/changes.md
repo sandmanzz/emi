@@ -50,6 +50,17 @@ explains a few non-obvious conventions that the entries below assume you already
 
 ---
 
+## Round 43 — Transfer with qty + target stage + Transferred tab; quick-create item from Add Item; Inventory incomplete reminder (2026-11-12)
+
+`EventDetailPage.jsx`: return context bar, `chooseTransferEvent`, `transferQty`, partial `confirmTransferItem` (returns cut pcs,
+keeps the line, `transferredQty`/`transfers`), Transferred tab + badges, `lineOutstanding` − transferred; picker uses live
+catalog/rows, quick-create modal (`quickItem`, `saveQuickItem`), new-item cart/line. `lib/catalogStore.js` `missingInfo`,
+`incompleteCount`. `ItemFormModal.jsx` completion rule (+ Item Value). `InventoryPage.jsx` banner/chip/missing line.
+`Sidebar.jsx` Inventory badge. `eventProgress.js` closing demos at Finished; `eventChecking.js` Summit lines. CSS R43.
+Spec `docs/prd/PRD-2026-11-12.md` §5–§6. Lint 11, build OK.
+
+---
+
 ## Round 42 — Closing flow: Ready for Checking (Checked + Note) → For Return → Partial Return (2026-11-12)
 
 - New `lib/eventChecking.js` (`emi_event_checking`, demo seed); `lib/eventStockCuts.js` `returnStockParts` (partial returns);

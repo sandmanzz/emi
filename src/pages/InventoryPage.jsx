@@ -5,6 +5,7 @@ import SortTh from '../components/SortTh';
 import SearchableSelect from '../components/SearchableSelect';
 import { IconSearch, IconPlus, IconEdit, IconDelete, IconClose } from '../components/icons';
 import { categories, stockStatuses } from '../data/inventory';
+import { missingInfo } from '../lib/catalogStore';
 import { getCatalog, markItemSetUp } from '../lib/producedItems';
 import { deleteCatalogItem } from '../lib/catalogStore';
 import ItemFormModal from '../components/ItemFormModal';
@@ -166,7 +167,12 @@ export default function InventoryPage() {
       {needsSetupCount > 0 && (
         <div className="setup-banner">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-          <div><strong>{needsSetupCount} item{needsSetupCount === 1 ? '' : 's'} created from production still need{needsSetupCount === 1 ? 's' : ''} setup.</strong> Their SKU is temporary and category and unit are empty. Complete the information, then tick &ldquo;Mark as set up&rdquo;.</div>
+          <div>
+            <strong>{needsSetupCount} item{needsSetupCount === 1 ? ' has' : 's have'} incomplete data.</strong>{' '}
+            They were created on the spot — {inventoryData.filter(r => r.needsSetup && r.source === 'event').length} while adding items to an event,
+            {' '}{inventoryData.filter(r => r.needsSetup && r.source !== 'event').length} from a finished production. Open each one and fill in SKU,
+            category, unit and Item Value (warehouse and photo if possible); saving with those marks it complete.
+          </div>
           <button type="button" className="btn btn-ghost" onClick={() => { setSetupOnly(s => !s); setPage(1); }}>{setupOnly ? 'Show all' : 'Show only these'}</button>
         </div>
       )}
@@ -264,7 +270,12 @@ export default function InventoryPage() {
                   <tr key={r.id} className={r.needsSetup ? 'row-needs-setup' : undefined}>
                     <td className="name-cell">
                       {r.name}
-                      {r.needsSetup && <span className="badge badge-orange needs-setup-chip" title="Created from a production request — complete its information">Needs setup</span>}
+                      {r.needsSetup && <span className="badge badge-orange needs-setup-chip" title={r.source === 'event' ? 'Created while adding items to an event — complete its information' : 'Created from a production request — complete its information'}>Incomplete</span>}
+                      {r.needsSetup && (
+                        <div className="incomplete-line">
+                          Missing: {missingInfo(r).join(', ') || 'review SKU'}{r.source === 'event' && r.producedFor ? ` · from ${r.producedFor.split(' | ').slice(1).join(' | ')}` : ''}
+                        </div>
+                      )}
                     </td>
                     <td className="id-cell">{r.sku}</td>
                     <td>

@@ -6,7 +6,7 @@
 // returnedQty = pieces back in the warehouse so far (cumulative over partial returns).
 const KEY = 'emi_event_checking';
 
-// Demo (2026-11-12): Harvest Festival Bazaar is half checked; Summit Afterparty is a Partial Return with 3 items (lines 2, 9, 17: 4 pcs back each)
+// Demo (2026-11-12): Harvest Festival Bazaar is half checked; Summit Afterparty is a Partial Return with 3 items (lines 3, 10, 14: 4 pcs back each; ids picked for the line list generated at Finished)
 // still out. Used only while nothing is stored for that event.
 function seedChecking() {
   const harvest = {};
@@ -16,7 +16,7 @@ function seedChecking() {
   harvest[95] = { checked: false, note: 'Still at the venue, pick up Monday' };
   const summit = {};
   for (let id = 1; id <= 64; id++) summit[id] = { checked: true, checkedBy: 'Lina', checkedAt: '2026-06-02T08:00:00', returnedQty: 1, returnedAt: '2026-06-02T10:00:00' };
-  for (const id of [2, 9, 17]) summit[id] = { checked: true, checkedBy: 'Lina', checkedAt: '2026-06-02T08:00:00', returnedQty: 4, note: 'Rest still at Raffles rooftop, pickup scheduled' };
+  for (const id of [3, 10, 14]) summit[id] = { checked: true, checkedBy: 'Lina', checkedAt: '2026-06-02T08:00:00', returnedQty: 4, note: 'Rest still at Raffles rooftop, pickup scheduled' };
   return { '2026-06-10 | HARVEST FESTIVAL BAZAAR': harvest, '2026-05-30 | SUMMIT AFTERPARTY': summit };
 }
 
