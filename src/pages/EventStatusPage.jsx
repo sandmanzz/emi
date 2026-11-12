@@ -42,7 +42,7 @@ export default function EventStatusPage() {
   const [deleteModal,  setDeleteModal]  = useState(false);
   const [editingId,    setEditingId]    = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [form, setForm] = useState({ status: '', code: '', scan: 'None', productionItem: false, checkOwnership: false, allowDelete: true, loanItem: false, outsourceItem: false, checkItem: false, order: '' });
+  const [form, setForm] = useState({ status: '', code: '', scan: 'None', productionItem: false, checkOwnership: false, allowDelete: true, allowAddItem: true, loanItem: false, outsourceItem: false, checkItem: false, order: '' });
 
   // Reordering is edit-mode + explicit Save, not instant-apply-per-click.
   const [reorderMode,    setReorderMode]    = useState(false);
@@ -86,7 +86,7 @@ export default function EventStatusPage() {
 
   function openNew() {
     setEditingId(null);
-    setForm({ status: '', code: '', scan: 'None', productionItem: false, checkOwnership: false, allowDelete: true, loanItem: false, outsourceItem: false, checkItem: false, order: String(statuses.length + 1) });
+    setForm({ status: '', code: '', scan: 'None', productionItem: false, checkOwnership: false, allowDelete: true, allowAddItem: true, loanItem: false, outsourceItem: false, checkItem: false, order: String(statuses.length + 1) });
     setStatusModal(true);
   }
 
@@ -94,7 +94,7 @@ export default function EventStatusPage() {
     const r = statuses.find(x => x.id === id);
     if (!r) return;
     setEditingId(id);
-    setForm({ status: r.status, code: r.code || '', scan: r.scan, productionItem: r.productionItem === true, checkOwnership: r.checkOwnership === true, allowDelete: r.allowDelete !== false, loanItem: r.loanItem === true, outsourceItem: isOutsourceFlag(r), checkItem: r.checkItem === true, order: String(r.order) });
+    setForm({ status: r.status, code: r.code || '', scan: r.scan, productionItem: r.productionItem === true, checkOwnership: r.checkOwnership === true, allowDelete: r.allowDelete !== false, allowAddItem: r.allowAddItem !== false, loanItem: r.loanItem === true, outsourceItem: isOutsourceFlag(r), checkItem: r.checkItem === true, order: String(r.order) });
     setStatusModal(true);
   }
 
@@ -104,11 +104,11 @@ export default function EventStatusPage() {
     const now = new Date().toISOString().slice(0, 10);
     if (editingId) {
       setStatuses(ss => ss.map(s => s.id === editingId
-        ? { ...s, status: form.status, code: form.code, scan: form.scan, productionItem: form.productionItem, checkOwnership: form.checkOwnership, allowDelete: form.allowDelete, loanItem: form.loanItem, outsourceItem: form.outsourceItem, checkItem: form.checkItem, order: parseInt(form.order) || s.order, updatedAt: now }
+        ? { ...s, status: form.status, code: form.code, scan: form.scan, productionItem: form.productionItem, checkOwnership: form.checkOwnership, allowDelete: form.allowDelete, allowAddItem: form.allowAddItem, loanItem: form.loanItem, outsourceItem: form.outsourceItem, checkItem: form.checkItem, order: parseInt(form.order) || s.order, updatedAt: now }
         : s
       ));
     } else {
-      setStatuses(ss => [...ss, { id: nextId, order: parseInt(form.order) || ss.length + 1, status: form.status, code: form.code, scan: form.scan, productionItem: form.productionItem, checkOwnership: form.checkOwnership, allowDelete: form.allowDelete, loanItem: form.loanItem, outsourceItem: form.outsourceItem, checkItem: form.checkItem, eventRunning: 0, updatedAt: now }]);
+      setStatuses(ss => [...ss, { id: nextId, order: parseInt(form.order) || ss.length + 1, status: form.status, code: form.code, scan: form.scan, productionItem: form.productionItem, checkOwnership: form.checkOwnership, allowDelete: form.allowDelete, allowAddItem: form.allowAddItem, loanItem: form.loanItem, outsourceItem: form.outsourceItem, checkItem: form.checkItem, eventRunning: 0, updatedAt: now }]);
       setNextId(n => n + 1);
     }
     setStatusModal(false);
@@ -156,6 +156,7 @@ export default function EventStatusPage() {
   const scanEnabled    = statuses.filter(s => s.scan === 'Scan').length;
   const productionEnabled = statuses.filter(s => s.productionItem === true).length;
   const ownershipEnabled = statuses.filter(s => s.checkOwnership === true).length;
+  const addAllowed = statuses.filter(s => s.allowAddItem !== false).length; // missing field = allowed
   const deleteAllowed = statuses.filter(s => s.allowDelete !== false).length; // missing field = allowed (pre-2026-10-16 data)
   const loanEnabled = statuses.filter(s => s.loanItem === true).length;
   const outsourceEnabled = statuses.filter(isOutsourceFlag).length;
@@ -176,19 +177,20 @@ export default function EventStatusPage() {
         Ownership set to &ldquo;True&rdquo; asks whether any item needs an ownership change
         before the event moves on from that stage. A status with Production Item set
         to &ldquo;True&rdquo; lets users request new items to be produced while an
-        event is at that stage. A status with Allow Delete set to &ldquo;False&rdquo; stops
+        event is at that stage. A status with Allow Add Item set to &ldquo;False&rdquo; stops new items from being added. A status with Allow Delete set to &ldquo;False&rdquo; stops
         items from being deleted from an event while it is at that stage. A status with Rent Item set to
         &ldquo;True&rdquo; lets users rent items from a rent vendor while an event is at that stage, and Outsource Item
         set to &ldquo;True&rdquo; lets them order items from an outsource vendor. Checking Item set to &ldquo;True&rdquo; shows the
         Checking tick box on items from that status on. Scan In appears from the first Scan status, Scan Out from the second.
       </p>
 
-      <div className="stats-bar" style={{ gridTemplateColumns:'repeat(9,1fr)' }}>
+      <div className="stats-bar" style={{ gridTemplateColumns:'repeat(10,1fr)' }}>
         {[
           { label:'Total Statuses',  value:statuses.length, color:'var(--brand)',  bg:'var(--brand-bg)' },
           { label:'Scan Enabled',    value:scanEnabled,     color:'var(--green)',  bg:'var(--green-bg)' },
           { label:'Check Ownership', value:ownershipEnabled, color:'var(--green)',  bg:'var(--green-bg)' },
           { label:'Production Item', value:productionEnabled, color:'var(--purple)', bg:'var(--purple-bg)' },
+          { label:'Allow Add Item',  value:addAllowed,      color:'var(--green)',  bg:'var(--green-bg)' },
           { label:'Allow Delete',    value:deleteAllowed,   color:'var(--red)',    bg:'var(--red-bg)' },
           { label:'Rent Item',       value:loanEnabled,     color:'var(--brand)',  bg:'var(--brand-bg)' },
           { label:'Outsource Item',  value:outsourceEnabled, color:'var(--purple)', bg:'var(--purple-bg)' },
@@ -251,6 +253,7 @@ export default function EventStatusPage() {
                 <th style={{ width:100, textAlign:'center' }}>Scan</th>
                 <th style={{ width:96, textAlign:'center', whiteSpace:'normal', lineHeight:1.3 }}>Production Item</th>
                 <th style={{ width:96, textAlign:'center', whiteSpace:'normal', lineHeight:1.3 }}>Check Ownership</th>
+                <th style={{ width:96, textAlign:'center', whiteSpace:'normal', lineHeight:1.3 }}>Allow Add Item</th>
                 <th style={{ width:96, textAlign:'center', whiteSpace:'normal', lineHeight:1.3 }}>Allow Delete</th>
                 <th style={{ width:96, textAlign:'center', whiteSpace:'normal', lineHeight:1.3 }}>Rent Item</th>
                 <th style={{ width:96, textAlign:'center', whiteSpace:'normal', lineHeight:1.3 }}>Outsource Item</th>
@@ -262,7 +265,7 @@ export default function EventStatusPage() {
             </thead>
             <tbody>
               {pageData.length === 0
-                ? <tr><td colSpan={14} style={{ textAlign:'center', padding:40, color:'var(--text-muted)' }}>No statuses found.</td></tr>
+                ? <tr><td colSpan={15} style={{ textAlign:'center', padding:40, color:'var(--text-muted)' }}>No statuses found.</td></tr>
                 : pageData.map((r, idx) => (
                   <tr key={r.id}>
                     <td style={{ textAlign:'center' }}>
@@ -301,6 +304,7 @@ export default function EventStatusPage() {
                     <td style={{ textAlign:'center' }}><ScanBadge scan={r.scan} /></td>
                     <td style={{ textAlign:'center' }}><BoolBadge value={r.productionItem === true} /></td>
                     <td style={{ textAlign:'center' }}><BoolBadge value={r.checkOwnership === true} /></td>
+                    <td style={{ textAlign:'center' }}><BoolBadge value={r.allowAddItem !== false} /></td>
                     <td style={{ textAlign:'center' }}><BoolBadge value={r.allowDelete !== false} /></td>
                     <td style={{ textAlign:'center' }}><BoolBadge value={r.loanItem === true} /></td>
                     <td style={{ textAlign:'center' }}><BoolBadge value={isOutsourceFlag(r)} /></td>
@@ -389,6 +393,22 @@ export default function EventStatusPage() {
           />
           <p style={{ fontSize: 11.5, color: 'var(--text-muted)', margin: '5px 0 0' }}>
             When True, moving an event on from this status first asks whether any item needs an ownership change.
+          </p>
+        </div>
+        <div className="form-group">
+          <label>Allow Add Item</label>
+          <SearchableSelect
+            value={form.allowAddItem ? 'true' : 'false'}
+            onChange={v => setForm(f => ({ ...f, allowAddItem: v === 'true' }))}
+            options={[
+              { value: 'true',  label: 'True' },
+              { value: 'false', label: 'False' },
+            ]}
+            placeholder="True"
+          />
+          <p style={{ fontSize: 11.5, color: 'var(--text-muted)', margin: '5px 0 0' }}>
+            When False, nothing can be added to an event at this status (Add Item, Rent Item, Outsource Item, Request
+            Production) &mdash; use it for late stages so no items are added at the end.
           </p>
         </div>
         <div className="form-group">

@@ -899,6 +899,14 @@ clashes or seems off) — proceeding with the stated assumption unless corrected
 
 ## Raw instruction log
 
+### 2026-11-12 — Event Status: Allow Add Item (Claude Web)
+> untuk ini tambahkan opsi juga untuk allow add item, jadi kalau allow maka user masih bisa add dan kalau no maka user sudah tidak bisa add item lagi. tujuanya untuk menjaga agar tidak ada penambahan di akhir
+
+- New Event Status flag **Allow Add Item** (`allowAddItem`, missing = true). False → at that stage nothing can be added:
+  Add Item / cart, Rent Item, Outsource Item, Request Production. Lock note on Event Detail says why.
+- **Interpretation:** "add item" includes Rent / Outsource / Production, because they also add lines to the event.
+- Seed: False for Waiting scan in, Event running, Waiting scan out, Finished. Spec: `docs/prd/PRD-2026-11-12.md`.
+
 ### 2026-11-11 — UX pass as head of design/UX (Claude Web)
 > work as head of design dan head of ux
 > 1. perhatikan bagian ini, jadi untuk "checking" itu harus disesuaikan dengan event setting kalau memang belum mencapai state yang membutuhkan checking maka itu bisa di hide dulu. (ss1)

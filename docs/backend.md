@@ -126,6 +126,11 @@ whose status is still `on-going`.
 
 ---
 
+## R39 (2026-11-12) — allowAddItem
+
+Event status `allowAddItem: boolean` (default true). Every endpoint that adds to an event (items, rentals, outsource orders,
+productions) returns `409 ADD_NOT_ALLOWED_AT_STAGE` when the current stage has it false.
+
 ## R38 (2026-11-11) — checking flag, scan phase, files, images, QR type
 
 Spec: [prd/PRD-2026-11-11.md](prd/PRD-2026-11-11.md).

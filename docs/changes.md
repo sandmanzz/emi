@@ -50,6 +50,13 @@ explains a few non-obvious conventions that the entries below assume you already
 
 ---
 
+## Round 39 — Event Status "Allow Add Item" (2026-11-12)
+
+`lib/eventStatuses.js` `isAddAllowedStage`; seed `allowAddItem`; `EventStatusPage.jsx` column/KPI/form; `EventDetailPage.jsx`
+`addLocked = stockReturnLocked || addNotAllowedHere` + lock note. Spec `docs/prd/PRD-2026-11-12.md`. Lint 11, build OK.
+
+---
+
 ## Round 38 — UX pass: stage-aware Checking/Scan, filter drawer, QR type, card cover + created, frozen Action column, photos & event files, realistic mock, cart warning (2026-11-11)
 
 Spec with every rule: `docs/prd/PRD-2026-11-11.md`.

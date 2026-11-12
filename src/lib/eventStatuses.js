@@ -76,6 +76,14 @@ export function isCheckItemStage(statusName) {
   return record?.checkItem === true;
 }
 
+// Allow Add Item (2026-11-12, owner: "untuk menjaga agar tidak ada penambahan di akhir"). At a stage with
+// allowAddItem = false nothing can be added to the event: Add Item / cart, Rent Item, Outsource Item and
+// Request Production are all off. Missing field = true (lists saved before the flag keep adding).
+export function isAddAllowedStage(statusName) {
+  const record = getEventStatuses().find(s => s.status === statusName);
+  return record?.allowAddItem !== false;
+}
+
 // While the event is at this stage, items may be deleted. Missing field counts as true
 // (status lists saved before the flag existed keep the old behaviour).
 export function isDeleteAllowedStage(statusName) {

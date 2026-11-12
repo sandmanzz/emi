@@ -9,7 +9,7 @@ import { initialAreas, SUB_AREAS } from '../data/areas';
 import { inventoryData, categories } from '../data/inventory';
 import { initialWarehouses } from '../data/warehouses';
 import { wiData } from '../data/warehouseInventory';
-import { getEventStageNames, isScanStage, isCuttingStockStage, isStockReturnStage, isProductionStage, isCheckOwnershipStage, isDeleteAllowedStage, isLoanStage, isOutsourceStage, isCheckItemStage } from '../lib/eventStatuses';
+import { getEventStageNames, isScanStage, isCuttingStockStage, isStockReturnStage, isProductionStage, isCheckOwnershipStage, isDeleteAllowedStage, isLoanStage, isOutsourceStage, isCheckItemStage, isAddAllowedStage } from '../lib/eventStatuses';
 import { getInventoryRows, applyStockMovement } from '../lib/stockOpnameStore';
 import { VENDOR_ORIGINS } from '../lib/vendorStore';
 import { CatalogItemPicker, VendorPicker } from '../components/QuickPickers';
@@ -698,7 +698,10 @@ export default function EventDetailPage() {
   // Once the event has reached the Stock Return stage, it can't take new items
   // (Add Item, Cart, Request Production). Stays locked even if the user goes back.
   const stockReturnIndex = stages.findIndex(isStockReturnStage);
-  const addLocked = stockReturnIndex >= 0 && maxReachedIndex >= stockReturnIndex;
+  const stockReturnLocked = stockReturnIndex >= 0 && maxReachedIndex >= stockReturnIndex;
+  // Allow Add Item = False on the current stage also locks adding (2026-11-12).
+  const addNotAllowedHere = !isAddAllowedStage(eventStatus);
+  const addLocked = stockReturnLocked || addNotAllowedHere;
   // From Checking Inventory onward, items can't be modified or deleted.
   const itemsLocked = closingStatus !== 'on-going';
 
@@ -1408,7 +1411,7 @@ export default function EventDetailPage() {
             <button
               className="btn-new btn-add-item-cart"
               disabled={addLocked}
-              title={addLocked ? 'Stock has been returned — no more items can be added' : cart.length > 0 ? `${cart.length} item(s) in the cart — open to review and save` : undefined}
+              title={addLocked ? (stockReturnLocked ? 'Stock has been returned — no more items can be added' : `Adding items is off at "${eventStatus}" (Event Settings → Allow Add Item)`) : cart.length > 0 ? `${cart.length} item(s) in the cart — open to review and save` : undefined}
               onClick={() => { setPickerQuery(''); setPickerCategory(''); setPickerOpen(true); }}
             >
               <IconPlus /> Add Item
@@ -1490,7 +1493,9 @@ export default function EventDetailPage() {
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
             {itemsLocked
               ? 'This event is in Checking Inventory or later — items can no longer be modified or deleted.'
-              : 'Stock has been returned for this event — no more items can be added.'}
+              : stockReturnLocked
+                ? 'Stock has been returned for this event — no more items can be added.'
+                : `Adding items is off at "${eventStatus}" (Event Settings → Allow Add Item = False). Rent, Outsource and Production requests are off too.`}
           </div>
         )}
 
