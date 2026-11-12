@@ -50,6 +50,20 @@ explains a few non-obvious conventions that the entries below assume you already
 
 ---
 
+## Round 42 — Closing flow: Ready for Checking (Checked + Note) → For Return → Partial Return (2026-11-12)
+
+- New `lib/eventChecking.js` (`emi_event_checking`, demo seed); `lib/eventStockCuts.js` `returnStockParts` (partial returns);
+  `lib/eventStatuses.js` `getClosingStageName` (rule `closeStage`, seed Finished; Stock Return off in seed);
+  `lib/eventClosing.js` `partial-return` + ready-to-close by closing stage + Summit Afterparty seed; `eventProgress.js` seeds
+  Rooftop at the closing stage; `eventClosingLabels.js` "Ready for Checking", "Partial Return".
+- `EventDetailPage.jsx`: Start Checking popup, checking panel + tabs, Checked/Note on cards and list, note popup, For Return popup
+  (Out / Back now / Transfer, Everything is back, partial), Return remaining; old Cross Check + Return & Transfer removed;
+  `addLocked` when closing ≠ on-going. `StockMoveNotice.jsx` text. `EventStatusPage.jsx` rule "Ready for checking" (Closing
+  group). `EventPage.jsx` Partial Return tab, renamed tab/KPI. CSS `.close-flow`, `.check-progress`, `.btn-check`, `.btn-note`, `.return-*`.
+Spec `docs/prd/PRD-2026-11-12.md` §4. Lint 11, build OK.
+
+---
+
 ## Round 41 — Event Settings (Event Status page) redesign (2026-11-12)
 
 `EventStatusPage.jsx`: `RULES` / `RULE_GROUPS` model, `RuleChips`, `Switch`, legend, compact KPIs + pipeline, 6-column

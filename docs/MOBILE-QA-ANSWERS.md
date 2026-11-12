@@ -1033,6 +1033,10 @@ Code: `openReport`, `saveReport`, `clearReport` (~line 944).
 
 ## E. Closing
 
+> **Update 2026-11-12:** closing flow changed — Start Checking at the finished stage → Ready for Checking (Checked + Note per
+> item, no adding) → For Return (partial allowed) → Partial Return / Returned & Completed. Cutting Stock is back and moves real
+> stock. See `docs/prd/PRD-2026-11-12.md`.
+
 **18. Return vs Transfer.** On an event in Checking Inventory: `Cross Check Items` (tick `checked` per line) and
 `Ready for Return` → modal **"Return Item & Transfer"**. It shows the *Event Logistics Summary* ("<checked> of <total> items
 were checked during Cross Check … <n> items never got checked") and, per line, buttons **Return** / **Transfer**.

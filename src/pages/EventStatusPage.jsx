@@ -27,6 +27,7 @@ const RULE_GROUPS = [
   { id: 'stock', label: 'Stock', color: 'orange' },
   { id: 'items', label: 'Items', color: 'blue' },
   { id: 'requests', label: 'Requests', color: 'purple' },
+  { id: 'closing', label: 'Closing', color: 'blue' },
 ];
 const RULES = [
   { key: 'scan', group: 'scan', label: 'Scan items', chip: 'Scan', on: r => r.scan === 'Scan',
@@ -34,7 +35,7 @@ const RULES = [
   { key: 'cuttingStock', group: 'stock', label: 'Cutting Stock', chip: 'Cut stock', on: r => r.cuttingStock === true, unique: true,
     desc: 'Entering this stage deducts the event’s items from warehouse stock and reserves them for the event. One stage only.' },
   { key: 'stockReturn', group: 'stock', label: 'Stock Return', chip: 'Return stock', on: r => r.stockReturn === true, unique: true,
-    desc: 'Entering this stage puts the cut stock back (minus broken units). After it nothing can be added. One stage only.' },
+    desc: 'Optional: put the cut stock back already when entering this stage. Normally stock comes back at “For Return” after checking. One stage only.' },
   { key: 'allowAddItem', group: 'items', label: 'Allow adding items', chip: 'No adding', restrictive: true, on: r => r.allowAddItem !== false,
     desc: 'Off = nothing can be added at this stage (Add Item, Rent, Outsource, Production). Use it for late stages.' },
   { key: 'allowDelete', group: 'items', label: 'Allow deleting items', chip: 'No deleting', restrictive: true, on: r => r.allowDelete !== false,
@@ -49,6 +50,8 @@ const RULES = [
     desc: 'Users can rent items from a rent vendor (returned after the event).' },
   { key: 'outsourceItem', group: 'requests', label: 'Outsource Item', chip: 'Outsource', on: isOutsourceFlag,
     desc: 'Users can order items or work from an outsource vendor.' },
+  { key: 'closeStage', group: 'closing', label: 'Ready for checking', chip: 'Ready for checking', on: r => r.closeStage === true, unique: true,
+    desc: 'The event is finished here: the main action becomes “Start Checking” (then For Return). One stage only; stages after it (Postphone, Disable) are not part of the normal flow.' },
 ];
 const groupColor = id => RULE_GROUPS.find(g => g.id === id)?.color || 'gray';
 
@@ -89,7 +92,7 @@ export default function EventStatusPage() {
   const [deleteModal,  setDeleteModal]  = useState(false);
   const [editingId,    setEditingId]    = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [form, setForm] = useState({ status: '', code: '', scan: 'None', productionItem: false, checkOwnership: false, allowDelete: true, allowAddItem: true, loanItem: false, outsourceItem: false, checkItem: false, cuttingStock: false, stockReturn: false, order: '' });
+  const [form, setForm] = useState({ status: '', code: '', scan: 'None', productionItem: false, checkOwnership: false, allowDelete: true, allowAddItem: true, loanItem: false, outsourceItem: false, checkItem: false, cuttingStock: false, stockReturn: false, closeStage: false, order: '' });
 
   // Reordering is edit-mode + explicit Save, not instant-apply-per-click.
   const [reorderMode,    setReorderMode]    = useState(false);
@@ -133,7 +136,7 @@ export default function EventStatusPage() {
 
   function openNew() {
     setEditingId(null);
-    setForm({ status: '', code: '', scan: 'None', productionItem: false, checkOwnership: false, allowDelete: true, allowAddItem: true, loanItem: false, outsourceItem: false, checkItem: false, cuttingStock: false, stockReturn: false, order: String(statuses.length + 1) });
+    setForm({ status: '', code: '', scan: 'None', productionItem: false, checkOwnership: false, allowDelete: true, allowAddItem: true, loanItem: false, outsourceItem: false, checkItem: false, cuttingStock: false, stockReturn: false, closeStage: false, order: String(statuses.length + 1) });
     setStatusModal(true);
   }
 
@@ -141,7 +144,7 @@ export default function EventStatusPage() {
     const r = statuses.find(x => x.id === id);
     if (!r) return;
     setEditingId(id);
-    setForm({ status: r.status, code: r.code || '', scan: r.scan, productionItem: r.productionItem === true, checkOwnership: r.checkOwnership === true, allowDelete: r.allowDelete !== false, allowAddItem: r.allowAddItem !== false, loanItem: r.loanItem === true, outsourceItem: isOutsourceFlag(r), checkItem: r.checkItem === true, cuttingStock: r.cuttingStock === true, stockReturn: r.stockReturn === true, order: String(r.order) });
+    setForm({ status: r.status, code: r.code || '', scan: r.scan, productionItem: r.productionItem === true, checkOwnership: r.checkOwnership === true, allowDelete: r.allowDelete !== false, allowAddItem: r.allowAddItem !== false, loanItem: r.loanItem === true, outsourceItem: isOutsourceFlag(r), checkItem: r.checkItem === true, cuttingStock: r.cuttingStock === true, stockReturn: r.stockReturn === true, closeStage: r.closeStage === true, order: String(r.order) });
     setStatusModal(true);
   }
 
@@ -151,11 +154,11 @@ export default function EventStatusPage() {
     const now = new Date().toISOString().slice(0, 10);
     if (editingId) {
       setStatuses(ss => ss.map(s => s.id === editingId
-        ? { ...s, status: form.status, code: form.code, scan: form.scan, productionItem: form.productionItem, checkOwnership: form.checkOwnership, allowDelete: form.allowDelete, allowAddItem: form.allowAddItem, loanItem: form.loanItem, outsourceItem: form.outsourceItem, checkItem: form.checkItem, cuttingStock: form.cuttingStock, stockReturn: form.stockReturn, order: parseInt(form.order) || s.order, updatedAt: now }
+        ? { ...s, status: form.status, code: form.code, scan: form.scan, productionItem: form.productionItem, checkOwnership: form.checkOwnership, allowDelete: form.allowDelete, allowAddItem: form.allowAddItem, loanItem: form.loanItem, outsourceItem: form.outsourceItem, checkItem: form.checkItem, cuttingStock: form.cuttingStock, stockReturn: form.stockReturn, closeStage: form.closeStage, order: parseInt(form.order) || s.order, updatedAt: now }
         : s
       ));
     } else {
-      setStatuses(ss => [...ss, { id: nextId, order: parseInt(form.order) || ss.length + 1, status: form.status, code: form.code, scan: form.scan, productionItem: form.productionItem, checkOwnership: form.checkOwnership, allowDelete: form.allowDelete, allowAddItem: form.allowAddItem, loanItem: form.loanItem, outsourceItem: form.outsourceItem, checkItem: form.checkItem, cuttingStock: form.cuttingStock, stockReturn: form.stockReturn, eventRunning: 0, updatedAt: now }]);
+      setStatuses(ss => [...ss, { id: nextId, order: parseInt(form.order) || ss.length + 1, status: form.status, code: form.code, scan: form.scan, productionItem: form.productionItem, checkOwnership: form.checkOwnership, allowDelete: form.allowDelete, allowAddItem: form.allowAddItem, loanItem: form.loanItem, outsourceItem: form.outsourceItem, checkItem: form.checkItem, cuttingStock: form.cuttingStock, stockReturn: form.stockReturn, closeStage: form.closeStage, eventRunning: 0, updatedAt: now }]);
       setNextId(n => n + 1);
     }
     setStatusModal(false);
@@ -204,6 +207,7 @@ export default function EventStatusPage() {
   // Cutting Stock / Stock Return: one status each, never the same status (2026-11-12).
   const cutOwner = statuses.find(st => st.cuttingStock === true && st.id !== editingId);
   const returnOwner = statuses.find(st => st.stockReturn === true && st.id !== editingId);
+  const closeOwner = statuses.find(st => st.closeStage === true && st.id !== editingId);
 
   const [legendOpen, setLegendOpen] = useState(false);
   // Form value for a rule (scan is stored as 'Scan' / 'None').
@@ -265,7 +269,7 @@ export default function EventStatusPage() {
             <b className="es-kpi-text">
               {cutStage ? <>Cut at <em>{cutStage.status}</em></> : 'No cutting stage'}
               {' · '}
-              {returnStage ? <>Return at <em>{returnStage.status}</em></> : 'no return stage'}
+              {returnStage ? <>Return at <em>{returnStage.status}</em></> : <>Return at <em>For Return</em></>}
             </b>
           </div>
         </div>
@@ -402,7 +406,7 @@ export default function EventStatusPage() {
           <div key={g.id} className="es-form-group">
             <div className="es-legend-title"><span className={`es-dot ${g.color}`} />{g.label}</div>
             {RULES.filter(rule => rule.group === g.id).map(rule => {
-              const owner = rule.key === 'cuttingStock' ? cutOwner : rule.key === 'stockReturn' ? returnOwner : null;
+              const owner = rule.key === 'cuttingStock' ? cutOwner : rule.key === 'stockReturn' ? returnOwner : rule.key === 'closeStage' ? closeOwner : null;
               return (
                 <Switch
                   key={rule.key}

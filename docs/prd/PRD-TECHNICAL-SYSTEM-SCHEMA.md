@@ -12,6 +12,10 @@
 > guidance. §10 = known gaps. §11 = source-file map. Items marked **[RULE]** are hard rules; **[ASSUMPTION]** marks a
 > product decision that the owner has not confirmed.
 >
+> **Update 2026-11-12:** closing flow changed — Start Checking at the finished stage → Ready for Checking (Checked + Note per
+> item, no adding) → For Return (partial allowed) → Partial Return / Returned & Completed. Cutting Stock is back and moves real
+> stock. See `docs/prd/PRD-2026-11-12.md`.
+
 > **Update 2026-11-11:** see `docs/prd/PRD-2026-11-11.md` — Checking Item flag, stage-based scan in/out (replaces §5.5's
 > "first scan = in, second = out"), QR Type INDIVIDUAL/GROUP, event `createdAt`, item `image`, event files, cart warning.
 >

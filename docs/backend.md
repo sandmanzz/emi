@@ -126,6 +126,14 @@ whose status is still `on-going`.
 
 ---
 
+## R42 (2026-11-12) — closing: checking, For Return, partial return
+
+Closing status adds `PARTIAL_RETURN`; `checking-inventory` is shown as "Ready for Checking". Event status rule `closeStage`
+(one). Endpoints: `POST /events/{id}/start-checking` (409 unless at closeStage), `PATCH /events/{id}/items/{lineId}/check
+{checked?, note?}`, `POST /events/{id}/return {lines:[{lineId, qty}]}` (409 unless every line is checked on the first return;
+creates EVENT_RETURN movements for cut stock; sets PARTIAL_RETURN if any line still has outstanding qty, else
+RETURNED_COMPLETED). Line fields: `checked`, `checkNote`, `returnedQty`.
+
 ## R40 (2026-11-12) — cutting stock reservations
 
 Event status `cuttingStock` / `stockReturn` (one each). Advance into the cut stage → per stock line a movement `EVENT_CUT`

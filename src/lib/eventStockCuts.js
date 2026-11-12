@@ -80,11 +80,34 @@ export function returnStock(eventKey, lines, { stage, by }) {
   return { lines: n, qty, lost };
 }
 
+// Partial / full return at "For Return" (2026-11-12): `parts` = [{ line, qty }]. Adds qty back to the row the
+// line was cut from and accumulates returnedQty; the cut is closed (returnedAt) once nothing is outstanding.
+// Lines that were never cut (no Cutting Stock stage) move no stock — their stock never left.
+export function returnStockParts(eventKey, parts, { stage, by }) {
+  const all = readAll();
+  const cuts = all[eventKey] || {};
+  let qty = 0;
+  for (const { line, qty: q } of parts) {
+    const c = cuts[line.id];
+    if (!c || c.returnedAt || q <= 0) continue;
+    const outstanding = Math.max(0, c.qty - (line.brokenWrittenOff || 0) - (c.returnedQty || 0));
+    const back = Math.min(q, outstanding);
+    if (back <= 0) continue;
+    applyStockMovement(c.rowId, back, { reason: 'Event return', eventName: eventKey, stage, by, note: `Back from ${eventKey}` });
+    const returnedQty = (c.returnedQty || 0) + back;
+    cuts[line.id] = { ...c, returnedQty, ...(returnedQty >= c.qty - (line.brokenWrittenOff || 0) ? { returnedAt: new Date().toISOString() } : {}) };
+    qty += back;
+  }
+  all[eventKey] = cuts;
+  writeAll(all);
+  return { qty };
+}
+
 // Stock reserved by events right now: Map(rowId → qty). Used by Warehouse Inventory.
 export function reservedByRow() {
   const m = new Map();
   for (const cuts of Object.values(readAll())) {
-    for (const c of Object.values(cuts)) if (!c.returnedAt) m.set(c.rowId, (m.get(c.rowId) || 0) + c.qty);
+    for (const c of Object.values(cuts)) if (!c.returnedAt) m.set(c.rowId, (m.get(c.rowId) || 0) + c.qty - (c.returnedQty || 0));
   }
   return m;
 }

@@ -899,6 +899,22 @@ clashes or seems off) — proceeding with the stated assumption unless corrected
 
 ## Raw instruction log
 
+### 2026-11-12 (4) — Closing flow: Ready for Checking → For Return → Partial Return (Claude Web)
+> jadi gini ketika sudah selesai finish akan masuk ke ready for checking. di ready for checking user sudah tidak bisa add barang apa apa lagi ke event. dan list item akan memiliki tombol checked dan note. kalau checked ya berati status nya checked kalau note user bisa memasukan informasi soal barang tersebut. dan jika sudah selesai semua di check maka main action akan berubah menjadi for return. ketika diklik akan ada confirm bahwa stock akan dikembalikan seperti semula. akan ada kondisi dimana bisa jadi barang itu belum selesai diambil semua maka nanti status event nya akan menjadi partial return.
+> coba pahami case ini dan perbaiki secara UI dan flow nya. jangan lupa selalu update di md terkait
+
+- **Standing rule:** always update the related .md files with every change.
+- At the finished stage (new Event Status rule **Ready for checking**, seed: Finished) the main action is **Start Checking**
+  (explained 3-step popup) → closing **Ready for Checking** (label of `checking-inventory`): no adding at all; each item has
+  **Checked** + **Note**; progress bar, Not checked / Checked tabs, Check all.
+- Main action **For Return** is disabled until all items are checked; it opens a return list (Out / Back now per stock line)
+  with the stock-return illustration; stock goes back as it was (cut stock is returned; if nothing was cut, numbers don't change).
+- Anything not fully back → event **Partial Return** (new closing value + tab); main action **Return remaining** until done →
+  Returned & Completed. Transfer of a line to another event stays as a secondary option in the return list.
+- Old "Cross Check Items" menu/modal and "Return Item & Transfer" modal are replaced. Stock Return stage is now optional
+  (off in the seed). Postphone / Disable are no longer the trigger for Ready to Close.
+- Spec: `docs/prd/PRD-2026-11-12.md` §4.
+
 ### 2026-11-12 (3) — Event Settings UI redesign (Claude Web)
 > ingat work as head of engineer, head of design, head of creative and head of product. kalau kamu liat di event setting sudah sangat panjang tolong perbaiki UI nya agar tetap rapi
 

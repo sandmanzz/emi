@@ -84,7 +84,7 @@ export default function StockMoveNotice({ mode = 'cut', stages = [], lines = 0, 
         {lost > 0 && <p className="stock-move-warn">⚠ {fmtNum(lost)} pcs were written off as broken and do not come back.</p>}
         <p className="stock-move-foot">
           {cut
-            ? <>Going back to an earlier stage does not restore it.{returnStage ? <> The stock comes back at &ldquo;{returnStage}&rdquo; (Stock Return).</> : <> No stage has Stock Return yet, so it stays deducted.</>} Rented and outsourced items are not cut.</>
+            ? <>Going back to an earlier stage does not restore it.{returnStage ? <> The stock comes back at &ldquo;{returnStage}&rdquo; (Stock Return).</> : <> It comes back when the event is closed with &ldquo;For Return&rdquo; (after Ready for Checking).</>} Rented and outsourced items are not cut.</>
             : <>Every movement is logged in Warehouse Inventory &rarr; Stock History.</>}
         </p>
       </div>

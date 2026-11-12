@@ -9,7 +9,8 @@ export const CLOSING_LABELS = {
   'upcoming':           { label: 'Upcoming',             badgeClass: 'badge-gray' },
   'on-going':           { label: 'On Going',              badgeClass: 'badge-green' },
   'ready-to-close':     { label: 'Ready to Close',       badgeClass: 'badge-orange' },
-  'checking-inventory': { label: 'Checking Inventory',   badgeClass: 'badge-blue' },
+  'checking-inventory': { label: 'Ready for Checking',   badgeClass: 'badge-blue' },
+  'partial-return':     { label: 'Partial Return',       badgeClass: 'badge-orange' },
   'returned-completed': { label: 'Returned & Completed', badgeClass: 'badge-green' },
   'transferred':        { label: 'Transferred',          badgeClass: 'badge-purple' },
 };

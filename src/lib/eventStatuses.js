@@ -84,6 +84,14 @@ export function isAddAllowedStage(statusName) {
   return record?.allowAddItem !== false;
 }
 
+// Ready for checking (2026-11-12): the stage where the event is finished. At it, the main action is
+// "Start Checking" (closing → Ready for Checking) instead of Next. Seed: Finished. When no stage has the
+// flag, the last stage is used (old behaviour). Postphone / Disable come after it and are not pipeline steps.
+export function getClosingStageName() {
+  const list = [...getEventStatuses()].sort((a, b) => a.order - b.order);
+  return (list.find(s => s.closeStage === true) || list[list.length - 1])?.status || '';
+}
+
 // While the event is at this stage, items may be deleted. Missing field counts as true
 // (status lists saved before the flag existed keep the old behaviour).
 export function isDeleteAllowedStage(statusName) {

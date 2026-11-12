@@ -1,5 +1,5 @@
 import { getEventProgress } from './eventProgress';
-import { getEventStageNames } from './eventStatuses';
+import { getClosingStageName } from './eventStatuses';
 import { hasItemsAdded } from './eventItemsFlag';
 
 const KEY = 'emi_event_closing';
@@ -13,6 +13,7 @@ const SEED_CLOSING = {
   '2026-06-10 | HARVEST FESTIVAL BAZAAR': 'checking-inventory',
   '2026-05-12 | DOWNTOWN PRODUCT LAUNCH': 'transferred',
   '2026-04-18 | BEACHSIDE ANNIVERSARY':   'returned-completed',
+  '2026-05-30 | SUMMIT AFTERPARTY':       'partial-return', // 2026-11-12 demo: 3 items not collected yet
 };
 
 // A single event-level status flag, 5 values:
@@ -26,6 +27,8 @@ const SEED_CLOSING = {
 //                          both happen while in this status.
 //  'returned-completed' — terminal. Every item got resolved (Return or Transfer)
 //                          and at least one was actually Returned.
+//  'partial-return'      — (2026-11-12) For Return was confirmed but some items are not back yet; the event
+//                          shows "Return remaining" until everything is back → returned-completed.
 //  'transferred'         — terminal. Every item got resolved and *none* were
 //                          Returned — they all moved out to other events.
 //
@@ -50,7 +53,7 @@ export function getEventClosing(eventName) {
   const raw = readAll()[eventName];
   if (raw === 'ready-for-check' || raw === 'ready-for-return') return 'checking-inventory';
   if (raw === 'returned') return 'returned-completed';
-  if (raw === 'checking-inventory' || raw === 'returned-completed' || raw === 'transferred' || raw === 'on-going') return raw;
+  if (raw === 'checking-inventory' || raw === 'partial-return' || raw === 'returned-completed' || raw === 'transferred' || raw === 'on-going') return raw;
   return SEED_CLOSING[eventName] || 'on-going';
 }
 
@@ -68,8 +71,7 @@ export function isReadyToClose(eventName) {
   if (getEventClosing(eventName) !== 'on-going') return false;
   const savedStage = getEventProgress(eventName);
   if (!savedStage) return false;
-  const stages = getEventStageNames();
-  return stages.length > 0 && savedStage === stages[stages.length - 1];
+  return savedStage === getClosingStageName();
 }
 
 // "Upcoming" and "On Going" are both represented by the single stored 'on-going'

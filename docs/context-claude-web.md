@@ -36,6 +36,14 @@ Newest session first.
 
 ---
 
+## Session 2026-11-12 — Allow Add Item, Cutting Stock (real), Event Settings redesign, closing flow
+
+- Allow Add Item rule; Cutting Stock back with real stock reservation + illustrated notice; Event Settings page redesigned
+  (rule chips, legend, pipeline, grouped switches).
+- Closing flow: Start Checking at Finished → Ready for Checking (Checked + Note per item, nothing can be added) → For Return
+  (stock back as before) → Partial Return when something is still out → Returned & Completed.
+- Spec `docs/prd/PRD-2026-11-12.md`.
+
 ## Session 2026-11-11 — UX pass (head of design / UX)
 
 - Checking and Scan In/Out on Event Detail now appear only once Event Settings says so; scan phase follows the stage.

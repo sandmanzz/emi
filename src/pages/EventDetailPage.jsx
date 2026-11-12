@@ -9,14 +9,15 @@ import { initialAreas, SUB_AREAS } from '../data/areas';
 import { inventoryData, categories } from '../data/inventory';
 import { initialWarehouses } from '../data/warehouses';
 import { wiData } from '../data/warehouseInventory';
-import { getEventStageNames, isScanStage, isCuttingStockStage, isStockReturnStage, isProductionStage, isCheckOwnershipStage, isDeleteAllowedStage, isLoanStage, isOutsourceStage, isCheckItemStage, isAddAllowedStage } from '../lib/eventStatuses';
+import { getEventStageNames, isScanStage, isCuttingStockStage, isStockReturnStage, isProductionStage, isCheckOwnershipStage, isDeleteAllowedStage, isLoanStage, isOutsourceStage, isCheckItemStage, isAddAllowedStage, getClosingStageName } from '../lib/eventStatuses';
 import { getInventoryRows, applyStockMovement } from '../lib/stockOpnameStore';
 import { VENDOR_ORIGINS } from '../lib/vendorStore';
 import { CatalogItemPicker, VendorPicker } from '../components/QuickPickers';
 import { getCatalog, stockInProduced } from '../lib/producedItems';
 import { setItemImageByName } from '../lib/catalogStore';
 import { getEventFiles, saveEventFiles } from '../lib/eventFiles';
-import { getEventStockCuts, isStockLine, previewCut, cutStock, returnStock } from '../lib/eventStockCuts';
+import { getEventStockCuts, isStockLine, previewCut, cutStock, returnStock, returnStockParts } from '../lib/eventStockCuts';
+import { getEventChecking, updateLineChecking } from '../lib/eventChecking';
 import StockMoveNotice from '../components/StockMoveNotice';
 import { imageFileToDataUrl, fileToUpload, fmtBytes } from '../lib/imageUtils';
 import PrintPlanModal from '../components/PrintPlanModal';
@@ -114,7 +115,7 @@ function ownershipBadgeClass(ownership) {
 
 const OWNERSHIP_CYCLE = ['IHC', 'IHP', 'Outsource'];
 
-function ItemCard({ item, group, imageOf = () => null, vis = {}, showScanButton, onScanClick, onDelete, onCycleOwnership, onOpen, onModify, onToggleChecking }) {
+function ItemCard({ item, group, checking = null, imageOf = () => null, vis = {}, showScanButton, onScanClick, onDelete, onCycleOwnership, onOpen, onModify, onToggleChecking }) {
   const scannedNow = vis.scanPhase === 'out' ? !!item.scanOut : !!item.scanIn;
   // The whole card opens the detail drawer; buttons inside stop propagation so
   // they keep doing their own job.
@@ -241,6 +242,22 @@ function ItemCard({ item, group, imageOf = () => null, vis = {}, showScanButton,
           </div>
         )}
         {item.note && <div className="item-note">{item.note}</div>}
+        {checking && (
+          <div className="item-check-box" onClick={e => e.stopPropagation()}>
+            {item.checkNote && <div className="item-check-note">📝 {item.checkNote}</div>}
+            {item.returnedQty > 0 && item.resolution !== 'returned' && <div className="item-check-partial">{fmtNum(item.returnedQty)} back · rest still out</div>}
+            <div className="item-check-actions">
+              {checking.onToggleCheck ? (
+                <button type="button" className={`btn-check${item.checked ? ' on' : ''}`} onClick={() => checking.onToggleCheck(item.id)} aria-pressed={!!item.checked}>
+                  <CheckIcon /> {item.checked ? 'Checked' : 'Mark checked'}
+                </button>
+              ) : (
+                <span className={`btn-check static${item.checked ? ' on' : ''}`}><CheckIcon /> {item.checked ? 'Checked' : 'Not checked'}</span>
+              )}
+              <button type="button" className="btn-note" onClick={() => checking.onNote(item)}>{item.checkNote ? 'Edit note' : 'Note'}</button>
+            </div>
+          </div>
+        )}
         {showScanButton && (
           <div className="item-actions">
             <button className={`btn-ia-scan${scannedNow ? ' scanned' : ''}`} onClick={e => { e.stopPropagation(); onScanClick(item); }}>
@@ -256,7 +273,7 @@ function ItemCard({ item, group, imageOf = () => null, vis = {}, showScanButton,
 
 // List (table) alternative to the card grid. Same callbacks as ItemCard; a missing
 // onModify/onDelete/onCycleOwnership means that action is locked.
-function ItemTable({ items, packages, imageOf = () => null, vis = {}, showScanButton, onScanClick, onDelete, onCycleOwnership, onOpen, onModify, onToggleChecking }) {
+function ItemTable({ items, packages, checking = null, imageOf = () => null, vis = {}, showScanButton, onScanClick, onDelete, onCycleOwnership, onOpen, onModify, onToggleChecking }) {
   const stop = fn => e => { e.stopPropagation(); fn(); };
   return (
     <div className="table-wrap item-table-wrap">
@@ -304,6 +321,7 @@ function ItemTable({ items, packages, imageOf = () => null, vis = {}, showScanBu
                     {item.resolution === 'returned' && <span className="badge badge-green" style={{ fontSize: 10 }}>Returned</span>}
                   </div>
                   {item.note && <div className="item-table-note">{item.note}</div>}
+                  {checking && item.checkNote && <div className="item-table-note">📝 {item.checkNote}</div>}
                 </td>
                 <td>
                   <span className={`area-badge ${areaBadgeClass(item.area)}`}>{item.area}</span>
@@ -333,6 +351,12 @@ function ItemTable({ items, packages, imageOf = () => null, vis = {}, showScanBu
                 {vis.showScanOut && <td className="item-table-scan">{item.scanOut || <span className="item-table-muted">—</span>}</td>}
                 <td className="col-action">
                   <div className="item-table-actions">
+                    {checking && (checking.onToggleCheck ? (
+                      <button type="button" className={`btn-check sm${item.checked ? ' on' : ''}`} onClick={stop(() => checking.onToggleCheck(item.id))}><CheckIcon /> {item.checked ? 'Checked' : 'Check'}</button>
+                    ) : (
+                      <span className={`btn-check sm static${item.checked ? ' on' : ''}`}><CheckIcon /> {item.checked ? 'Checked' : '—'}</span>
+                    ))}
+                    {checking && <button type="button" className="btn-note sm" onClick={stop(() => checking.onNote(item))}>Note</button>}
                     {showScanButton && (
                       <button className={`btn-ia-scan${scannedNow ? ' scanned' : ''}`} style={{ flex: '0 0 auto', padding: '5px 10px' }} onClick={stop(() => onScanClick(item))}>
                         {scannedNow ? 'Re-scan' : vis.scanPhase === 'out' ? 'Scan Out' : 'Scan In'}
@@ -381,9 +405,17 @@ export default function EventDetailPage() {
   // the 26 generic items (see lib/eventItems.js — Event Report reads the same list).
   // Lines already cut / returned are restored from emi_event_stock_cuts, so a reload never cuts twice.
   const savedCuts = getEventStockCuts(eventName);
-  const baseItems = getEventSeedItems(eventName).map(it => savedCuts[it.id]
-    ? { ...it, stockCut: true, stockReturned: !!savedCuts[it.id].returnedAt }
-    : it);
+  const savedChecks = getEventChecking(eventName);
+  const baseItems = getEventSeedItems(eventName)
+    .map(it => savedCuts[it.id]
+      ? { ...it, stockCut: true, stockReturned: !!savedCuts[it.id].returnedAt }
+      : it)
+    // Closing checks (Checked / note / returned qty) survive a reload — lib/eventChecking.js.
+    .map(it => savedChecks[it.id]
+      ? { ...it, checked: !!savedChecks[it.id].checked, checkNote: savedChecks[it.id].note || '', returnedQty: savedChecks[it.id].returnedQty || 0,
+          ...(savedChecks[it.id].returnedAt ? { resolution: 'returned' } : {}) }
+      : it)
+    .filter(it => !savedChecks[it.id]?.transferredTo);
   const baseNextId = Math.max(0, ...baseItems.map(i => i.id)) + 1;
   const [items, setItems] = useState(() => {
     const incoming = getIncomingItems(eventName);
@@ -411,14 +443,12 @@ export default function EventDetailPage() {
   const [reportItemId, setReportItemId] = useState(null);
   const [reportForm, setReportForm] = useState({ qty: 1, note: '' });
   const [closingStatus, setClosingStatus] = useState(() => getEventClosing(eventName));
-  const [crossCheckOpen, setCrossCheckOpen] = useState(false);
   // Bulk Assign Ownership modal
   const [bulkOwnOpen, setBulkOwnOpen] = useState(false);
   const [bulkOwnTarget, setBulkOwnTarget] = useState('IHC');
   const [bulkOwnSelected, setBulkOwnSelected] = useState([]);
   const [bulkOwnQuery, setBulkOwnQuery] = useState('');
   const [bulkOwnFrom, setBulkOwnFrom] = useState('');
-  const [returnTransferOpen, setReturnTransferOpen] = useState(false);
   const [transferPickerItemId, setTransferPickerItemId] = useState(null);
   const [transferTargetEvent, setTransferTargetEvent] = useState('');
   const [transferTargetStage, setTransferTargetStage] = useState('');
@@ -518,7 +548,11 @@ export default function EventDetailPage() {
   const isScannedNow = it => (stageScanPhase === 'out' ? !!it.scanOut : !!it.scanIn);
   const waitingScanItems = useMemo(() => scopedItems.filter(it => !isScannedNow(it)), [scopedItems, stageScanPhase]); // eslint-disable-line react-hooks/exhaustive-deps -- isScannedNow only reads stageScanPhase
   const effectiveStageFilter = (stageFilter === 'waiting' && !stageScanEnabled) ? 'all' : stageFilter;
-  const stageFiltered = effectiveStageFilter === 'added' ? currentStageItems : effectiveStageFilter === 'waiting' ? waitingScanItems : scopedItems;
+  const stageFiltered = effectiveStageFilter === 'added' ? currentStageItems
+    : effectiveStageFilter === 'waiting' ? waitingScanItems
+    : effectiveStageFilter === 'unchecked' ? filtered.filter(it => !it.checked)
+    : effectiveStageFilter === 'checkedTab' ? filtered.filter(it => it.checked)
+    : scopedItems;
 
   const areaCounts = useMemo(() => {
     const map = {};
@@ -536,7 +570,11 @@ export default function EventDetailPage() {
   const unscannedCount = useMemo(() => items.filter(it => !isScannedNow(it)).length, [items, stageScanPhase]); // eslint-disable-line react-hooks/exhaustive-deps -- see waitingScanItems
   const hasNextStage = stageIndex < stages.length - 1;
   // "Ready to Close" is a derived display state, not stored — see eventClosing.js.
-  const readyToClose = closingStatus === 'on-going' && !hasNextStage;
+  // The "finished" stage (Event Settings → Ready for checking; seed: Finished). At it, the main action is
+  // "Start Checking" instead of Next (2026-11-12). Postphone / Disable after it are not pipeline steps.
+  const closingStageName = getClosingStageName();
+  const readyToClose = closingStatus === 'on-going' && (eventStatus === closingStageName || !hasNextStage);
+  const checkingMode = closingStatus === 'checking-inventory' || closingStatus === 'partial-return';
   // Single lifecycle badge shown next to the event title.
   const phaseBadge = CLOSING_LABELS[
     closingStatus !== 'on-going' ? closingStatus
@@ -560,7 +598,8 @@ export default function EventDetailPage() {
   //  - Scan In:  first stage with Scan = "Scan".  Scan Out: the second scan stage.
   const firstCheckIdx = stages.findIndex(isCheckItemStage);
   const itemFieldVisibility = {
-    showChecking: firstCheckIdx >= 0 && maxReachedIndex >= firstCheckIdx,
+    // Hidden again during closing: there the closing "Checked" button replaces it (2026-11-12).
+    showChecking: firstCheckIdx >= 0 && maxReachedIndex >= firstCheckIdx && closingStatus === 'on-going',
     showScanIn: scanStageIdx.length > 0 && maxReachedIndex >= scanStageIdx[0],
     showScanOut: scanStageIdx.length > 1 && maxReachedIndex >= scanStageIdx[1],
     scanPhase: stageScanPhase,
@@ -727,7 +766,8 @@ export default function EventDetailPage() {
   const stockReturnLocked = stockReturnIndex >= 0 && maxReachedIndex >= stockReturnIndex;
   // Allow Add Item = False on the current stage also locks adding (2026-11-12).
   const addNotAllowedHere = !isAddAllowedStage(eventStatus);
-  const addLocked = stockReturnLocked || addNotAllowedHere;
+  // From Ready for Checking on, nothing can be added to the event (2026-11-12).
+  const addLocked = stockReturnLocked || addNotAllowedHere || closingStatus !== 'on-going';
   // From Checking Inventory onward, items can't be modified or deleted.
   const itemsLocked = closingStatus !== 'on-going';
 
@@ -799,6 +839,9 @@ export default function EventDetailPage() {
     setItems(is => is.map(it => (it.id === id ? { ...it, checking: !it.checking } : it)));
   }
   const itemActionProps = {
+    // Closing checks: Checked toggle only while Ready for Checking; notes also in Partial Return.
+    checking: !checkingMode ? null
+      : closingStatus === 'checking-inventory' ? { onToggleCheck: toggleLineChecked, onNote: openNote } : { onNote: openNote },
     vis: itemFieldVisibility,
     imageOf: it => imageByName.get(it.name) || null,
     onToggleChecking: canTickChecking ? toggleChecking : undefined,
@@ -858,13 +901,6 @@ export default function EventDetailPage() {
     navigate(`/event-summary?name=${encodeURIComponent(eventName)}`);
   }
 
-  // Event Logistics Summary — generated going into the Return & Transfer step.
-  // Items never marked "Checked" during Cross Check are flagged as missing.
-  const logisticsSummary = useMemo(() => {
-    const checkedItems = items.filter(it => it.checked);
-    const missingItems = items.filter(it => !it.checked);
-    return { total: items.length, checkedCount: checkedItems.length, missingItems };
-  }, [items]);
 
   // Scan-in at the first scan stage, scan-out at later scan stages (2026-11-11; before, it was simply
   // "first scan = in, second = out", which let Waiting scan out pass without scanning out).
@@ -906,9 +942,6 @@ export default function EventDetailPage() {
     setItems(is => is.filter(i => i.id !== id));
   }
 
-  function toggleItemChecked(id) {
-    setItems(is => is.map(it => it.id === id ? { ...it, checked: !it.checked } : it));
-  }
 
   function cycleItemOwnership(id) {
     setItems(is => is.map(it => {
@@ -974,34 +1007,108 @@ export default function EventDetailPage() {
     setResumeStage(null);
   }
 
-  // --- Closing the event: On Going -> (Ready to Close) -> Checking Inventory
-  // -> Returned & Completed | Transferred ---
-  function handleReadyToClose() {
-    if (!window.confirm(`Close "${eventName}"? This moves it into Checking Inventory.`)) return;
+  // --- Closing flow (2026-11-12) ------------------------------------------------------------------
+  // On Going → (at the finished stage) Start Checking → Ready for Checking: every line gets Checked + Note,
+  // nothing can be added → all checked → For Return: confirm how much of each stock line is back in the
+  // warehouse → everything back = Returned & Completed, something still out = Partial Return
+  // ("Return remaining" later). Rented / outsourced lines go back to their vendors via their own tabs.
+  const [startCheckOpen, setStartCheckOpen] = useState(false);
+  function handleReadyToClose() { setStartCheckOpen(true); }
+  function confirmStartChecking() {
     setEventClosing(eventName, 'checking-inventory');
     setClosingStatus('checking-inventory');
+    setStartCheckOpen(false);
+    setStageFilter('unchecked');
+    addActivityLog({ userName: currentUser?.name || 'Admin', action: 'Update', module: 'Event Detail', description: `"${eventName}" moved to Ready for Checking` });
   }
 
-  // --- Cross Check Items (checking-inventory phase) ---
-  function openCrossCheck() {
-    setCrossCheckOpen(true);
+  // Checked + note per line (persisted).
+  const checkedCount = items.filter(it => it.checked).length;
+  const allChecked = items.length > 0 && checkedCount === items.length;
+  function toggleLineChecked(id) {
+    const line = items.find(it => it.id === id);
+    if (!line) return;
+    const checked = !line.checked;
+    updateLineChecking(eventName, id, { checked, checkedBy: currentUser?.name || 'Admin', checkedAt: new Date().toISOString() });
+    setItems(is => is.map(it => (it.id === id ? { ...it, checked } : it)));
+  }
+  function checkAllLines() {
+    items.filter(it => !it.checked).forEach(it => updateLineChecking(eventName, it.id, { checked: true, checkedBy: currentUser?.name || 'Admin', checkedAt: new Date().toISOString() }));
+    setItems(is => is.map(it => ({ ...it, checked: true })));
+  }
+  const [noteItemId, setNoteItemId] = useState(null);
+  const [noteDraft, setNoteDraft] = useState('');
+  const noteItem = noteItemId != null ? items.find(it => it.id === noteItemId) : null;
+  function openNote(item) { setNoteItemId(item.id); setNoteDraft(item.checkNote || ''); }
+  function saveNote() {
+    const note = noteDraft.trim();
+    updateLineChecking(eventName, noteItemId, { note });
+    setItems(is => is.map(it => (it.id === noteItemId ? { ...it, checkNote: note } : it)));
+    setNoteItemId(null);
   }
 
-  // --- Return Item & Transfer (checking-inventory's primary action) ---
+  // Outstanding = pieces of a stock line that are not back in the warehouse yet.
+  function lineOutstanding(it) {
+    if (!isStockLine(it) || it.resolution === 'returned') return 0;
+    const cut = getEventStockCuts(eventName)[it.id];
+    if (cut?.returnedAt && !it.returnedQty) return 0; // already returned at a Stock Return stage
+    const base = cut ? cut.qty : it.qty;
+    return Math.max(0, base - (it.brokenWrittenOff || 0) - (it.returnedQty || 0));
+  }
+  const stockLines = items.filter(isStockLine);
+  const outstandingLines = stockLines.filter(it => lineOutstanding(it) > 0);
+  const outstandingQty = outstandingLines.reduce((sum, it) => sum + lineOutstanding(it), 0);
+
+  // For Return modal
+  const [returnOpen, setReturnOpen] = useState(false);
+  const [returnDraft, setReturnDraft] = useState({}); // { [lineId]: qty string }
   function openReturnTransfer() {
+    setReturnDraft(Object.fromEntries(outstandingLines.map(it => [it.id, String(lineOutstanding(it))])));
     setTransferPickerItemId(null);
     setTransferTargetEvent('');
     setTransferTargetStage('');
-    setReturnTransferOpen(true);
+    setReturnOpen(true);
   }
-
   function closeReturnTransfer() {
-    setReturnTransferOpen(false);
+    setReturnOpen(false);
     setTransferPickerItemId(null);
   }
+  const returnRows = outstandingLines.map(it => {
+    const out = lineOutstanding(it);
+    const now = Math.max(0, Math.min(out, Math.floor(Number(returnDraft[it.id]) || 0)));
+    const cut = getEventStockCuts(eventName)[it.id];
+    return { it, out, now, cut, warehouse: cut?.warehouse || it.warehouse || '—' };
+  });
+  const returnNowQty = returnRows.reduce((sum, r) => sum + r.now, 0);
+  const returnLeftQty = returnRows.reduce((sum, r) => sum + (r.out - r.now), 0);
+  const returnStockQty = returnRows.filter(r => r.cut).reduce((sum, r) => sum + r.now, 0);
 
-  function resolveItemReturn(id) {
-    setItems(is => is.map(it => it.id === id ? { ...it, resolution: 'returned' } : it));
+  function confirmForReturn() {
+    const by = currentUser?.name || 'Admin';
+    const nowIso = new Date().toISOString();
+    returnStockParts(eventName, returnRows.filter(r => r.cut && r.now > 0).map(r => ({ line: r.it, qty: r.now })), { stage: 'For Return', by });
+    const updated = new Map();
+    returnRows.forEach(r => {
+      if (r.now <= 0) return;
+      const returnedQty = (r.it.returnedQty || 0) + r.now;
+      const complete = r.now >= r.out;
+      updateLineChecking(eventName, r.it.id, { returnedQty, ...(complete ? { returnedAt: nowIso } : {}) });
+      updated.set(r.it.id, { returnedQty, complete });
+    });
+    setItems(is => is.map(it => {
+      const u = updated.get(it.id);
+      if (!u) return it;
+      return { ...it, returnedQty: u.returnedQty, ...(u.complete ? { resolution: 'returned', stockReturned: it.stockCut ? true : it.stockReturned } : {}) };
+    }));
+    const finalStatus = returnLeftQty > 0 ? 'partial-return'
+      : items.some(it => it.resolution === 'returned') || updated.size > 0 || stockLines.length === 0 ? 'returned-completed' : 'transferred';
+    setEventClosing(eventName, finalStatus);
+    setClosingStatus(finalStatus);
+    addActivityLog({
+      userName: by, action: 'Return', module: 'Event Detail',
+      description: `For Return on "${eventName}": ${returnNowQty} pcs back${returnLeftQty ? `, ${returnLeftQty} pcs still out (Partial Return)` : ''}`,
+    });
+    closeReturnTransfer();
   }
 
   function openTransferPicker(item) {
@@ -1014,37 +1121,23 @@ export default function EventDetailPage() {
     setTransferPickerItemId(null);
   }
 
+  // Transfer a whole line to another on-going event instead of returning it (kept from the old flow).
   function confirmTransferItem() {
     const item = items.find(it => it.id === transferPickerItemId);
     if (!item || !transferTargetEvent || !transferTargetStage) return;
     const target = transferTargetCandidates.find(e => e.key === transferTargetEvent);
     queueMovedItem(transferTargetEvent, {
       name: item.name, area: item.area, subArea: item.subArea,
-      stage: transferTargetStage, qty: item.qty, pic: item.pic,
+      stage: transferTargetStage, qty: lineOutstanding(item) || item.qty, pic: item.pic,
       ownership: item.ownership, note: item.note,
     });
+    updateLineChecking(eventName, item.id, { transferredTo: transferTargetEvent });
     setItems(is => is.filter(it => it.id !== item.id));
     addActivityLog({
       userName: currentUser?.name || 'Admin', action: 'Transfer', module: 'Event Detail',
       description: `Transferred "${item.name}" from ${eventName} to ${target?.name || transferTargetEvent} (${transferTargetStage})`,
     });
     setTransferPickerItemId(null);
-  }
-
-  const unresolvedItems = useMemo(() => items.filter(it => !it.resolution), [items]);
-
-  function finalizeReturnTransfer() {
-    if (unresolvedItems.length > 0) return;
-    const hasAnyReturned = items.some(it => it.resolution === 'returned');
-    const finalStatus = hasAnyReturned ? 'returned-completed' : 'transferred';
-    setEventClosing(eventName, finalStatus);
-    setClosingStatus(finalStatus);
-    addActivityLog({
-      userName: currentUser?.name || 'Admin', action: finalStatus === 'transferred' ? 'Transfer' : 'Return',
-      module: 'Event Detail',
-      description: `"${eventName}" finalized as ${CLOSING_LABELS[finalStatus].label}`,
-    });
-    closeReturnTransfer();
   }
 
   // --- Item detail drawer & Modify ---
@@ -1450,12 +1543,6 @@ export default function EventDetailPage() {
               </button>
               {moreMenuOpen && (
                 <div className="more-menu-dropdown">
-                  {closingStatus === 'checking-inventory' && (
-                    <button className="more-menu-item" onClick={() => { openCrossCheck(); setMoreMenuOpen(false); }}>
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-                      Cross Check Items
-                    </button>
-                  )}
                   <button className="more-menu-item" onClick={() => { openPackagingModal(); setMoreMenuOpen(false); }}>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
                     Group Items
@@ -1503,13 +1590,20 @@ export default function EventDetailPage() {
           )}
           {readyToClose && (
             <button type="button" className="btn-next-stage" onClick={handleReadyToClose}>
-              Close &amp; Start Checking
+              Start Checking
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
             </button>
           )}
           {closingStatus === 'checking-inventory' && (
+            <button type="button" className={`btn-next-stage${allChecked ? ' ready' : ''}`} onClick={openReturnTransfer} disabled={!allChecked}
+              title={allChecked ? 'Put the stock back' : `Check every item first (${checkedCount}/${items.length})`}>
+              {allChecked ? 'For Return' : `For Return · ${checkedCount}/${items.length} checked`}
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+          )}
+          {closingStatus === 'partial-return' && (
             <button type="button" className="btn-next-stage" onClick={openReturnTransfer}>
-              Ready for Return
+              Return remaining ({fmtNum(outstandingQty)} pcs)
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
             </button>
           )}
@@ -1524,7 +1618,32 @@ export default function EventDetailPage() {
             lines={items.filter(it => isStockLine(it) && it.stockCut && !it.stockReturned).length}
             qty={items.filter(it => isStockLine(it) && it.stockCut && !it.stockReturned).reduce((sum, it) => sum + it.qty, 0)} onDetails={handleNextClick} />
         )}
-        {(addLocked || itemsLocked) && (
+        {checkingMode && (
+          <div className={`check-progress${closingStatus === 'partial-return' ? ' partial' : ''}`}>
+            {closingStatus === 'checking-inventory' ? (
+              <>
+                <div className="check-progress-head">
+                  <strong>Ready for Checking</strong>
+                  <span>{fmtNum(checkedCount)} of {fmtNum(items.length)} items checked</span>
+                  {!allChecked && <button type="button" className="link-btn" onClick={() => { if (window.confirm('Mark every item as Checked?')) checkAllLines(); }}>Check all</button>}
+                </div>
+                <div className="check-progress-bar"><i style={{ width: `${items.length ? (checkedCount / items.length) * 100 : 0}%` }} /></div>
+                <p>{allChecked
+                  ? 'Every item is checked. Click "For Return" to put the stock back.'
+                  : 'Mark each item Checked and add a note for anything damaged, missing or still at the venue. Nothing can be added to this event any more.'}</p>
+              </>
+            ) : (
+              <>
+                <div className="check-progress-head">
+                  <strong>Partial Return</strong>
+                  <span>{fmtNum(outstandingQty)} pcs of {fmtNum(outstandingLines.length)} items still out</span>
+                </div>
+                <p>Some items were not collected yet. When they are back, click &ldquo;Return remaining&rdquo;.</p>
+              </>
+            )}
+          </div>
+        )}
+        {!checkingMode && (addLocked || itemsLocked) && (
           <div className="ed-lock-note">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
             {itemsLocked
@@ -1590,6 +1709,16 @@ export default function EventDetailPage() {
             <button type="button" className={`stage-tab${effectiveStageFilter === 'waiting' ? ' active' : ''}`} onClick={() => setStageFilter('waiting')}>
               Waiting Scan <span className="stage-tab-count">{waitingScanItems.length}</span>
             </button>
+          )}
+          {checkingMode && (
+            <>
+              <button type="button" className={`stage-tab${effectiveStageFilter === 'unchecked' ? ' active' : ''}`} onClick={() => setStageFilter('unchecked')}>
+                Not checked <span className="stage-tab-count">{items.length - checkedCount}</span>
+              </button>
+              <button type="button" className={`stage-tab${effectiveStageFilter === 'checkedTab' ? ' active' : ''}`} onClick={() => setStageFilter('checkedTab')}>
+                Checked <span className="stage-tab-count">{checkedCount}</span>
+              </button>
+            </>
           )}
           <button type="button" className={`stage-tab${effectiveStageFilter === 'grouped' ? ' active' : ''}`} onClick={() => setStageFilter('grouped')}>
             Grouped <span className="stage-tab-count">{packages.length}</span>
@@ -2077,7 +2206,9 @@ export default function EventDetailPage() {
             ['Source', detailItem.fromOutsource ? `Outsourced to ${detailItem.loanVendor || 'outsource vendor'}` : detailItem.fromLoan ? `Rented from ${detailItem.loanVendor || 'rent vendor'}` : detailItem.fromConvert ? 'Convert request' : detailItem.fromProduction ? 'Production request' : detailItem.warehouseItem ? 'Warehouse inventory' : 'Non-warehouse item'],
             ['Group', group ? group.name : '—'],
             ...(itemFieldVisibility.showChecking ? [['Checking', detailItem.checking ? 'Yes' : 'No']] : []),
-            ['Cross-checked', detailItem.checked ? 'Yes' : 'No'],
+            ['Checked (closing)', detailItem.checked ? 'Yes' : 'No'],
+            ...(detailItem.checkNote ? [['Check note', detailItem.checkNote]] : []),
+            ...(detailItem.returnedQty ? [['Returned', `${detailItem.returnedQty} pcs`]] : []),
             ...(itemFieldVisibility.showScanIn ? [['Scan In', detailItem.scanIn || 'Not yet']] : []),
             ...(itemFieldVisibility.showScanOut ? [['Scan Out', detailItem.scanOut || 'Not yet']] : []),
           ];
@@ -2776,116 +2907,134 @@ export default function EventDetailPage() {
         }
       </Modal>
 
+      {/* Start Checking — at the finished stage (2026-11-12) */}
       <Modal
-        open={crossCheckOpen}
-        title="Cross Check Items"
-        onClose={() => setCrossCheckOpen(false)}
-        size="lg"
-        footer={
-          <button className="btn-save-modal" onClick={() => setCrossCheckOpen(false)}><IconCheck /> Done</button>
-        }
-      >
-        <p className="confirm-msg" style={{ marginBottom: 14 }}>
-          <strong>{logisticsSummary.checkedCount}</strong> of <strong>{logisticsSummary.total}</strong> items checked so far. Click a row to toggle it.
-        </p>
-        {items.length === 0
-          ? <div className="no-data">No items on this event.</div>
-          : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 420, overflowY: 'auto' }}>
-              {items.map(it => (
-                <div
-                  key={it.id}
-                  className="indicator-row indicator-row-clickable"
-                  style={{ padding: '8px 10px', border: '1px solid var(--border-2)', borderRadius: 'var(--r)' }}
-                  onClick={() => toggleItemChecked(it.id)}
-                >
-                  <span className={`indicator-box${it.checked ? ' checked' : ''}`}>
-                    {it.checked && <CheckIcon />}
-                  </span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text)' }}>{it.name}</div>
-                    <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{it.area} · Qty: {fmtNum(it.qty)}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )
-        }
-      </Modal>
-
-      <Modal
-        open={returnTransferOpen}
-        title="Return Item & Transfer"
-        onClose={closeReturnTransfer}
-        size="lg"
+        open={startCheckOpen}
+        title="Start checking this event?"
+        onClose={() => setStartCheckOpen(false)}
         footer={
           <>
-            <button className="btn-cancel-modal" onClick={closeReturnTransfer}><IconClose /> Close</button>
-            <button className="btn-save-modal" disabled={unresolvedItems.length > 0} onClick={finalizeReturnTransfer}>
-              <IconCheck /> Finalize ({items.length - unresolvedItems.length}/{items.length})
+            <button className="btn-cancel-modal" onClick={() => setStartCheckOpen(false)}><IconClose /> Cancel</button>
+            <button className="btn-save-modal" onClick={confirmStartChecking}><IconCheck /> Start Checking</button>
+          </>
+        }
+      >
+        <div className="close-flow">
+          {[
+            ['1', 'Ready for Checking', 'Mark every item Checked. Add a note for anything damaged, missing or still at the venue.', true],
+            ['2', 'For Return', 'When all items are checked, confirm how much is back in the warehouse. The stock goes back to what it was.', false],
+            ['3', 'Returned & Completed', 'Everything back. If some items are not collected yet, the event becomes Partial Return until they are.', false],
+          ].map(([n, t, d, active]) => (
+            <div key={n} className={`close-flow-step${active ? ' active' : ''}`}><span>{n}</span><div><strong>{t}</strong><p>{d}</p></div></div>
+          ))}
+        </div>
+        <p className="confirm-msg" style={{ marginTop: 12 }}>
+          <strong>After this, nothing can be added to this event</strong> (no Add Item, Rent, Outsource or Production), and items can no
+          longer be modified or deleted.
+        </p>
+      </Modal>
+
+      {/* Note on an item during checking */}
+      <Modal
+        open={!!noteItem}
+        title={noteItem ? `Note — ${noteItem.name}` : 'Note'}
+        onClose={() => setNoteItemId(null)}
+        footer={
+          <>
+            <button className="btn-cancel-modal" onClick={() => setNoteItemId(null)}><IconClose /> Cancel</button>
+            <button className="btn-save-modal" onClick={saveNote}><IconCheck /> Save note</button>
+          </>
+        }
+      >
+        <div className="form-group">
+          <label>What should others know about this item?</label>
+          <textarea rows={4} autoFocus placeholder="e.g. 2 chairs scratched · 1 box still at the venue, pick up Monday" value={noteDraft} onChange={e => setNoteDraft(e.target.value)} />
+          <p className="field-hint">Shown on the item card, in the item drawer and in the For Return list.</p>
+        </div>
+      </Modal>
+
+      {/* For Return — put the stock back (2026-11-12) */}
+      <Modal
+        open={returnOpen}
+        size="lg"
+        title={closingStatus === 'partial-return' ? 'Return remaining items' : 'For Return — put the stock back'}
+        onClose={closeReturnTransfer}
+        footer={
+          <>
+            <button className="btn-cancel-modal" onClick={closeReturnTransfer}><IconClose /> Cancel</button>
+            <button className="btn btn-ghost" onClick={() => setReturnDraft(Object.fromEntries(returnRows.map(r => [r.it.id, String(r.out)])))}>Everything is back</button>
+            <button className="btn-save-modal" disabled={returnRows.length > 0 && returnNowQty === 0} onClick={confirmForReturn}>
+              <IconCheck /> {returnLeftQty > 0 ? `Confirm partial return` : 'Confirm return'}
             </button>
           </>
         }
       >
-        <p className="confirm-msg" style={{ marginBottom: 14 }}>
-          <strong>Event Logistics Summary</strong> — <strong>{logisticsSummary.checkedCount}</strong> of <strong>{logisticsSummary.total}</strong> items were checked during Cross Check.
-          {logisticsSummary.missingItems.length > 0
-            ? <> <strong style={{ color: 'var(--red)' }}>{logisticsSummary.missingItems.length} item{logisticsSummary.missingItems.length === 1 ? '' : 's'}</strong> never got checked.</>
-            : ' Every item was checked.'
-          }
-        </p>
-        <p style={{ fontSize: 12.5, color: 'var(--text-muted)', marginBottom: 14 }}>
-          Resolve every item below — either <strong>Return</strong> it, or <strong>Transfer</strong> it to another
-          on-going event — before this event can be finalized.
-        </p>
-        {items.length === 0
-          ? <div className="no-data">No items left on this event — finalizing will mark it Transferred.</div>
+        {returnStockQty > 0 ? (
+          <StockMoveNotice
+            mode="return"
+            stages={['For Return']}
+            lines={returnRows.filter(r => r.cut && r.now > 0).length}
+            qty={returnStockQty}
+            byWarehouse={[...returnRows.filter(r => r.cut && r.now > 0).reduce((m, r) => m.set(r.warehouse, (m.get(r.warehouse) || 0) + r.now), new Map())].map(([name, qty]) => ({ name, qty }))}
+          />
+        ) : (
+          <p className="confirm-msg">
+            {returnRows.some(r => r.cut)
+              ? 'Enter how much of each item is back.'
+              : 'Stock was not cut for this event (no Cutting Stock stage was reached), so warehouse numbers don’t change. Confirm what is physically back.'}
+          </p>
+        )}
+        {returnLeftQty > 0 && (
+          <div className="return-partial-warn">
+            <strong>{fmtNum(returnLeftQty)} pcs are not back yet.</strong> The event becomes <b>Partial Return</b>; use
+            &ldquo;Return remaining&rdquo; when they arrive.
+          </div>
+        )}
+        {returnRows.length === 0
+          ? <div className="no-data">Nothing is outstanding.</div>
           : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 420, overflowY: 'auto' }}>
-              {items.map(it => (
-                <div key={it.id} style={{ border: '1px solid var(--border-2)', borderRadius: 'var(--r-lg)', padding: '10px 12px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
-                    <div>
-                      <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text)' }}>{it.name}</div>
-                      <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{it.area} · Qty: {fmtNum(it.qty)}</div>
-                    </div>
-                    {it.resolution === 'returned' ? (
-                      <span className="badge badge-green" style={{ fontSize: 10, flexShrink: 0 }}>Returned</span>
-                    ) : transferPickerItemId !== it.id && (
-                      <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                        <button className="btn-ia-scan" style={{ flex: 'none', padding: '6px 12px' }} onClick={() => resolveItemReturn(it.id)}>Return</button>
-                        <button className="btn-ia-move" style={{ flex: 'none', padding: '6px 12px' }} onClick={() => openTransferPicker(it)}>Transfer</button>
-                      </div>
-                    )}
-                  </div>
-                  {transferPickerItemId === it.id && (
-                    <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      <SearchableSelect
-                        value={transferTargetEvent}
-                        onChange={setTransferTargetEvent}
-                        placeholder="Select an on-going event"
-                        emptyText="No other on-going events"
-                        options={transferTargetCandidates.map(e => ({ value: e.key, label: `${e.name} (${e.code})` }))}
-                      />
-                      <SearchableSelect
-                        value={transferTargetStage}
-                        onChange={setTransferTargetStage}
-                        placeholder="Select event status stage"
-                        options={stages.map(s => ({ value: s, label: s }))}
-                      />
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <button className="btn-save-modal" disabled={!transferTargetEvent || !transferTargetStage} onClick={confirmTransferItem}>
-                          <IconCheck /> Confirm Transfer
-                        </button>
-                        <button className="btn-cancel-m" onClick={cancelTransferPicker}>Cancel</button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
+            <div className="table-wrap" style={{ maxHeight: 340, overflowY: 'auto' }}>
+              <table className="return-table">
+                <thead>
+                  <tr><th>Item</th><th>Warehouse</th><th style={{ textAlign: 'right' }}>Out</th><th style={{ width: 120 }}>Back now</th><th style={{ width: 80 }} /></tr>
+                </thead>
+                <tbody>
+                  {returnRows.map(r => (
+                    <tr key={r.it.id}>
+                      <td>
+                        <div style={{ fontWeight: 600 }}>{r.it.name}</div>
+                        <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{r.it.area}{r.it.brokenWrittenOff ? ` · ${r.it.brokenWrittenOff} broken written off` : ''}</div>
+                        {r.it.checkNote && <div className="return-note">{r.it.checkNote}</div>}
+                        {transferPickerItemId === r.it.id && (
+                          <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            <SearchableSelect value={transferTargetEvent} onChange={setTransferTargetEvent} placeholder="Select an on-going event" emptyText="No other on-going events"
+                              options={transferTargetCandidates.map(e => ({ value: e.key, label: `${e.name} (${e.code})` }))} />
+                            <SearchableSelect value={transferTargetStage} onChange={setTransferTargetStage} placeholder="Select event status stage"
+                              options={stages.map(st => ({ value: st, label: st }))} />
+                            <div style={{ display: 'flex', gap: 8 }}>
+                              <button className="btn-save-modal" disabled={!transferTargetEvent || !transferTargetStage} onClick={confirmTransferItem}><IconCheck /> Confirm Transfer</button>
+                              <button className="btn-cancel-m" onClick={cancelTransferPicker}>Cancel</button>
+                            </div>
+                          </div>
+                        )}
+                      </td>
+                      <td style={{ fontSize: 12.5 }}>{r.warehouse}{!r.cut && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>stock not cut</div>}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 700 }}>{fmtNum(r.out)}</td>
+                      <td>
+                        <input type="number" min="0" max={r.out} className="return-qty" value={returnDraft[r.it.id] ?? ''}
+                          onChange={e => setReturnDraft(d => ({ ...d, [r.it.id]: e.target.value }))} />
+                        {r.now < r.out && <div style={{ fontSize: 11, color: 'var(--orange)', marginTop: 2 }}>{fmtNum(r.out - r.now)} still out</div>}
+                      </td>
+                      <td>{transferPickerItemId !== r.it.id && <button type="button" className="link-btn" style={{ fontSize: 12 }} onClick={() => openTransferPicker(r.it)}>Transfer</button>}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          )
-        }
+          )}
+        {items.some(it => !isStockLine(it)) && (
+          <p className="field-hint" style={{ marginTop: 10 }}>Rented and outsourced items are not part of this: they go back to their vendors from the Rented / Outsourced tabs.</p>
+        )}
       </Modal>
     </>
   );

@@ -365,7 +365,7 @@ export default function EventPage() {
   }
 
   // Raw buckets — one per status the event's own flag can show, mirroring the
-  // status flag 1:1 (Upcoming / On Going / Ready to Close / Checking Inventory /
+  // status flag 1:1 (Upcoming / On Going / Ready to Close / Ready for Checking / Partial Return /
   // Returned & Completed / Transferred) so the tab bar matches it exactly. Not
   // query-filtered, since tab badge counts should stay stable while typing in
   // the search box — only the rendered list below is.
@@ -400,6 +400,11 @@ export default function EventPage() {
   const readyToCloseEvents = useMemo(() =>
     applySearch(rawReadyToClose, tabQuery).sort((a, b) => (a.start || '').localeCompare(b.start || '')),
   [rawReadyToClose, tabQuery]);
+  // Partial Return (2026-11-12): For Return was done but some items are not back yet.
+  const rawPartial = useMemo(() => filteredEvents.filter(e => closingOf(e) === 'partial-return'), [filteredEvents]);
+  const partialEvents = useMemo(() =>
+    applySearch(rawPartial, tabQuery).sort((a, b) => (b.start || '').localeCompare(a.start || '')),
+  [rawPartial, tabQuery]);
   const checkingEvents = useMemo(() =>
     applySearch(rawChecking, tabQuery).sort((a, b) => (b.start || '').localeCompare(a.start || '')),
   [rawChecking, tabQuery]);
@@ -472,6 +477,7 @@ export default function EventPage() {
     { id:'on-going',       label:CLOSING_LABELS['on-going'].label,           count:rawOnGoing.length },
     { id:'ready-to-close', label:CLOSING_LABELS['ready-to-close'].label,     count:rawReadyToClose.length },
     { id:'checking',       label:CLOSING_LABELS['checking-inventory'].label, count:rawChecking.length },
+    { id:'partial',        label:CLOSING_LABELS['partial-return'].label,     count:rawPartial.length },
     { id:'returned',       label:CLOSING_LABELS['returned-completed'].label, count:rawReturned.length },
     { id:'transferred',    label:CLOSING_LABELS['transferred'].label,        count:rawTransferred.length },
     { id:'invite',         label:'Invite User',                              count:null },
@@ -539,7 +545,7 @@ export default function EventPage() {
         {[
           { label:'Total Events',       value:events.length,      color:'var(--brand)',      bg:'var(--brand-bg)' },
           { label:'Active',             value:totalActive,        color:'var(--green)',      bg:'var(--green-bg)' },
-          { label:'Checking Inventory', value:rawChecking.length, color:'var(--orange)',     bg:'var(--orange-bg)' },
+          { label:'Ready for Checking', value:rawChecking.length + rawPartial.length, color:'var(--orange)',     bg:'var(--orange-bg)' },
           { label:'Completed',          value:totalCompleted,     color:'var(--text-muted)', bg:'var(--bg)' },
         ].map(s => (
           <div key={s.label} style={{
@@ -663,8 +669,16 @@ export default function EventPage() {
       {activeTab === 'checking' && (
         <div>
           {searchBar('Search events in checking…')}
-          {hint('Closed events whose items are being cross-checked, then returned or transferred item by item.')}
-          {rowList(checkingEvents, 'No events currently in Checking Inventory.', 'checking-inventory')}
+          {hint('Finished events. The crew marks every item Checked (with a note if needed); then "For Return" puts the stock back. No items can be added.')}
+          {rowList(checkingEvents, 'No events are ready for checking.', 'checking-inventory')}
+        </div>
+      )}
+
+      {activeTab === 'partial' && (
+        <div>
+          {searchBar('Search partially returned events…')}
+          {hint('"For Return" was done, but some items are not back in the warehouse yet. Open the event and use "Return remaining".')}
+          {rowList(partialEvents, 'No events with a partial return.', 'partial-return')}
         </div>
       )}
 

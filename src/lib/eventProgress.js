@@ -1,5 +1,5 @@
 import { eiData } from '../data/eventInventory';
-import { getEventStageNames } from './eventStatuses';
+import { getEventStageNames, getClosingStageName } from './eventStatuses';
 
 const KEY = 'emi_event_progress'; // { [eventName]: statusName }
 
@@ -33,10 +33,9 @@ export function getEventProgress(eventName) {
   const saved = readAll()[eventName];
   if (saved) return saved;
   if (SEED_STAGE[eventName]) return SEED_STAGE[eventName];
-  if (SEED_AT_LAST_STAGE.includes(eventName)) {
-    const stages = getEventStageNames();
-    return stages[stages.length - 1] || null;
-  }
+  // Seeded at the "finished" stage (Event Settings → Ready for checking; else the last stage), so the
+  // demo shows "Start Checking" / Ready to Close.
+  if (SEED_AT_LAST_STAGE.includes(eventName)) return getClosingStageName() || null;
   return null;
 }
 
