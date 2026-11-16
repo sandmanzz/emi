@@ -13,6 +13,7 @@ import { getCatalog, stockInProduced } from '../lib/producedItems';
 import { addActivityLog } from '../lib/activityLogStore';
 import { getCurrentTenantUser } from '../lib/tenantAuth';
 import { fmtNum } from '../lib/format';
+import { advanceEventProduction } from '../lib/eventRecordActions';
 
 const PAGE_SIZE = 10;
 const EMPTY_FORM = { itemMode: 'existing', name: '', newName: '', qty: 1, warehouse: '', vendorOrigin: 'Internal', vendorId: '', note: '' };
@@ -114,6 +115,16 @@ export default function ProductionLogTab({ warehouseNames, onStockChanged }) {
     log('Update', `Production "${rec.name}" → ${nextStatus}`);
   }
 
+  // Event productions use the same action as Event Detail (lib/eventRecordActions.js), so both stay in sync.
+  function advanceEvent(rec) {
+    const next = PRODUCTION_STATUSES[PRODUCTION_STATUSES.indexOf(rec.status) + 1];
+    if (!next) return;
+    if (next === 'Done' && !window.confirm(`Mark "${rec.name}" as done? ${rec.qty} go into ${rec.warehouse} (our asset) and the item is added to ${rec.eventName}.`)) return;
+    advanceEventProduction(rec, currentUser?.name || 'Admin');
+    if (next === 'Done') onStockChanged?.();
+    setList(getAllProductions());
+  }
+
   function cancel(rec) {
     if (!window.confirm(`Cancel the production record for "${rec.name}"?`)) return;
     writeManual(rs => rs.filter(r => r.id !== rec.id));
@@ -210,9 +221,12 @@ export default function ProductionLogTab({ warehouseNames, onStockChanged }) {
                       <td style={{ color: 'var(--text-muted)', fontSize: '12.5px', whiteSpace: 'nowrap' }}>{p.finishedAt || '—'}</td>
                       <td>
                         <div className="action-btns" style={{ justifyContent: 'center', gap: 6 }}>
-                          {p.source === 'event' && (
-                            <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{p.status === 'Done' ? 'Done' : 'Update in Event Detail'}</span>
+                          {p.source === 'event' && nextStatus && (
+                            <button type="button" className="btn-save-modal" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => advanceEvent(p)}>
+                              {nextStatus === 'In Production' ? 'Start' : 'Mark Done'}
+                            </button>
                           )}
+                          {p.source === 'event' && !nextStatus && <span style={{ fontSize: 11.5, color: 'var(--green)' }}>Done · in stock</span>}
                           {p.source === 'manual' && p.status === 'Requested' && (
                             <button type="button" className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => cancel(p)}>Cancel</button>
                           )}

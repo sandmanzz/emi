@@ -126,6 +126,13 @@ whose status is still `on-going`.
 
 ---
 
+## R44 (2026-11-16) — shared actions
+
+Rent / outsource / production state changes must be one endpoint used by both the event screen and the menus
+(`POST /rentals/{id}/receive|return|cancel`, `POST /productions/{id}/start|done`); receive / done creates the event line
+server-side (with `source`, `vendor`). Transfers store `transferredFrom` on the target line. Item photos are edited only via
+`/items/{id}` (no photo endpoint on event lines).
+
 ## R43 (2026-11-12) — partial transfer, draft items
 
 - `POST /events/{id}/items/{lineId}/transfer {targetEventId, stage, qty}` (qty ≤ outstanding): creates the target line, returns

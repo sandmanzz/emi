@@ -899,6 +899,19 @@ clashes or seems off) — proceeding with the stated assumption unless corrected
 
 ## Raw instruction log
 
+### 2026-11-16 — Return form fixes, transferred info, no photo change in Event Detail, menus in sync (Claude Web)
+> 1. untuk return form, bagian event name masih terpotong jadi harus diperbaiki
+> 2. kemudian pastikan ketika barang ditransfer harus ada informasi transfered
+> 3. kemudian di barang detail di event detail itu harusnya image tidak boleh diganti disitu.
+> 4. selain itu antara outsource, rent, production harus sync dengan data yang ada di main navbar
+
+- Transfer box moved to its own full-width row (event name no longer cut off).
+- Transferred info: on the return row ("↗ 5 transferred → <event> (<stage>)"), a "Transferred from this event" list in the
+  popup, the "Transferred N" badge/tab, and on the receiving event a **Transferred in** badge + drawer row.
+- **Decision (reverses 2026-11-11):** the item photo can't be changed from Event Detail any more; it is master data (Inventory).
+- Rent / Outsource / Production menus can now move event records too (same stores and same rules as Event Detail):
+  `lib/eventRecordActions.js`. Spec: `docs/prd/PRD-2026-11-16.md`.
+
 ### 2026-11-12 (5) — Transfer with qty + target stage, Transferred tab; create items from Add Item + Inventory reminder (Claude Web)
 > for return anda perlu memberikan info state apa yang terakhir lagi aktif. kemudian untuk memindahkan harus ada informasi di chip all dll harus ada yang transferred juga. kemudian jumlah transfer ada butuh qty nya artinya bisa partial transfer.
 > oke untuk topik lain pada saat mengisi barang ke event ada permintaan dari user bisa tidak membuat data barang disana, saya pikir kita bisa lakukan tapi memang harus membuat pengingat di menu barang untuk barang barang yang belum lengkap datanya.

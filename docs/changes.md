@@ -50,6 +50,15 @@ explains a few non-obvious conventions that the entries below assume you already
 
 ---
 
+## Round 44 — Return form layout, transferred info, no photo change on Event Detail, menus in sync (2026-11-16)
+
+`EventDetailPage.jsx`: transfer box as full-width row (`Fragment` rows), transferred lines/log, `transferredFrom` on queued
+lines + "Transferred in" badge, drawer photo upload removed, incoming merge keeps origin flags. New `lib/eventRecordActions.js`;
+`LoanLogTab.jsx` / `ProductionLogTab.jsx` act on event records. CSS `.transfer-box`, `.return-transferred`, `.return-transfer-log`.
+Spec `docs/prd/PRD-2026-11-16.md`. Lint 11, build OK.
+
+---
+
 ## Round 43 — Transfer with qty + target stage + Transferred tab; quick-create item from Add Item; Inventory incomplete reminder (2026-11-12)
 
 `EventDetailPage.jsx`: return context bar, `chooseTransferEvent`, `transferQty`, partial `confirmTransferItem` (returns cut pcs,

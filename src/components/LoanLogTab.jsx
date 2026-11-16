@@ -8,6 +8,7 @@ import { initialWarehouses } from '../data/warehouses';
 import { addActivityLog } from '../lib/activityLogStore';
 import { getCurrentTenantUser } from '../lib/tenantAuth';
 import { BorrowItemModal } from './EventLoans';
+import { advanceEventRental, cancelEventRental, eventAcceptsChanges } from '../lib/eventRecordActions';
 import { formatIDR } from '../lib/superAdminUtils';
 import { TODAY } from '../data/events';
 import { fmtNum } from '../lib/format';
@@ -55,6 +56,21 @@ export default function LoanLogTab({ kind = 'loan', vendorId = null, allowCreate
       requestedAt: new Date().toLocaleDateString('en-CA'), borrowedAt: null, returnedAt: null }, ...list]);
     log(`New ${t.record}: ${data.qty} ${data.unit} "${data.itemName}" from ${data.vendorName}, kept in ${data.warehouse}`);
     setNewOpen(false);
+  }
+  // Event records are moved with the same actions as Event Detail (lib/eventRecordActions.js) — one source of truth.
+  function advanceEvent(l) {
+    const next = LOAN_STATUSES[LOAN_STATUSES.indexOf(l.status) + 1];
+    if (!next) return;
+    if (next === 'Borrowed' && !eventAcceptsChanges(l.eventKey)) { window.alert(`${l.eventName} is already in checking — nothing can be added to it.`); return; }
+    const msg = next === 'Borrowed' ? `Mark "${l.itemName}" as received? It is added to ${l.eventName}'s items.` : `Mark "${l.itemName}" as ${t.doneVerb}?`;
+    if (!window.confirm(msg)) return;
+    advanceEventRental(kind, l, currentUser?.name || 'Admin');
+    setVersion(v => v + 1);
+  }
+  function cancelEvent(l) {
+    if (!window.confirm(`Cancel the ${t.record} of "${l.itemName}" for ${l.eventName}?`)) return;
+    cancelEventRental(kind, l, currentUser?.name || 'Admin');
+    setVersion(v => v + 1);
   }
   function advance(l) {
     const next = LOAN_STATUSES[LOAN_STATUSES.indexOf(l.status) + 1];
@@ -125,13 +141,13 @@ export default function LoanLogTab({ kind = 'loan', vendorId = null, allowCreate
         {kind === 'outsource' ? (
         <p style={{ fontSize: 12.5, color: 'var(--text-muted)', margin: '0 0 14px' }}>
           Items and work we order from outsource vendors for events. They are requested and moved forward on
-          Event Detail &rarr; Outsource Item; received items join the event as Outsource. They are not our assets:
+          Event Detail &rarr; Outsource Item and can be moved forward here or there (same data); received items join the event as Outsource. They are not our assets:
           they never change our stock or asset value.
         </p>
         ) : (
         <p style={{ fontSize: 12.5, color: 'var(--text-muted)', margin: '0 0 14px' }}>
-          Items we rent from rent vendors. Rentals <strong>for an event</strong> are requested and moved forward on
-          Event Detail &rarr; Rent Item. Rentals <strong>kept in a warehouse</strong> (not for one event) are managed here.
+          Items we rent from rent vendors. Rentals <strong>for an event</strong> are requested on Event Detail &rarr; Rent Item and
+          can be moved forward here or there (same data). Rentals <strong>kept in a warehouse</strong> (not for one event) are managed here.
           Rented items are not our assets: they never change our stock or asset value.
         </p>
         )}
@@ -186,7 +202,15 @@ export default function LoanLogTab({ kind = 'loan', vendorId = null, allowCreate
                     <td><span className={`badge ${LOAN_BADGE[l.displayStatus]}`} style={{ fontSize: 11 }}>{LOAN_LABEL[l.displayStatus]}</span></td>
                     <td>
                       <div className="action-btns" style={{ justifyContent: 'center', gap: 6 }}>
-                        {l.source === 'event' && <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{l.status === 'Returned' ? t.done : 'Update in Event Detail'}</span>}
+                        {l.source === 'event' && l.status === 'Requested' && (
+                          <button type="button" className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => cancelEvent(l)}>Cancel</button>
+                        )}
+                        {l.source === 'event' && l.status !== 'Returned' && (
+                          <button type="button" className="btn-save-modal" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => advanceEvent(l)}>
+                            {l.status === 'Requested' ? 'Mark Received' : t.markDone}
+                          </button>
+                        )}
+                        {l.source === 'event' && l.status === 'Returned' && <span style={{ fontSize: 11.5, color: 'var(--green)' }}>{t.done}</span>}
                         {l.source === 'general' && l.status === 'Requested' && (
                           <button type="button" className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => cancel(l)}>Cancel</button>
                         )}

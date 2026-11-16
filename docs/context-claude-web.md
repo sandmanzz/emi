@@ -36,6 +36,12 @@ Newest session first.
 
 ---
 
+## Session 2026-11-16 — Return form, transferred info, photo rule, menus in sync
+
+- Transfer box full width; transferred info on rows, in a log, and "Transferred in" on the receiving event.
+- Photos only editable in Inventory. Rent / Outsource / Production menus can move event records (shared actions).
+- Spec `docs/prd/PRD-2026-11-16.md`.
+
 ## Session 2026-11-12 — Allow Add Item, Cutting Stock (real), Event Settings redesign, closing flow
 
 - Allow Add Item rule; Cutting Stock back with real stock reservation + illustrated notice; Event Settings page redesigned

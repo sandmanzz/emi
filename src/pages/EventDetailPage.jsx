@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, Fragment } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal';
 import Drawer from '../components/Drawer';
@@ -13,13 +13,13 @@ import { getInventoryRows, applyStockMovement } from '../lib/stockOpnameStore';
 import { VENDOR_ORIGINS } from '../lib/vendorStore';
 import { CatalogItemPicker, VendorPicker } from '../components/QuickPickers';
 import { getCatalog, stockInProduced } from '../lib/producedItems';
-import { setItemImageByName, addCatalogItem, suggestSku, isNameTaken } from '../lib/catalogStore';
+import { addCatalogItem, suggestSku, isNameTaken } from '../lib/catalogStore';
 import { initialUnits } from '../data/units';
 import { getEventFiles, saveEventFiles } from '../lib/eventFiles';
 import { getEventStockCuts, isStockLine, previewCut, cutStock, returnStock, returnStockParts } from '../lib/eventStockCuts';
 import { getEventChecking, updateLineChecking } from '../lib/eventChecking';
 import StockMoveNotice from '../components/StockMoveNotice';
-import { imageFileToDataUrl, fileToUpload, fmtBytes } from '../lib/imageUtils';
+import { fileToUpload, fmtBytes } from '../lib/imageUtils';
 import PrintPlanModal from '../components/PrintPlanModal';
 import { getEventSeedItems } from '../lib/eventItems';
 import { EventLoansPanel, BorrowItemModal } from '../components/EventLoans';
@@ -178,6 +178,7 @@ function ItemCard({ item, group, checking = null, imageOf = () => null, vis = {}
           {item.resolution === 'returned' && (
             <span className="badge badge-green" style={{ fontSize: 10 }}>Returned</span>
           )}
+          {item.transferredFrom && <span className="badge badge-purple" style={{ fontSize: 10 }} title={`Transferred in from ${item.transferredFromName || item.transferredFrom}`}>Transferred in</span>}
           {item.newItem && <span className="badge badge-orange" style={{ fontSize: 10 }} title="Created from this event — complete it in Inventory; not in stock yet">New item</span>}
           {(item.transferredQty || 0) > 0 && (
             <span className="badge badge-purple" style={{ fontSize: 10 }} title={(item.transfers || []).map(t => `${t.qty} → ${t.toName} (${t.stage})`).join('\n')}>
@@ -326,6 +327,7 @@ function ItemTable({ items, packages, checking = null, imageOf = () => null, vis
                     {item.fromOutsource && <span className="badge badge-purple" style={{ fontSize: 10 }}>Outsourced</span>}
                     {item.resolution === 'returned' && <span className="badge badge-green" style={{ fontSize: 10 }}>Returned</span>}
                     {(item.transferredQty || 0) > 0 && <span className="badge badge-purple" style={{ fontSize: 10 }}>Transferred {item.transferredQty}</span>}
+                    {item.transferredFrom && <span className="badge badge-purple" style={{ fontSize: 10 }}>Transferred in</span>}
                   </div>
                   {item.note && <div className="item-table-note">{item.note}</div>}
                   {checking && item.checkNote && <div className="item-table-note">📝 {item.checkNote}</div>}
@@ -432,6 +434,12 @@ export default function EventDetailPage() {
       id: id++, name: inc.name, area: inc.area, subArea: inc.subArea || '', stage: inc.stage,
       scanned: false, groupId: null, qty: inc.qty, pic: inc.pic || '', checking: false,
       scanIn: null, scanOut: null, note: inc.note || '', checked: false, ownership: inc.ownership || 'IHC',
+      // Origin flags travel with the queue: rented / outsourced / produced from a main menu, or transferred in.
+      ...(inc.warehouseItem === false ? { warehouseItem: false } : {}),
+      ...(inc.warehouse ? { warehouse: inc.warehouse } : {}),
+      ...(inc.fromLoan ? { fromLoan: true } : {}), ...(inc.fromOutsource ? { fromOutsource: true } : {}),
+      ...(inc.fromProduction ? { fromProduction: true } : {}), ...(inc.loanVendor ? { loanVendor: inc.loanVendor } : {}),
+      ...(inc.transferredFrom ? { transferredFrom: inc.transferredFrom, transferredFromName: inc.transferredFromName } : {}),
     }));
     return [...baseItems, ...added];
   });
@@ -793,25 +801,7 @@ export default function EventDetailPage() {
 
   // Shared props for ItemCard / ItemTable; locked actions are passed as undefined.
   // Item photos come from master data (catalog `image`), joined by name like everything else.
-  const [imageByName, setImageByName] = useState(() => new Map(getCatalog().filter(i => i.image).map(i => [i.name, i.image])));
-  const photoInputRef = useRef(null);
-  async function uploadItemPhoto(itemName, file) {
-    if (!file) return;
-    try {
-      const dataUrl = await imageFileToDataUrl(file);
-      if (!getCatalog().some(i => i.name === itemName)) { window.alert('This item is not in Inventory master data, so it has no photo slot.'); return; }
-      if (!setItemImageByName(itemName, dataUrl)) { window.alert('The browser storage is full. Remove some photos or files first.'); return; }
-      setImageByName(m => new Map(m).set(itemName, dataUrl));
-    } catch {
-      window.alert('This file could not be read as an image.');
-    }
-  }
-  function removeItemPhoto(itemName) {
-    if (!window.confirm(`Remove the photo of "${itemName}"? It is removed from Inventory master data too.`)) return;
-    setItemImageByName(itemName, '');
-    setImageByName(m => { const n = new Map(m); n.delete(itemName); return n; });
-  }
-
+  const [imageByName] = useState(() => new Map(getCatalog().filter(i => i.image).map(i => [i.name, i.image])));
   // Event files (drawer): any document or photo for this event — floor plan, rundown, contract, venue photos.
   const [filesOpen, setFilesOpen] = useState(false);
   const [eventFiles, setEventFilesState] = useState(() => getEventFiles(eventName));
@@ -1178,6 +1168,8 @@ export default function EventDetailPage() {
       name: item.name, area: item.area, subArea: item.subArea,
       stage: transferTargetStage, qty, pic: item.pic,
       ownership: item.ownership, note: `Transferred from ${eventName}${item.note ? ` — ${item.note}` : ''}`,
+      transferredFrom: eventName, transferredFromName: eventName.split(' | ').slice(1).join(' | '),
+      warehouse: item.warehouse || '',
     });
     // Cut stock of the transferred pieces goes back to its row; the target event cuts it again at its own
     // Cutting Stock stage, so stock is never deducted twice.
@@ -2282,6 +2274,7 @@ export default function EventDetailPage() {
             ...(detailItem.checkNote ? [['Check note', detailItem.checkNote]] : []),
             ...(detailItem.returnedQty ? [['Returned', `${detailItem.returnedQty} pcs`]] : []),
             ...((detailItem.transfers || []).map((t, i) => [`Transfer ${i + 1}`, `${t.qty} pcs → ${t.toName} (${t.stage})`])),
+            ...(detailItem.transferredFrom ? [['Transferred in from', detailItem.transferredFromName || detailItem.transferredFrom]] : []),
             ...(itemFieldVisibility.showScanIn ? [['Scan In', detailItem.scanIn || 'Not yet']] : []),
             ...(itemFieldVisibility.showScanOut ? [['Scan Out', detailItem.scanOut || 'Not yet']] : []),
           ];
@@ -2292,19 +2285,8 @@ export default function EventDetailPage() {
                   ? <img src={imageByName.get(detailItem.name)} alt={detailItem.name} />
                   : <ImagePlaceholder />}
               </div>
-              {!itemsLocked && (
-                <div className="drawer-photo-actions">
-                  <input ref={photoInputRef} type="file" accept="image/*" style={{ display: 'none' }}
-                    onChange={e => { uploadItemPhoto(detailItem.name, e.target.files?.[0]); e.target.value = ''; }} />
-                  <button type="button" className="drawer-link-btn" onClick={() => photoInputRef.current?.click()}>
-                    {imageByName.get(detailItem.name) ? 'Change photo' : 'Upload photo'}
-                  </button>
-                  {imageByName.get(detailItem.name) && (
-                    <button type="button" className="drawer-link-btn danger" onClick={() => removeItemPhoto(detailItem.name)}>Remove photo</button>
-                  )}
-                  <span className="field-hint" style={{ margin: 0 }}>Saved to the item in Inventory, so every event shows it.</span>
-                </div>
-              )}
+              {/* The photo is master data: change it in Inventory → Edit Item, not here (2026-11-16). */}
+              <p className="field-hint" style={{ margin: '-6px 0 14px' }}>Photo from Inventory. To change it, edit the item in Inventory.</p>
               <div className="item-badge-row" style={{ marginBottom: 14 }}>
                 <span className={`area-badge ${areaBadgeClass(detailItem.area)}`}>{detailItem.area}</span>
                 {detailItem.ownership && <span className={`badge ${ownershipBadgeClass(detailItem.ownership)}`} style={{ fontSize: 10 }}>{detailItem.ownership}</span>}
@@ -3134,13 +3116,31 @@ export default function EventDetailPage() {
                 </thead>
                 <tbody>
                   {returnRows.map(r => (
-                    <tr key={r.it.id}>
+                    <Fragment key={r.it.id}>
+                    <tr>
                       <td>
                         <div style={{ fontWeight: 600 }}>{r.it.name}</div>
                         <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>{r.it.area}{r.it.brokenWrittenOff ? ` · ${r.it.brokenWrittenOff} broken written off` : ''}</div>
                         {r.it.checkNote && <div className="return-note">{r.it.checkNote}</div>}
-                        {transferPickerItemId === r.it.id && (
-                          <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {(r.it.transferredQty || 0) > 0 && (
+                          <div className="return-transferred">
+                            {(r.it.transfers || []).map((t, i) => <div key={i}>↗ {fmtNum(t.qty)} transferred → <strong>{t.toName}</strong> ({t.stage})</div>)}
+                          </div>
+                        )}
+                      </td>
+                      <td style={{ fontSize: 12.5 }}>{r.warehouse}{!r.cut && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>stock not cut</div>}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 700 }}>{fmtNum(r.out)}</td>
+                      <td>
+                        <input type="number" min="0" max={r.out} className="return-qty" value={returnDraft[r.it.id] ?? ''}
+                          onChange={e => setReturnDraft(d => ({ ...d, [r.it.id]: e.target.value }))} />
+                        {r.now < r.out && <div style={{ fontSize: 11, color: 'var(--orange)', marginTop: 2 }}>{fmtNum(r.out - r.now)} still out</div>}
+                      </td>
+                      <td>{transferPickerItemId !== r.it.id && <button type="button" className="link-btn" style={{ fontSize: 12 }} onClick={() => openTransferPicker(r.it)}>Transfer</button>}</td>
+                    </tr>
+                    {transferPickerItemId === r.it.id && (
+                      <tr className="transfer-row">
+                        <td colSpan={5}>
+                      <div className="transfer-box">
                             <div className="transfer-box-title">Transfer to another event</div>
                             <SearchableSelect value={transferTargetEvent} onChange={chooseTransferEvent} placeholder="Select an on-going event" emptyText="No other on-going events"
                               options={transferTargetCandidates.map(e => ({ value: e.key, label: `${e.name} (${e.code})`, meta: resolveEventStage(e.key) || '' }))} />
@@ -3148,7 +3148,7 @@ export default function EventDetailPage() {
                               <div className="transfer-current">
                                 Currently at <strong>{resolveEventStage(transferTargetEvent) || stages[0]}</strong>
                                 {' '}(step {stages.indexOf(resolveEventStage(transferTargetEvent) || stages[0]) + 1} of {stages.length})
-                              </div>
+                          </div>
                             )}
                             <SearchableSelect value={transferTargetStage} onChange={setTransferTargetStage} placeholder="Add it at stage…"
                               options={stages.map(st => ({ value: st, label: st, meta: st === resolveEventStage(transferTargetEvent) ? 'current' : '' }))} />
@@ -3164,22 +3164,25 @@ export default function EventDetailPage() {
                               <button className="btn-cancel-m" onClick={cancelTransferPicker}>Cancel</button>
                             </div>
                           </div>
-                        )}
-                      </td>
-                      <td style={{ fontSize: 12.5 }}>{r.warehouse}{!r.cut && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>stock not cut</div>}</td>
-                      <td style={{ textAlign: 'right', fontWeight: 700 }}>{fmtNum(r.out)}</td>
-                      <td>
-                        <input type="number" min="0" max={r.out} className="return-qty" value={returnDraft[r.it.id] ?? ''}
-                          onChange={e => setReturnDraft(d => ({ ...d, [r.it.id]: e.target.value }))} />
-                        {r.now < r.out && <div style={{ fontSize: 11, color: 'var(--orange)', marginTop: 2 }}>{fmtNum(r.out - r.now)} still out</div>}
-                      </td>
-                      <td>{transferPickerItemId !== r.it.id && <button type="button" className="link-btn" style={{ fontSize: 12 }} onClick={() => openTransferPicker(r.it)}>Transfer</button>}</td>
-                    </tr>
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
                   ))}
                 </tbody>
               </table>
             </div>
           )}
+        {items.some(it => (it.transfers || []).length > 0) && (
+          <div className="return-transfer-log">
+            <div className="transfer-box-title">Transferred from this event</div>
+            <ul>
+              {items.filter(it => (it.transfers || []).length > 0).flatMap(it => it.transfers.map((t, i) => (
+                <li key={`${it.id}-${i}`}><span>{it.name}</span><span>{fmtNum(t.qty)} pcs → <strong>{t.toName}</strong> · {t.stage}</span></li>
+              )))}
+            </ul>
+          </div>
+        )}
         {items.some(it => !isStockLine(it)) && (
           <p className="field-hint" style={{ marginTop: 10 }}>Rented and outsourced items are not part of this: they go back to their vendors from the Rented / Outsourced tabs.</p>
         )}
