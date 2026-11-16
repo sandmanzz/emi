@@ -50,6 +50,12 @@ explains a few non-obvious conventions that the entries below assume you already
 
 ---
 
+## Round 45 — Product review (docs only, 2026-11-16)
+
+New `docs/PM-REVIEW-2026-11-16.md`. No code change.
+
+---
+
 ## Round 44 — Return form layout, transferred info, no photo change on Event Detail, menus in sync (2026-11-16)
 
 `EventDetailPage.jsx`: transfer box as full-width row (`Fragment` rows), transferred lines/log, `transferredFrom` on queued

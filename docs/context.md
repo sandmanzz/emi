@@ -899,6 +899,13 @@ clashes or seems off) — proceeding with the stated assumption unless corrected
 
 ## Raw instruction log
 
+### 2026-11-16 (2) — Product review of all features (Claude Web)
+> work as product manager tolong lakukan semua review feature yang ada disini. apakah ada flow yang missing atau tidak
+
+- Review written: `docs/PM-REVIEW-2026-11-16.md` (18 findings: 4 P0, 9 P1, P2 list; suggested order). No code change.
+- Biggest gaps: event lines and events are not persisted (lost on reload), broken units stay in stock when not cut, event delete
+  has no guard, no "lost" ending for Partial Return.
+
 ### 2026-11-16 — Return form fixes, transferred info, no photo change in Event Detail, menus in sync (Claude Web)
 > 1. untuk return form, bagian event name masih terpotong jadi harus diperbaiki
 > 2. kemudian pastikan ketika barang ditransfer harus ada informasi transfered
