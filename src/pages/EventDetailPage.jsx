@@ -3128,14 +3128,14 @@ export default function EventDetailPage() {
                           </div>
                         )}
                       </td>
-                      <td style={{ fontSize: 12.5 }}>{r.warehouse}{!r.cut && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>stock not cut</div>}</td>
-                      <td style={{ textAlign: 'right', fontWeight: 700 }}>{fmtNum(r.out)}</td>
-                      <td>
+                      <td data-label="Warehouse" style={{ fontSize: 12.5 }}>{r.warehouse}{!r.cut && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>stock not cut</div>}</td>
+                      <td data-label="Out" style={{ textAlign: 'right', fontWeight: 700 }}>{fmtNum(r.out)}</td>
+                      <td data-label="Back now">
                         <input type="number" min="0" max={r.out} className="return-qty" value={returnDraft[r.it.id] ?? ''}
                           onChange={e => setReturnDraft(d => ({ ...d, [r.it.id]: e.target.value }))} />
                         {r.now < r.out && <div style={{ fontSize: 11, color: 'var(--orange)', marginTop: 2 }}>{fmtNum(r.out - r.now)} still out</div>}
                       </td>
-                      <td>{transferPickerItemId !== r.it.id && <button type="button" className="link-btn" style={{ fontSize: 12 }} onClick={() => openTransferPicker(r.it)}>Transfer</button>}</td>
+                      <td className="return-transfer-cell">{transferPickerItemId !== r.it.id && <button type="button" className="link-btn" style={{ fontSize: 12 }} onClick={() => openTransferPicker(r.it)}>Transfer</button>}</td>
                     </tr>
                     {transferPickerItemId === r.it.id && (
                       <tr className="transfer-row">

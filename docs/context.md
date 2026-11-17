@@ -899,6 +899,14 @@ clashes or seems off) — proceeding with the stated assumption unless corrected
 
 ## Raw instruction log
 
+### 2026-11-17 (2) — Sidebar search + responsive pass (Claude Web)
+> 1. sidebar pastikan sudah ada search bar nya  2. kemudian saya mau pastikan semua UI nya responsive ya
+
+- Sidebar: "Search menu…" box at the top (filters by menu or section name, Enter opens the first match, Esc clears, "/" focuses it).
+- Responsive: automated check of 38 pages at 375 px and 768 px (no horizontal page overflow). Fixed on phones: For Return list
+  as stacked cards; Event Status shows rule chips under the name and hides Rules / Events / Updated columns; "/" hint hidden.
+- Rule kept: wide data tables scroll inside their card with the Action column frozen.
+
 ### 2026-11-17 — Review v2: risk / worst case / workflow (Claude Web)
 > kita tidak bicara soal kondisi data karena memang tidak terhubung ke database tapi saya lebih fokus kepada risk, worst case, workflow apakah ada yang perlu kita perbaiki.
 

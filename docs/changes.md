@@ -50,6 +50,14 @@ explains a few non-obvious conventions that the entries below assume you already
 
 ---
 
+## Round 46 — Sidebar menu search + responsive pass (2026-11-17)
+
+`Sidebar.jsx`: menu search (filter, Enter, Esc, "/" shortcut). `EventStatusPage.jsx`: `.es-rules-mobile` chips.
+`EventDetailPage.jsx`: `data-label` on For Return cells. `style.css`: `.sidebar-search`, responsive block (≤ 640 px: Event Status
+columns, For Return cards). Checked 38 routes at 375 / 768 px with a Playwright overflow script: no page overflow. Lint 11, build OK.
+
+---
+
 ## Round 45 — Product review (docs only, 2026-11-16)
 
 New `docs/PM-REVIEW-2026-11-16.md`. No code change.

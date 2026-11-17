@@ -36,6 +36,10 @@ Newest session first.
 
 ---
 
+## Session 2026-11-17 — Review v2, sidebar search, responsive pass
+
+- Risk / worst-case review (`docs/PM-REVIEW-2026-11-16.md`), menu search in the sidebar, responsive fixes for phones.
+
 ## Session 2026-11-16 — Return form, transferred info, photo rule, menus in sync
 
 - Transfer box full width; transferred info on rows, in a log, and "Transferred in" on the receiving event.

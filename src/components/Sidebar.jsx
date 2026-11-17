@@ -1,4 +1,5 @@
-import { NavLink, Link } from 'react-router-dom';
+import { useState, useRef, useEffect } from 'react';
+import { NavLink, Link, useNavigate } from 'react-router-dom';
 import { version } from '../../package.json';
 import { incompleteCount } from '../lib/catalogStore';
 import { isTenantAdmin } from '../lib/tenantAuth';
@@ -99,9 +100,47 @@ export default function Sidebar({ visible, mobile = false }) {
     return { ...section, items: [...section.items, EVENT_SETTINGS_ITEM] };
   });
 
+  // Menu search (2026-11-17): filters menu items by name or section; Enter opens the first match,
+  // Escape clears. "/" focuses it from anywhere (when not typing in a field).
+  const navigate = useNavigate();
+  const [menuQuery, setMenuQuery] = useState('');
+  const searchRef = useRef(null);
+  const q = menuQuery.trim().toLowerCase();
+  const shown = sections
+    .map(sec => ({ ...sec, items: !q || sec.label.toLowerCase().includes(q) ? sec.items : sec.items.filter(it => it.label.toLowerCase().includes(q)) }))
+    .filter(sec => sec.items.length > 0);
+  useEffect(() => {
+    function onKey(e) {
+      const tag = (e.target.tagName || '').toLowerCase();
+      if (e.key === '/' && !['input', 'textarea', 'select'].includes(tag) && !e.target.isContentEditable) {
+        e.preventDefault();
+        searchRef.current?.focus();
+      }
+    }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
+
   return (
     <nav className={`sidebar${mobile ? ' sidebar-mobile' : ''}`} style={visible ? {} : { display: 'none' }}>
-      {sections.map(section => (
+      <div className="sidebar-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input
+          ref={searchRef}
+          type="search"
+          placeholder="Search menu…"
+          aria-label="Search menu"
+          value={menuQuery}
+          onChange={e => setMenuQuery(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter' && shown[0]?.items[0]) { navigate(shown[0].items[0].to); setMenuQuery(''); }
+            if (e.key === 'Escape') setMenuQuery('');
+          }}
+        />
+        {!menuQuery && <kbd>/</kbd>}
+      </div>
+      {shown.length === 0 && <div className="sidebar-empty">No menu matches &ldquo;{menuQuery}&rdquo;.</div>}
+      {shown.map(section => (
         <div key={section.label} className="sidebar-section">
           <div className="sidebar-section-label">{section.label}</div>
           {section.items.map(({ to, label, icon }) => (

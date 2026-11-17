@@ -326,7 +326,7 @@ export default function EventStatusPage() {
               <tr>
                 <SortTh label="Order"   colIndex={0} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width:90 }} />
                 <SortTh label="Status"  colIndex={1} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ minWidth:200 }} />
-                <th style={{ minWidth:280 }}>Rules</th>
+                <th className="es-col-rules" style={{ minWidth:280 }}>Rules</th>
                 <SortTh label="Events"  colIndex={4} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width:90, textAlign:'right' }} />
                 <SortTh label="Updated" colIndex={5} sortCol={sortCol} sortAsc={sortAsc} onSort={handleSort} style={{ width:110 }} />
                 <th className="col-action" style={{ width:90, textAlign:'center' }}>Action</th>
@@ -355,8 +355,10 @@ export default function EventStatusPage() {
                     <td>
                       <div className="es-name">{r.status}</div>
                       {r.code && <span className="es-code">{r.code}</span>}
+                      {/* Phones: the Rules column is hidden, so the chips show under the name. */}
+                      <div className="es-rules-mobile"><RuleChips r={r} /></div>
                     </td>
-                    <td><RuleChips r={r} /></td>
+                    <td className="es-col-rules"><RuleChips r={r} /></td>
                     <td style={{ textAlign:'right', fontVariantNumeric:'tabular-nums', fontWeight:600 }}>
                       <span style={{ color: r.eventRunning > 0 ? 'var(--orange)' : 'var(--text-muted)' }}>{r.eventRunning}</span>
                     </td>
