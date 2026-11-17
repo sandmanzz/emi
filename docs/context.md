@@ -899,6 +899,12 @@ clashes or seems off) — proceeding with the stated assumption unless corrected
 
 ## Raw instruction log
 
+### 2026-11-17 — Review v2: risk / worst case / workflow (Claude Web)
+> kita tidak bicara soal kondisi data karena memang tidak terhubung ke database tapi saya lebih fokus kepada risk, worst case, workflow apakah ada yang perlu kita perbaiki.
+
+- Data persistence is out of scope for reviews (prototype). `docs/PM-REVIEW-2026-11-16.md` rewritten as v2: 17 risks with scenario
+  → worst case → fix. No code change.
+
 ### 2026-11-16 (2) — Product review of all features (Claude Web)
 > work as product manager tolong lakukan semua review feature yang ada disini. apakah ada flow yang missing atau tidak
 
